@@ -1,0 +1,153 @@
+using System.Net.Http.Json;
+using Microsoft.Extensions.Logging;
+using Solar.Core.Json;
+using Solar.Core.Models;
+using Solar.Core.Paths;
+
+namespace Solar.Core.Minecraft;
+
+/// <summary>已解析（含 inheritsFrom 合并）的完整版本信息。</summary>
+public sealed class ResolvedVersion
+{
+    public required VersionDetail Detail { get; init; }
+    public required IReadOnlyList<VersionDetail> Chain { get; init; }
+
+    public string Id => Detail.Id;
+
+    /// <summary>合并后的库列表（父版本在前）。</summary>
+    public IReadOnlyList<Library> Libraries => Detail.Libraries;
+
+    /// <summary>按平台过滤后、需要下载的库。</summary>
+    public IEnumerable<Library> GetEffectiveLibraries(RuleContext context) =>
+        Detail.Libraries.Where(l => RuleEvaluator.IsAllowed(l.Rules, context));
+}
+
+public interface IVersionResolver
+{
+    Task<ResolvedVersion> ResolveAsync(string versionId, CancellationToken ct = default);
+    Task<VersionDetail> DownloadVersionJsonAsync(VersionSummary summary, CancellationToken ct = default);
+}
+
+public sealed class VersionResolver(
+    HttpClient http,
+    AppPaths paths,
+    ILogger<VersionResolver> logger) : IVersionResolver
+{
+    public string GetVersionDirectory(string versionId) => Path.Combine(paths.Versions, versionId);
+    public string GetVersionJsonPath(string versionId) => Path.Combine(GetVersionDirectory(versionId), versionId + ".json");
+    public string GetVersionJarPath(string versionId) => Path.Combine(GetVersionDirectory(versionId), versionId + ".jar");
+
+    public async Task<ResolvedVersion> ResolveAsync(string versionId, CancellationToken ct = default)
+    {
+        var chain = new List<VersionDetail>();
+        var current = await LoadOrDownloadAsync(versionId, ct).ConfigureAwait(false);
+        chain.Add(current);
+
+        var guard = 0;
+        while (!string.IsNullOrWhiteSpace(current.InheritsFrom) && guard++ < 16)
+        {
+            current = await LoadOrDownloadAsync(current.InheritsFrom!, ct).ConfigureAwait(false);
+            chain.Add(current);
+        }
+
+        var merged = Merge(chain);
+        return new ResolvedVersion { Detail = merged, Chain = chain };
+    }
+
+    /// <summary>
+    /// 子版本覆盖父版本的同名字段，库列表按顺序拼接（父在前），
+    /// 与官方启动器及主流第三方启动器一致。
+    /// </summary>
+    public static VersionDetail Merge(IReadOnlyList<VersionDetail> chain)
+    {
+        // chain[0] 是最具体的版本（子），最后一个是根版本。
+        var result = new VersionDetail
+        {
+            Id = chain[0].Id,
+            Type = chain[0].Type,
+            MainClass = FirstNonNull(chain, v => v.MainClass),
+            Assets = FirstNonNull(chain, v => v.Assets),
+            AssetIndex = FirstNonNull(chain, v => v.AssetIndex),
+            ComplianceLevel = FirstNonNull(chain, v => v.ComplianceLevel),
+            JavaVersion = FirstNonNull(chain, v => v.JavaVersion),
+            ReleaseTime = FirstNonNull(chain, v => v.ReleaseTime),
+            Time = FirstNonNull(chain, v => v.Time),
+        };
+
+        var libraries = new List<Library>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        for (var i = chain.Count - 1; i >= 0; i--)
+        {
+            foreach (var library in chain[i].Libraries)
+            {
+                // 同名库以更具体的版本为准，跳过父版本里的重复项。
+                if (seen.Add(library.Name))
+                {
+                    libraries.Add(library);
+                }
+            }
+        }
+
+        result.Libraries = libraries;
+
+        var gameArgs = new List<ArgumentEntry>();
+        var jvmArgs = new List<ArgumentEntry>();
+        for (var i = chain.Count - 1; i >= 0; i--)
+        {
+            if (chain[i].Arguments is { } args)
+            {
+                gameArgs.AddRange(args.Game);
+                jvmArgs.AddRange(args.Jvm);
+            }
+        }
+
+        result.Arguments = new Arguments { Game = gameArgs, Jvm = jvmArgs };
+        result.Downloads = chain.Select(v => v.Downloads).FirstOrDefault(d => d is { Count: > 0 });
+        result.MinecraftArguments = FirstNonNull(chain, v => v.MinecraftArguments);
+        return result;
+    }
+
+    private static T? FirstNonNull<T>(IReadOnlyList<VersionDetail> chain, Func<VersionDetail, T?> selector)
+    {
+        foreach (var item in chain)
+        {
+            if (selector(item) is { } value)
+            {
+                return value;
+            }
+        }
+
+        return default;
+    }
+
+    private async Task<VersionDetail> LoadOrDownloadAsync(string versionId, CancellationToken ct)
+    {
+        var path = GetVersionJsonPath(versionId);
+        var cached = await JsonFile.ReadAsync<VersionDetail>(path, ct).ConfigureAwait(false);
+        if (cached is not null)
+        {
+            return cached;
+        }
+
+        var manifest = await GetManifestFromCacheAsync(ct).ConfigureAwait(false)
+                       ?? throw new InvalidOperationException("本地没有版本清单，无法下载版本 JSON。");
+
+        var summary = manifest.Versions.FirstOrDefault(v => v.Id == versionId)
+                      ?? throw new InvalidOperationException($"版本清单中找不到 {versionId}。");
+
+        return await DownloadVersionJsonAsync(summary, ct).ConfigureAwait(false);
+    }
+
+    private Task<VersionManifest?> GetManifestFromCacheAsync(CancellationToken ct) =>
+        JsonFile.ReadAsync<VersionManifest>(Path.Combine(paths.Data, "version_manifest_v2.json"), ct);
+
+    public async Task<VersionDetail> DownloadVersionJsonAsync(VersionSummary summary, CancellationToken ct = default)
+    {
+        logger.LogInformation("下载版本 JSON: {Id}", summary.Id);
+        var detail = await http.GetFromJsonAsync<VersionDetail>(summary.Url, SolarJson.Options, ct).ConfigureAwait(false)
+                     ?? throw new InvalidOperationException($"版本 {summary.Id} 的 JSON 无效。");
+
+        await JsonFile.WriteAsync(GetVersionJsonPath(summary.Id), detail, ct).ConfigureAwait(false);
+        return detail;
+    }
+}

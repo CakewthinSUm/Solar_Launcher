@@ -1,0 +1,12 @@
+<Project>
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <Company>Solar Launcher</Company>
+    <Product>Solar Launcher</Product>
+    <Version>0.1.0</Version>
+    <NeutralLanguage>zh-CN</NeutralLanguage>
+  </PropertyGroup>
+</Project>
