@@ -21,6 +21,13 @@
             <conv:ModLoaderDisplayConverter x:Key="ModLoaderDisplay" />
 
             <!--
+                TitleBar 的返回键在禁用时默认会填一块 ControlFillColorDisabledBrush 灰底，
+                在标题栏上看起来像个突兀的方块。标题栏的其它按钮平时都是透明的，
+                这里让返回键禁用时也保持透明，只靠箭头变灰表示不可用。
+            -->
+            <SolidColorBrush x:Key="TitleBarBackButtonBackgroundDisabled" Color="Transparent" />
+
+            <!--
                 卡片容器：遵循 WinUI 3 的 Card 视觉规范（卡片底色 + 1px 描边 + 系统控件圆角），
                 颜色全部取自 ThemeResource，自动适配浅色/深色/高对比度主题。
             -->

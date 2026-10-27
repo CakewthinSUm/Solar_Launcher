@@ -54,13 +54,26 @@ tests/
 ```
 SolarData/          设置、账户、日志、版本清单缓存
 SolarShared/        共享资源：versions / libraries / assets / runtime
-SolarInstances/     每个实例一个目录，内含 natives 与 instance.json
-.minecraft/         游戏目录：存档、模组、配置（默认位置，可在设置中改）
+SolarInstances/     每个实例一个目录，内含 natives、instance.json
+                    以及开启版本隔离后的 .minecraft/
+.minecraft/         共享游戏目录：存档、模组、配置（默认位置，可在设置中改）
 ```
 
-游戏目录（`.minecraft`）是**全局共享**的，所有实例都指向同一份，
-因此换实例不会丢存档。把它指向官方启动器的 `.minecraft` 就能直接复用已有的模组与存档；
-不同版本的 natives 仍按实例隔离在 `SolarInstances/<id>/natives`。
+共享游戏目录（`.minecraft`）默认被所有实例使用，因此换实例不会丢存档。
+把它指向官方启动器的 `.minecraft` 就能直接复用已有的模组与存档。
+不同版本的 natives 始终按实例隔离在 `SolarInstances/<id>/natives`。
+
+### 版本隔离
+
+在「实例 → 设置」里可以给单个实例开启版本隔离。开启后该实例使用
+`SolarInstances/<id>/.minecraft`，存档、模组、配置、资源包都与其它实例分开，
+因此可以同时放一个 Fabric 实例和一个 Forge 实例而互不干扰。
+
+- 默认关闭，已有实例的行为不变。
+- 关闭 → 开启时可以选择把共享目录的 `mods` / `config` / `saves` / `resourcepacks` /
+  `shaderpacks` 等复制一份到实例目录；目标已存在的文件不覆盖，共享目录本身不会被改动。
+- 开启 → 关闭时只切回共享目录，实例目录原样保留，下次再开启还在。
+- `assets` 与 `libraries` 在 `SolarShared/` 下，始终共享，不受隔离影响。
 
 ## 开发
 
@@ -85,6 +98,7 @@ Windows App SDK 以自包含方式随输出一起分发，终端用户无需单�
 - [x] 下载镜像（BMCLAPI）与实例级 Java / 内存覆盖
 - [x] 微软正版登录（设备码流程、多账户、令牌静默刷新）
 - [x] 模组加载器安装（Fabric / Quilt / Forge / NeoForge）
+- [x] 实例级版本隔离（独立游戏目录，可把共享内容复制过来）
 
 ## 模组加载器
 

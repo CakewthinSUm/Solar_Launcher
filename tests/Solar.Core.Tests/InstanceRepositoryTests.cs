@@ -27,6 +27,7 @@ public sealed class InstanceRepositoryTests : IDisposable
             MinecraftVersion = "1.21.4",
             Loader = ModLoader.Fabric,
             LoaderVersion = "0.16.9",
+            VersionIsolation = true,
         };
 
         await _repository.SaveAsync(instance);
@@ -36,6 +37,7 @@ public sealed class InstanceRepositoryTests : IDisposable
         Assert.Equal("测试实例", loaded!.Name);
         Assert.Equal(ModLoader.Fabric, loaded.Loader);
         Assert.Equal("1.21.4", loaded.EffectiveVersionId);
+        Assert.True(loaded.VersionIsolation);
         Assert.True(Directory.Exists(_paths.GetInstanceDirectory("abc123")));
     }
 

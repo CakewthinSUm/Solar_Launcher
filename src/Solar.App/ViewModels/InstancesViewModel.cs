@@ -204,8 +204,13 @@ public sealed partial class InstancesViewModel : ViewModelBase
             return;
         }
 
-        // 游戏目录是所有实例共用的，删实例只清掉它自己的记录与 natives
-        if (!await _dialogs.ShowConfirmAsync("删除实例", $"确定要删除“{instance.Name}”吗？\n存档与模组在共享的游戏目录里，不会被删除。", "删除", "取消"))
+        // 未隔离的实例不拥有游戏目录，删它只清掉记录与 natives；
+        // 隔离实例的游戏目录在实例文件夹里，会跟着一起删。
+        var detail = instance.VersionIsolation
+            ? "该实例已开启版本隔离，它的存档与模组会被一并删除。"
+            : "存档与模组在共享的游戏目录里，不会被删除。";
+
+        if (!await _dialogs.ShowConfirmAsync("删除实例", $"确定要删除“{instance.Name}”吗？\n{detail}", "删除", "取消"))
         {
             return;
         }

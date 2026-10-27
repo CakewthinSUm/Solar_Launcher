@@ -77,7 +77,7 @@
                     </StackPanel>
                 </Border>
 
-                <!-- 游戏目录：所有实例共用的 .minecraft -->
+                <!-- 游戏目录：未开启版本隔离的实例共用的 .minecraft -->
                 <Border Style="{StaticResource SolarCardStyle}">
                     <StackPanel Spacing="8">
                         <StackPanel Spacing="2">
@@ -85,7 +85,7 @@
                             <TextBlock
                                 Style="{StaticResource CaptionTextBlockStyle}"
                                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                Text="所有实例共用的存档、模组与配置目录。可直接指向官方启动器的 .minecraft 以复用已有内容；留空则使用程序目录下的 .minecraft。"
+                                Text="未开启版本隔离的实例共用的存档、模组与配置目录。可直接指向官方启动器的 .minecraft 以复用已有内容；留空则使用程序目录下的 .minecraft。"
                                 TextWrapping="Wrap" />
                         </StackPanel>
 

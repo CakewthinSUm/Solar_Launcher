@@ -28,7 +28,7 @@
             <TextBlock
                 Style="{StaticResource BodyTextBlockStyle}"
                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                Text="每个实例可选择不同版本与加载器，共用同一份游戏目录" />
+                Text="每个实例可选择不同版本与加载器；在实例设置里可开启版本隔离，让它独占存档与模组" />
         </StackPanel>
 
         <!-- 新建实例表单 -->
@@ -134,15 +134,19 @@
                                     <Run Text="{x:Bind MinecraftVersion}" />
                                     <Run Text=" · " />
                                     <Run Text="{x:Bind DisplayLoader}" />
+                                    <Run Text="{x:Bind IsolationBadge}" />
                                 </TextBlock>
                             </StackPanel>
 
                             <!-- 列表项内的操作按钮，点击由页面代码转发给 ViewModel -->
-                            <Button
+                            <StackPanel
                                 Grid.Column="1"
                                 VerticalAlignment="Center"
-                                Click="DeleteInstance_Click"
-                                Content="删除" />
+                                Orientation="Horizontal"
+                                Spacing="8">
+                                <Button Click="SetupInstance_Click" Content="设置" />
+                                <Button Click="DeleteInstance_Click" Content="删除" />
+                            </StackPanel>
                         </Grid>
                     </DataTemplate>
                 </ListView.ItemTemplate>

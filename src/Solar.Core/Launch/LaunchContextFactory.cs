@@ -1,4 +1,5 @@
 using Solar.Core.Accounts;
+using Solar.Core.Instances;
 using Solar.Core.Minecraft;
 using Solar.Core.Paths;
 using Solar.Core.Settings;
@@ -8,7 +9,8 @@ namespace Solar.Core.Launch;
 /// <summary>拼装启动上下文。把"该用什么 Java、目录在哪、用哪个账户"集中在一处。</summary>
 public sealed class LaunchContextFactory(
     AppPaths paths,
-    ISettingsService settings)
+    ISettingsService settings,
+    InstanceGameDirectory gameDirectories)
 {
     public LaunchContext Create(
         Instances.GameInstance instance,
@@ -17,9 +19,10 @@ public sealed class LaunchContextFactory(
         AccountSession account,
         string? logConfigPath = null)
     {
-        // 游戏目录是全局设置：所有实例共用同一份 .minecraft（存档、模组、配置）。
-        // natives 仍按实例隔离，不同版本的原生库不能混用。
-        var gameDirectory = paths.ResolveMinecraftDirectory(settings.Current.MinecraftDirectory);
+        // 游戏目录取决于实例的版本隔离开关：关闭时所有实例共用设置里的 .minecraft，
+        // 开启时用实例自己的目录（存档、模组、配置互不影响）。
+        // natives 始终按实例隔离，不同版本的原生库不能混用。
+        var gameDirectory = gameDirectories.Resolve(instance);
 
         return new LaunchContext
         {

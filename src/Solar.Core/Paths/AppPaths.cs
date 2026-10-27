@@ -49,6 +49,10 @@ public sealed class AppPaths
 
     public string GetInstanceDirectory(string instanceId) => Path.Combine(Instances, instanceId);
 
+    /// <summary>开启版本隔离的实例所用的游戏目录（.minecraft）。</summary>
+    public string GetInstanceMinecraftDirectory(string instanceId) =>
+        Path.Combine(GetInstanceDirectory(instanceId), ".minecraft");
+
     /// <summary>
     /// 解析实际使用的游戏目录（.minecraft）。设置为空时用默认的
     /// <see cref="DefaultMinecraft"/>；支持 <c>%APPDATA%</c> 这类环境变量；

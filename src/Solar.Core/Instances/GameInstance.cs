@@ -32,6 +32,13 @@ public sealed class GameInstance
     /// <summary>加载器是否已安装完成。未安装时启动会先触发安装。</summary>
     public bool LoaderInstalled { get; set; }
 
+    /// <summary>
+    /// 版本隔离：开启后该实例使用自己的游戏目录
+    /// <c>SolarInstances/&lt;id&gt;/.minecraft</c>，存档、模组、配置都与其它实例分开。
+    /// 关闭时与其它未隔离的实例共用设置里的那份 .minecraft。
+    /// </summary>
+    public bool VersionIsolation { get; set; }
+
     /// <summary>覆盖全局的 Java 路径。</summary>
     public string? JavaPath { get; set; }
 
@@ -46,4 +53,8 @@ public sealed class GameInstance
 
     [JsonIgnore]
     public string DisplayLoader => Loader == ModLoader.Vanilla ? "原版" : $"{Loader} {LoaderVersion}".Trim();
+
+    /// <summary>列表里的附加标记；未开启隔离时为空，便于直接拼在说明行末尾。</summary>
+    [JsonIgnore]
+    public string IsolationBadge => VersionIsolation ? " · 已隔离" : "";
 }
