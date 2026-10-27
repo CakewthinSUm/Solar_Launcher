@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using Microsoft.UI.Dispatching;
+using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media.Animation;
@@ -12,6 +13,13 @@ public sealed partial class MainWindow : Window
 {
     [DllImport("user32.dll")]
     private static extern uint GetDpiForWindow(IntPtr hwnd);
+
+    /// <summary>
+    /// 最小窗口尺寸（逻辑像素）。取 800×600：再窄侧栏会退到只剩图标，
+    /// 页面里的表单和卡片（实例页的四列表单、设置页的说明文字）就挤不下了。
+    /// </summary>
+    private const int MinimumLogicalWidth = 800;
+    private const int MinimumLogicalHeight = 600;
 
     /// <summary>最近一次导航携带的参数，用于判断同一个页面的不同分区是否需要重新导航。</summary>
     private object? _currentParameter;
@@ -27,6 +35,7 @@ public sealed partial class MainWindow : Window
         SetTitleBar(AppTitleBar);
         AppWindow.SetIcon("Assets/AppIcon.ico");
         ResizeToLogicalSize(1180, 760);
+        ApplyMinimumSize();
 
         App.RegisterMainWindow(this);
 
@@ -48,6 +57,29 @@ public sealed partial class MainWindow : Window
         }
 
         AppWindow.Resize(new Windows.Graphics.SizeInt32((int)(width * scale), (int)(height * scale)));
+    }
+
+    /// <summary>
+    /// 最小窗口尺寸。以逻辑像素给出，再按当前 DPI 换算成物理像素——
+    /// <c>PreferredMinimumWidth</c> 收的是物理像素，而 125%/150% 缩放下
+    /// 直接填逻辑值会让窗口缩得比预期小。
+    /// </summary>
+    private void ApplyMinimumSize()
+    {
+        if (AppWindow.Presenter is not OverlappedPresenter presenter)
+        {
+            return;
+        }
+
+        var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+        var scale = GetDpiForWindow(hwnd) / 96.0;
+        if (scale <= 0)
+        {
+            scale = 1;
+        }
+
+        presenter.PreferredMinimumWidth = (int)(MinimumLogicalWidth * scale);
+        presenter.PreferredMinimumHeight = (int)(MinimumLogicalHeight * scale);
     }
 
     private void AppTitleBar_PaneToggleRequested(TitleBar sender, object args) =>
