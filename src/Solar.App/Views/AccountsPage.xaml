@@ -13,6 +13,7 @@
     <Page.Resources>
         <conv:VisibleWhenTrueConverter x:Key="VisibleWhenTrue" />
         <conv:VisibleWhenTextConverter x:Key="VisibleWhenText" />
+        <conv:InvertBoolConverter x:Key="InvertBool" />
     </Page.Resources>
 
     <Grid Padding="{StaticResource SolarPagePadding}" RowSpacing="16">

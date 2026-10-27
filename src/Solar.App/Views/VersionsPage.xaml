@@ -36,14 +36,24 @@
 
             <AutoSuggestBox
                 Grid.Column="0"
-                PlaceholderText="搜索版本"
+                VerticalAlignment="Bottom"
+                Header="搜索"
+                PlaceholderText="版本号"
                 QueryIcon="Find"
                 Text="{x:Bind ViewModel.SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+            <!--
+                ToggleSwitch 的 On/OffContent 描述的是开关当前状态，不是它控制的行为。
+                原先写 OnContent="包含快照" / OffContent="仅正式版"，读起来像"关掉才只显示正式版"，
+                与实际的“开=包含快照”正好相反。改用 Header 说明开关的含义，
+                状态文案只写“开 / 关”，避免歧义。
+            -->
             <ToggleSwitch
                 Grid.Column="1"
+                VerticalAlignment="Bottom"
+                Header="显示快照版本"
                 IsOn="{x:Bind ViewModel.ShowSnapshots, Mode=TwoWay}"
-                OffContent="仅正式版"
-                OnContent="包含快照" />
+                OffContent="关"
+                OnContent="开" />
         </Grid>
 
         <ListView
