@@ -33,6 +33,21 @@ public sealed class GameInstance
     public bool LoaderInstalled { get; set; }
 
     /// <summary>
+    /// OptiFine 构建名（如 <c>1.20.1_HD_U_I6</c>）。它和主加载器是正交的：
+    /// 没有主加载器时生成独立的版本 profile，有主加载器时作为 Mod 放进 mods。
+    /// </summary>
+    public string? OptiFineVersion { get; set; }
+
+    /// <summary>LiteLoader 版本号；只支持 1.13 以前的版本。</summary>
+    public string? LiteLoaderVersion { get; set; }
+
+    /// <summary>
+    /// 创建实例时替用户装进 mods 的附加 Mod（Fabric API / OptiFabric / OptiFine-as-mod）。
+    /// 只记录文件名，用于实例设置页展示，不参与启动。
+    /// </summary>
+    public List<string> CompanionMods { get; set; } = [];
+
+    /// <summary>
     /// 版本隔离：开启后该实例使用自己的游戏目录
     /// <c>SolarInstances/&lt;id&gt;/.minecraft</c>，存档、模组、配置都与其它实例分开。
     /// 关闭时与其它未隔离的实例共用设置里的那份 .minecraft。
@@ -59,7 +74,38 @@ public sealed class GameInstance
     public string EffectiveVersionId => string.IsNullOrWhiteSpace(VersionId) ? MinecraftVersion : VersionId!;
 
     [JsonIgnore]
-    public string DisplayLoader => Loader == ModLoader.Vanilla ? "原版" : $"{Loader} {LoaderVersion}".Trim();
+    public string DisplayLoader
+    {
+        get
+        {
+            var parts = new List<string>();
+            if (Loader == ModLoader.Vanilla)
+            {
+                // 纯原版时不写“原版”，由调用方与版本号拼接；
+                // 但有 OptiFine / LiteLoader 时要把它们列出来，否则界面会误显示为原版。
+                if (string.IsNullOrEmpty(OptiFineVersion) && string.IsNullOrEmpty(LiteLoaderVersion))
+                {
+                    return "原版";
+                }
+            }
+            else
+            {
+                parts.Add($"{Loader} {LoaderVersion}".Trim());
+            }
+
+            if (!string.IsNullOrEmpty(OptiFineVersion))
+            {
+                parts.Add($"OptiFine {OptiFineVersion}");
+            }
+
+            if (!string.IsNullOrEmpty(LiteLoaderVersion))
+            {
+                parts.Add($"LiteLoader {LiteLoaderVersion}");
+            }
+
+            return string.Join(" · ", parts);
+        }
+    }
 
     /// <summary>列表里的附加标记；未开启隔离时为空，便于直接拼在说明行末尾。</summary>
     [JsonIgnore]

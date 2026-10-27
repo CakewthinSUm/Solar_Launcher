@@ -122,6 +122,28 @@
                     </StackPanel>
                 </Border>
 
+                <!-- 新建实例的版本隔离默认值 -->
+                <Border Style="{StaticResource SolarCardStyle}">
+                    <StackPanel Spacing="8">
+                        <StackPanel Spacing="2">
+                            <TextBlock Text="新建实例的版本隔离" />
+                            <TextBlock
+                                Style="{StaticResource CaptionTextBlockStyle}"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Text="开启隔离的实例使用自己的存档、模组与配置目录，不会与其它实例互相影响。带模组加载器的实例建议开启。"
+                                TextWrapping="Wrap" />
+                        </StackPanel>
+
+                        <ComboBox
+                            MinWidth="240"
+                            SelectedIndex="{x:Bind ViewModel.NewInstanceIsolationIndex, Mode=TwoWay}">
+                            <ComboBoxItem Content="每次创建时询问" />
+                            <ComboBoxItem Content="总是开启" />
+                            <ComboBoxItem Content="总是关闭" />
+                        </ComboBox>
+                    </StackPanel>
+                </Border>
+
                 <!-- 游戏目录：未开启版本隔离的实例共用的 .minecraft -->
                 <Border Style="{StaticResource SolarCardStyle}">
                     <StackPanel Spacing="8">

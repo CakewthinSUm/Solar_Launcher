@@ -65,4 +65,23 @@ public sealed class LauncherSettings
     /// 在 Azure 门户注册应用后填写，详见 <c>AuthOptions</c> 的说明。
     /// </summary>
     public string? MicrosoftClientId { get; set; }
+
+    /// <summary>
+    /// 新建实例时版本隔离的默认值。默认「每次询问」：
+    /// 带模组加载器时建议隔离，纯原版则沿用共享目录。
+    /// </summary>
+    public VersionIsolationDefault NewInstanceIsolation { get; set; } = VersionIsolationDefault.Ask;
+}
+
+/// <summary>新建实例时版本隔离的处理方式。</summary>
+public enum VersionIsolationDefault
+{
+    /// <summary>创建实例时问一次，可记住选择。</summary>
+    Ask = 0,
+
+    /// <summary>总是开启，不再询问。</summary>
+    Always = 1,
+
+    /// <summary>总是关闭，不再询问。</summary>
+    Never = 2,
 }

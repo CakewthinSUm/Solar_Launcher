@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Solar.Core.Accounts;
+using Solar.Core.Addons;
 using Solar.Core.Assets;
 using Solar.Core.Content;
 using Solar.Core.Download;
@@ -61,6 +62,7 @@ public static class SolarServiceCollectionExtensions
         });
 
         AddModServices(services);
+        AddAddonServices(services);
 
         return services;
     }
@@ -90,6 +92,29 @@ public static class SolarServiceCollectionExtensions
         services.AddSingleton<IModCatalog, CurseForgeCatalog>();
         services.AddSingleton<IModCatalogService, ModCatalogService>();
         services.AddSingleton<IModInstaller, ModInstaller>();
+    }
+
+    /// <summary>
+    /// 创建实例时用到的附加组件（OptiFine / LiteLoader）与编排服务。
+    /// <para>
+    /// Fabric API 与 OptiFabric 不在这里单独注册客户端：它们复用
+    /// <see cref="Mods.IModCatalogService"/>，和「管理 → Mods」共用同一套源与镜像降级。
+    /// </para>
+    /// </summary>
+    private static void AddAddonServices(IServiceCollection services)
+    {
+        services.AddSingleton<IInstanceCreationService, InstanceCreationService>();
+        services.AddSingleton<ILiteLoaderInstaller, LiteLoaderInstaller>();
+        services.AddSingleton<IAddonCatalog, AddonCatalog>();
+
+        // OptiFine 安装器有 7~9MB，超时放宽到与加载器安装器一致
+        services.AddHttpClient<IOptiFineService, OptiFineService>(client =>
+        {
+            ConfigureHttpClient(client);
+            client.Timeout = TimeSpan.FromMinutes(15);
+        });
+
+        services.AddHttpClient<ILiteLoaderService, LiteLoaderService>(ConfigureHttpClient);
     }
 
     /// <summary>模组 API 客户端的名字，与文件下载用的 client 区分开。</summary>

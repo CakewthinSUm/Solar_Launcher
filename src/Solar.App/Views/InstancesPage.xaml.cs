@@ -20,6 +20,10 @@ public sealed partial class InstancesPage : PageBase
 
     public new InstancesViewModel ViewModel { get; }
 
+    /// <summary>新建实例走创建页：那里能选版本、加载器与附加组件，并一次装完。</summary>
+    private void NewInstance_Click(object sender, RoutedEventArgs e) =>
+        Frame.Navigate(typeof(InstanceCreatePage));
+
     private void SetupInstance_Click(object sender, RoutedEventArgs e)
     {
         if (sender is FrameworkElement { DataContext: GameInstance instance })
