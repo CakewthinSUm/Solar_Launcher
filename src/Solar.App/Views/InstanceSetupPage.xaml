@@ -70,6 +70,26 @@
                 </Border>
             </StackPanel>
 
+            <!-- 界面 -->
+            <StackPanel Spacing="8">
+                <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="界面" />
+
+                <Border Style="{StaticResource SolarCardStyle}">
+                    <StackPanel Spacing="8">
+                        <TextBox
+                            Header="自定义游戏标题"
+                            PlaceholderText="留空则显示默认标题（版本 id）"
+                            Text="{x:Bind ViewModel.CustomWindowTitle, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+                        <TextBlock
+                            Style="{StaticResource CaptionTextBlockStyle}"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            Text="修改游戏窗口左上角显示的标题，保存后下次启动生效。"
+                            TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
             <!-- 保存 -->
             <StackPanel Orientation="Horizontal" Spacing="12">
                 <Button

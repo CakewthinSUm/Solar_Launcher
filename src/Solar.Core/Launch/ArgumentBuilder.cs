@@ -202,7 +202,10 @@ public sealed class ArgumentBuilder
 
         "user_type" => context.UserType,
         "user_properties" => "{}",
-        "version_name" => context.Version.Id,
+        // 实例设置了自定义标题时覆盖 version_name：游戏的窗口标题取自 --version 参数的值
+        "version_name" => string.IsNullOrWhiteSpace(context.Instance.CustomWindowTitle)
+            ? context.Version.Id
+            : context.Instance.CustomWindowTitle.Trim(),
         "version_type" => context.VersionType,
         "game_directory" => context.GameDirectory,
         "assets_root" => context.AssetsDirectory,
