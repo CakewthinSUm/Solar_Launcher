@@ -26,11 +26,13 @@ public class ArgumentBuilderTests
             Instance = new GameInstance { Id = "inst1", Name = "测试" },
             Version = version,
             Paths = paths,
-            Settings = new LauncherSettings { MaxMemoryMb = 4096, PlayerName = "Steve" },
+            Settings = new LauncherSettings { MaxMemoryMb = 4096 },
             JavaPath = "java.exe",
             PlayerName = "Steve",
             Uuid = "8667ba71-b85a-4004-af54-457a9734eed7",
             AccessToken = "0",
+            Xuid = "2535400000000000",
+            UserType = "msa",
             GameDirectory = @"C:\games\inst1",
             NativesDirectory = @"C:\games\inst1\natives",
             AssetsDirectory = @"C:\shared\assets",
@@ -48,14 +50,14 @@ public class ArgumentBuilderTests
     }
 
     [Fact]
-    public void ModernAuthPlaceholdersBecomeEmptyForOfflineAccounts()
+    public void ModernAuthPlaceholdersResolve()
     {
         // 1.21.4 的 game 参数里有 ${clientid} 和 ${auth_xuid}。
         // 若原样保留，其后的参数会错位，游戏无法启动。
         var context = CreateContext();
 
         Assert.Equal("", ArgumentBuilder.Substitute("${clientid}", context));
-        Assert.Equal("", ArgumentBuilder.Substitute("${auth_xuid}", context));
+        Assert.Equal("2535400000000000", ArgumentBuilder.Substitute("${auth_xuid}", context));
     }
 
     [Fact]

@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
+using Solar.Core.Accounts;
 using Solar.Core.Download;
 using Solar.Core.Instances;
 using Solar.Core.Java;
@@ -12,6 +13,7 @@ namespace Solar.Core.Launch;
 /// <summary>启动流程的阶段，供 UI 显示进度文案。</summary>
 public enum LaunchStage
 {
+    Authenticating,
     ResolvingVersion,
     DetectingJava,
     Downloading,
@@ -45,24 +47,26 @@ public sealed class GameLaunchService(
     IGameDownloader downloader,
     IGameLauncher launcher,
     LaunchContextFactory contextFactory,
+    IAccountStore accountStore,
+    IMicrosoftAuthService authService,
     ILogger<GameLaunchService> logger) : IGameLaunchService
 {
-    /// <summary>启动前至少要有这么多内存余量，避免刚进去就 OOM。</summary>
-    private const int MinimumMemoryMb = 512;
-
     public async Task<Process> LaunchAsync(
         GameInstance instance,
         IProgress<DownloadProgress>? downloadProgress = null,
         IProgress<LaunchStageChanged>? stageProgress = null,
         CancellationToken ct = default)
     {
+        stageProgress?.Report(new LaunchStageChanged(LaunchStage.Authenticating, "正在验证账户…"));
+        var account = await AcquireAccountAsync(ct).ConfigureAwait(false);
+
         var (version, java) = await PrepareCoreAsync(instance, downloadProgress, stageProgress, ct)
             .ConfigureAwait(false);
 
         stageProgress?.Report(new LaunchStageChanged(LaunchStage.Starting, "正在启动游戏…"));
 
         var logConfig = GetLogConfigPath(version);
-        var context = contextFactory.Create(instance, version, java.Path, logConfig);
+        var context = contextFactory.Create(instance, version, java.Path, account, logConfig);
 
         var process = launcher.Start(context);
 
@@ -72,6 +76,21 @@ public sealed class GameLaunchService(
         return process;
     }
 
+    /// <summary>启动前取一份新的账户凭据；令牌有时效，不能缓存。</summary>
+    private async Task<AccountSession> AcquireAccountAsync(CancellationToken ct)
+    {
+        var accountId = accountStore.ActiveAccountId;
+        if (string.IsNullOrEmpty(accountId))
+        {
+            throw new AccountException(
+                AccountErrorKind.NotSignedIn,
+                "还没有登录微软账户，请先到「账户」页登录。");
+        }
+
+        return await authService.AcquireSessionAsync(accountId, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>只补齐文件，不要求登录（未登录也能预下载）。</summary>
     public async Task PrepareAsync(
         GameInstance instance,
         IProgress<DownloadProgress>? downloadProgress = null,

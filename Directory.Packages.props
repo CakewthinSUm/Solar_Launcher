@@ -15,6 +15,11 @@
     <PackageVersion Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <!-- 下载引擎：只使用其 ParallelGameInstaller / GameFile，不使用其版本解析与启动逻辑 -->
     <PackageVersion Include="CmlLib.Core" Version="4.1.0" />
+    <!-- 微软正版登录：OAuth 设备码 + Xbox Live + XSTS + Minecraft Services -->
+    <PackageVersion Include="CmlLib.Core.Auth.Microsoft" Version="3.4.0" />
+    <!-- MSAL 适配层不在上面的包依赖里，需要单独引用 -->
+    <PackageVersion Include="XboxAuthNet.Game.Msal" Version="0.2.0" />
+    <PackageVersion Include="Microsoft.Identity.Client" Version="4.61.3" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageVersion Include="xunit" Version="2.9.3" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="2.8.2" />

@@ -30,6 +30,9 @@ public sealed class LauncherSettings
     /// <summary>启动后是否自动关闭启动器。</summary>
     public bool CloseLauncherAfterLaunch { get; set; }
 
-    /// <summary>玩家昵称（离线模式）。</summary>
-    public string PlayerName { get; set; } = "Steve";
+    /// <summary>
+    /// 微软应用的客户端 ID，正版登录必需。
+    /// 在 Azure 门户注册应用后填写，详见 <c>AuthOptions</c> 的说明。
+    /// </summary>
+    public string? MicrosoftClientId { get; set; }
 }

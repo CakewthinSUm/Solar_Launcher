@@ -20,8 +20,11 @@ public sealed class LaunchContext
     public required string Uuid { get; init; }
     public required string AccessToken { get; init; }
 
-    /// <summary>离线账户的 userType；微软登录是 msa。</summary>
-    public string UserType { get; init; } = "legacy";
+    /// <summary>Xbox 用户 ID，1.21+ 的 <c>${auth_xuid}</c> 需要它。正版登录才有。</summary>
+    public string Xuid { get; init; } = "";
+
+    /// <summary>微软登录固定为 <c>msa</c>。</summary>
+    public string UserType { get; init; } = "msa";
 
     public string GameDirectory { get; init; } = "";
     public string NativesDirectory { get; init; } = "";
@@ -191,10 +194,10 @@ public sealed class ArgumentBuilder
         "auth_access_token" => context.AccessToken,
         "auth_session" => context.AccessToken,
 
-        // 1.21+ 新增：离线账户没有客户端 ID 与 XUID，必须替换成空串。
-        // 若原样保留，后续参数会整体错位，游戏启动时解析失败。
+        // 1.21+ 新增。必须始终能解析：若原样保留 ${...}，
+        // 其后的参数会整体错位，游戏启动时解析失败。
         "clientid" => "",
-        "auth_xuid" => "",
+        "auth_xuid" => context.Xuid,
 
         "user_type" => context.UserType,
         "user_properties" => "{}",

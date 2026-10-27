@@ -16,6 +16,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tools", "tools", "{E2E14A31
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Solar.Smoke", "tools\Solar.Smoke\Solar.Smoke.csproj", "{F0926DFD-51B5-4FB6-9BD4-63A05E767A18}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Solar.AuthProbe", "tools\Solar.AuthProbe\Solar.AuthProbe.csproj", "{43B54C75-773E-4B5B-A9B0-7DB2E853DF33}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -38,6 +40,10 @@ Global
 		{F0926DFD-51B5-4FB6-9BD4-63A05E767A18}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{F0926DFD-51B5-4FB6-9BD4-63A05E767A18}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{F0926DFD-51B5-4FB6-9BD4-63A05E767A18}.Release|Any CPU.Build.0 = Release|Any CPU
+		{43B54C75-773E-4B5B-A9B0-7DB2E853DF33}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{43B54C75-773E-4B5B-A9B0-7DB2E853DF33}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{43B54C75-773E-4B5B-A9B0-7DB2E853DF33}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{43B54C75-773E-4B5B-A9B0-7DB2E853DF33}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -47,5 +53,6 @@ Global
 		{A1B2C3D4-0001-4000-8000-000000000012} = {A1B2C3D4-0001-4000-8000-000000000001}
 		{A1B2C3D4-0001-4000-8000-000000000021} = {A1B2C3D4-0001-4000-8000-000000000002}
 		{F0926DFD-51B5-4FB6-9BD4-63A05E767A18} = {E2E14A31-57F2-4782-808B-5A4035BC30C8}
+		{43B54C75-773E-4B5B-A9B0-7DB2E853DF33} = {E2E14A31-57F2-4782-808B-5A4035BC30C8}
 	EndGlobalSection
 EndGlobal

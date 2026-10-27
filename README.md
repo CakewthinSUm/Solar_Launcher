@@ -76,10 +76,36 @@ Windows App SDK 以自包含方式随输出一起分发，终端用户无需单�
 - [x] 版本 JSON 下载、`inheritsFrom` 合并、rules 平台求值
 - [x] Java 自动探测与版本匹配
 - [x] 依赖（libraries / assets / natives）下载与 SHA1 校验
-- [x] 启动参数拼装与游戏进程启动（离线账户）
+- [x] 启动参数拼装与游戏进程启动
 - [x] 下载镜像（BMCLAPI）与实例级 Java / 内存覆盖
-- [ ] 账户系统（微软登录）
+- [x] 微软正版登录（设备码流程、多账户、令牌静默刷新）
 - [ ] 模组加载器安装（Forge / NeoForge / Fabric / Quilt）
+
+## 账户
+
+只支持**微软正版账户**，不提供离线登录。
+
+登录走 OAuth 设备码流程：点「登录」后启动器显示一个一次性代码，
+在浏览器打开 `microsoft.com/link` 输入即可，无需在启动器内嵌浏览器。
+
+令牌链（OAuth → Xbox Live → XSTS → Minecraft Services）由
+[CmlLib.Core.Auth.Microsoft](https://github.com/CmlLib/CmlLib.Core.Auth.Microsoft)
+完成，它基于 MSAL.NET 并自行缓存与刷新令牌。
+`SolarData/accounts.json` 只存用户名、UUID、XUID 等展示信息，
+不含任何令牌；令牌在 `SolarData/msa-accounts.json`。
+
+### 必须自行注册 Azure 应用
+
+启动器**不内置**客户端 ID。使用前需要：
+
+1. 在 [Azure 门户](https://portal.azure.com) 注册应用
+2. 应用类型选「移动和桌面应用」，启用「允许公共客户端流」
+3. 重定向 URI 填 `http://localhost`
+4. 在 [aka.ms/mce-reviewappid](https://aka.ms/mce-reviewappid) 提交审核
+   （否则调用 Minecraft API 会返回 403）
+5. 把客户端 ID 填进「设置 → 账户」
+
+用别人注册的客户端 ID 违反微软的使用条款。
 
 ## 下载引擎
 
@@ -96,9 +122,12 @@ Windows App SDK 以自包含方式随输出一起分发，终端用户无需单�
 ## 端到端验证
 
 ```bash
-# 真实下载一个版本的全部依赖
+# 真实下载一个版本的全部依赖（不需要登录）
 dotnet run --project tools/Solar.Smoke -- 1.21.4 %TEMP%\solar-smoke --prepare-only
 
-# 下载并启动，60 秒后若仍在运行则判定成功
+# 下载并启动，60 秒后若仍在运行则判定成功（需要先登录）
 dotnet run --project tools/Solar.Smoke -- 1.21.4 %TEMP%\solar-smoke
+
+# 验证微软登录全流程：设备码 → Xbox → XSTS → Minecraft → 静默刷新
+dotnet run --project tools/Solar.AuthProbe -- <你的客户端ID>
 ```

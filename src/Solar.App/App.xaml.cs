@@ -5,6 +5,7 @@ using Solar.App.Services;
 using Solar.App.ViewModels;
 using Solar.App.Views;
 using Solar.Core;
+using Solar.Core.Accounts;
 using Solar.Core.Instances;
 using Solar.Core.Java;
 using Solar.Core.Minecraft;
@@ -62,19 +63,33 @@ public partial class App : Application
         services.AddTransient<InstancesViewModel>();
         services.AddTransient<VersionsViewModel>();
         services.AddTransient<SettingsViewModel>();
+        services.AddTransient<AccountsViewModel>();
         services.AddTransient<HomePage>();
         services.AddTransient<InstancesPage>();
         services.AddTransient<VersionsPage>();
         services.AddTransient<SettingsPage>();
+        services.AddTransient<AccountsPage>();
 
         return services.BuildServiceProvider();
     }
 
-    protected override void OnLaunched(LaunchActivatedEventArgs args)
+    protected override async void OnLaunched(LaunchActivatedEventArgs args)
     {
         var paths = Services.GetRequiredService<AppPaths>();
         var logger = Services.GetRequiredService<ILogger<App>>();
         logger.LogInformation("Solar Launcher 启动，数据目录: {Root}", paths.Root);
+
+        // 设置必须在任何服务读取之前加载：账户登录、下载镜像都依赖它。
+        // 之前只在设置页导航时加载，导致启动后直接用空设置。
+        try
+        {
+            await Services.GetRequiredService<ISettingsService>().LoadAsync();
+            await Services.GetRequiredService<IAccountStore>().LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "加载本地配置失败，将使用默认值");
+        }
 
         _window = new MainWindow();
         _window.Activate();

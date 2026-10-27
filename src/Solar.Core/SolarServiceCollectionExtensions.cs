@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Solar.Core.Accounts;
 using Solar.Core.Assets;
 using Solar.Core.Download;
 using Solar.Core.Instances;
@@ -22,6 +23,12 @@ public static class SolarServiceCollectionExtensions
         services.AddSingleton<ISettingsService, SettingsService>();
         services.AddSingleton<IInstanceRepository, InstanceRepository>();
         services.AddSingleton<IJavaDetector, JavaDetector>();
+
+        services.AddSingleton<IAccountStore, AccountStore>();
+
+        // 默认配置为空；实际取值每次从 ISettingsService 读取，用户改了立即生效
+        services.AddSingleton(new AuthOptions());
+        services.AddSingleton<IMicrosoftAuthService, MicrosoftAuthService>();
 
         services.AddSingleton<IAssetIndexService, AssetIndexService>();
         services.AddSingleton<IGameDownloader, GameDownloader>();

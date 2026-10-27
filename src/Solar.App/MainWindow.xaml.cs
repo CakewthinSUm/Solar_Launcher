@@ -54,6 +54,7 @@ public sealed partial class MainWindow : Window
             {
                 "instances" => typeof(InstancesPage),
                 "versions" => typeof(VersionsPage),
+                "accounts" => typeof(AccountsPage),
                 _ => typeof(HomePage),
             });
         }

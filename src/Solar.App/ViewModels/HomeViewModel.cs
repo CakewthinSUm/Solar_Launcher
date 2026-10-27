@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
 using Solar.App.Services;
+using Solar.Core.Accounts;
 using Solar.Core.Download;
 using Solar.Core.Instances;
 using Solar.Core.Java;
@@ -16,6 +17,7 @@ public sealed partial class HomeViewModel : ViewModelBase
     private readonly IInstanceRepository _instances;
     private readonly IJavaDetector _javaDetector;
     private readonly IGameLaunchService _launchService;
+    private readonly IAccountStore _accounts;
     private readonly IDialogService _dialogs;
     private readonly ILogger<HomeViewModel> _logger;
 
@@ -38,19 +40,28 @@ public sealed partial class HomeViewModel : ViewModelBase
     [ObservableProperty]
     private bool _isLaunching;
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsSignedIn))]
+    private string _accountSummary = "未登录";
+
     public HomeViewModel(
         IInstanceRepository instances,
         IJavaDetector javaDetector,
         IGameLaunchService launchService,
+        IAccountStore accounts,
         IDialogService dialogs,
         ILogger<HomeViewModel> logger)
     {
         _instances = instances;
         _javaDetector = javaDetector;
         _launchService = launchService;
+        _accounts = accounts;
         _dialogs = dialogs;
         _logger = logger;
     }
+
+    /// <summary>没有登录账户时启动必定失败，提前在界面上标出来。</summary>
+    public bool IsSignedIn => !string.IsNullOrEmpty(_accounts.ActiveAccountId);
 
     public ObservableCollection<GameInstance> Instances { get; } = new();
 
@@ -92,6 +103,8 @@ public sealed partial class HomeViewModel : ViewModelBase
             JavaStatus = runtimes.Count == 0
                 ? "未找到 Java"
                 : $"已检测 {runtimes.Count} 个 Java · 推荐 Java {runtimes[0].MajorVersion}";
+
+            await RefreshAccountAsync();
         }
         catch (Exception ex)
         {
@@ -104,12 +117,27 @@ public sealed partial class HomeViewModel : ViewModelBase
         }
     }
 
+    private async Task RefreshAccountAsync()
+    {
+        var accounts = await _accounts.GetAllAsync();
+        var active = accounts.FirstOrDefault(a => a.Id == _accounts.ActiveAccountId);
+
+        AccountSummary = active is null ? "未登录" : active.Username;
+        OnPropertyChanged(nameof(IsSignedIn));
+    }
+
     [RelayCommand]
     private async Task LaunchAsync()
     {
         if (SelectedInstance is not { } instance)
         {
             StatusMessage = "还没有可启动的实例，请先到“实例”页创建一个。";
+            return;
+        }
+
+        if (!IsSignedIn)
+        {
+            ErrorMessage = "还没有登录微软账户，请先到「账户」页登录后再启动。";
             return;
         }
 

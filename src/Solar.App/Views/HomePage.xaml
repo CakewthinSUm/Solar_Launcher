@@ -51,6 +51,12 @@
                             Style="{StaticResource CaptionTextBlockStyle}"
                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                             Text="{x:Bind ViewModel.SelectedInstanceSummary, Mode=OneWay}" />
+
+                        <InfoBar
+                            IsClosable="False"
+                            IsOpen="{x:Bind ViewModel.IsSignedIn, Mode=OneWay, Converter={StaticResource InvertBool}}"
+                            Message="尚未登录微软账户，请先到「账户」页登录"
+                            Severity="Warning" />
                     </StackPanel>
 
                     <StackPanel
@@ -108,15 +114,22 @@
                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                             Text="{x:Bind ViewModel.JavaStatus, Mode=OneWay}"
                             TextWrapping="Wrap" />
+                        <TextBlock
+                            Style="{StaticResource CaptionTextBlockStyle}"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}">
+                            <Run Text="实例数量 " />
+                            <Run Text="{x:Bind ViewModel.Instances.Count, Mode=OneWay}" />
+                        </TextBlock>
                     </StackPanel>
                 </Border>
 
                 <Border Grid.Column="1" Style="{StaticResource SolarCardStyle}">
                     <StackPanel Spacing="8">
-                        <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="实例数量" />
+                        <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="当前账户" />
                         <TextBlock
                             Style="{StaticResource SubtitleTextBlockStyle}"
-                            Text="{x:Bind ViewModel.Instances.Count, Mode=OneWay}" />
+                            Text="{x:Bind ViewModel.AccountSummary, Mode=OneWay}"
+                            TextTrimming="CharacterEllipsis" />
                     </StackPanel>
                 </Border>
             </Grid>
