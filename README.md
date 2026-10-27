@@ -24,6 +24,7 @@ src/
     Models/              Mojang 版本 JSON 模型、rules 求值
     Minecraft/           版本清单下载与缓存、版本 JSON 解析与 inheritsFrom 合并
     Instances/           游戏实例模型与持久化
+    Content/             实例游戏目录里的 Mods / 资源包 / 光影 读写
     Java/                Java 探测与版本选择
     Settings/            全局设置
   Solar.App/             WinUI 3 界面层
@@ -63,9 +64,24 @@ SolarInstances/     每个实例一个目录，内含 natives、instance.json
 把它指向官方启动器的 `.minecraft` 就能直接复用已有的模组与存档。
 不同版本的 natives 始终按实例隔离在 `SolarInstances/<id>/natives`。
 
+### 管理
+
+侧边栏「管理」下是四个子项：
+
+| 子项 | 内容 |
+| --- | --- |
+| 实例 | 创建 / 删除实例，进入单个实例的设置 |
+| Mods | 实例 `mods` 目录里的 jar |
+| 资源包 | 实例 `resourcepacks` 目录里的 zip 或解压后的文件夹 |
+| 光影 | 实例 `shaderpacks` 目录里的 zip 或解压后的文件夹 |
+
+三类内容都直接读写实例实际使用的游戏目录（开启版本隔离的实例读它自己的
+`.minecraft`），不维护额外索引——手动往里放文件，刷新就能看到。
+页面里可以导入文件 / 文件夹、在资源管理器中定位、删除。
+
 ### 版本隔离
 
-在「实例 → 设置」里可以给单个实例开启版本隔离。开启后该实例使用
+在「管理 → 实例 → 设置」里可以给单个实例开启版本隔离。开启后该实例使用
 `SolarInstances/<id>/.minecraft`，存档、模组、配置、资源包都与其它实例分开，
 因此可以同时放一个 Fabric 实例和一个 Forge 实例而互不干扰。
 
@@ -99,6 +115,7 @@ Windows App SDK 以自包含方式随输出一起分发，终端用户无需单�
 - [x] 微软正版登录（设备码流程、多账户、令牌静默刷新）
 - [x] 模组加载器安装（Fabric / Quilt / Forge / NeoForge）
 - [x] 实例级版本隔离（独立游戏目录，可把共享内容复制过来）
+- [x] 「管理」下的 Mods / 资源包 / 光影 列表、导入、删除
 - [x] 内存分配：自动按物理内存 / 可用内存 / 模组数量计算，或手动用滑条指定
 
 ## 模组加载器
