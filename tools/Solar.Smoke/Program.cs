@@ -44,6 +44,8 @@ var instance = await repository.GetAsync("smoke") ?? new GameInstance
 };
 
 instance.MinecraftVersion = versionId;
+// 冒烟测试用独立游戏目录，不污染真实 .minecraft
+instance.VersionIsolation = true;
 await repository.SaveAsync(instance);
 
 var lastReport = DateTimeOffset.MinValue;

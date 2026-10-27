@@ -56,12 +56,8 @@ public sealed class GameDirectoryTests : IDisposable
     {
         var settings = new FakeSettings();
         settings.Current.MinecraftDirectory = Path.Combine(_root, "shared-mc");
-        var factory = new LaunchContextFactory(_paths, settings);
-        var version = new ResolvedVersion
-        {
-            Detail = new VersionDetail { Id = "1.21.4", MainClass = "Main" },
-            Chain = [],
-        };
+        var factory = CreateFactory(settings);
+        var version = CreateVersion();
         var account = new AccountSession("Steve", "uuid", "0", "", "msa");
 
         var first = factory.Create(new GameInstance { Id = "inst-a" }, version, "java.exe", account);
@@ -75,24 +71,51 @@ public sealed class GameDirectoryTests : IDisposable
     }
 
     [Fact]
+    public void IsolatedInstanceUsesItsOwnGameDirectory()
+    {
+        var settings = new FakeSettings();
+        settings.Current.MinecraftDirectory = Path.Combine(_root, "shared-mc");
+        var factory = CreateFactory(settings);
+        var version = CreateVersion();
+        var account = new AccountSession("Steve", "uuid", "0", "", "msa");
+
+        var isolated = factory.Create(
+            new GameInstance { Id = "inst-a", VersionIsolation = true }, version, "java.exe", account);
+        var shared = factory.Create(
+            new GameInstance { Id = "inst-b" }, version, "java.exe", account);
+
+        Assert.Equal(Path.Combine(_root, "SolarInstances", "inst-a", ".minecraft"), isolated.GameDirectory);
+        Assert.NotEqual(isolated.GameDirectory, shared.GameDirectory);
+
+        // 两个隔离实例之间也互不影响
+        var otherIsolated = factory.Create(
+            new GameInstance { Id = "inst-c", VersionIsolation = true }, version, "java.exe", account);
+        Assert.NotEqual(isolated.GameDirectory, otherIsolated.GameDirectory);
+    }
+
+    [Fact]
     public void UnsetSettingUsesDefaultForLaunch()
     {
         var settings = new FakeSettings();
-        var factory = new LaunchContextFactory(_paths, settings);
-        var version = new ResolvedVersion
-        {
-            Detail = new VersionDetail { Id = "1.21.4", MainClass = "Main" },
-            Chain = [],
-        };
+        var factory = CreateFactory(settings);
 
         var context = factory.Create(
             new GameInstance { Id = "inst" },
-            version,
+            CreateVersion(),
             "java.exe",
             new AccountSession("Steve", "uuid", "0", "", "msa"));
 
         Assert.Equal(_paths.DefaultMinecraft, context.GameDirectory);
     }
+
+    private LaunchContextFactory CreateFactory(FakeSettings settings) =>
+        new(_paths, settings, new InstanceGameDirectory(_paths, settings));
+
+    private static ResolvedVersion CreateVersion() => new()
+    {
+        Detail = new VersionDetail { Id = "1.21.4", MainClass = "Main" },
+        Chain = [],
+    };
 
     private sealed class FakeSettings : ISettingsService
     {

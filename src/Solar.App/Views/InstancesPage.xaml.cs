@@ -20,6 +20,14 @@ public sealed partial class InstancesPage : PageBase
 
     public new InstancesViewModel ViewModel { get; }
 
+    private void SetupInstance_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: GameInstance instance })
+        {
+            Frame.Navigate(typeof(InstanceSetupPage), instance.Id);
+        }
+    }
+
     private void DeleteInstance_Click(object sender, RoutedEventArgs e)
     {
         if (sender is FrameworkElement { DataContext: GameInstance instance })
