@@ -23,13 +23,16 @@ public sealed partial class SettingsViewModel : ViewModelBase
     private string _javaPath = "";
 
     [ObservableProperty]
-    private string _playerName = "";
+    private string _microsoftClientId = "";
 
     [ObservableProperty]
     private string _versionManifestUrl = "";
 
     [ObservableProperty]
     private int _downloadThreads;
+
+    [ObservableProperty]
+    private string _downloadMirrorUrl = "";
 
     [ObservableProperty]
     private string _detectedJava = "未检测";
@@ -57,9 +60,10 @@ public sealed partial class SettingsViewModel : ViewModelBase
         var s = _settings.Current;
         MaxMemoryMb = s.MaxMemoryMb;
         JavaPath = s.JavaPath ?? "";
-        PlayerName = s.PlayerName;
+        MicrosoftClientId = s.MicrosoftClientId ?? "";
         VersionManifestUrl = s.VersionManifestUrl;
         DownloadThreads = s.DownloadThreads;
+        DownloadMirrorUrl = s.DownloadMirrorUrl ?? "";
     }
 
     public override async Task OnNavigatedToAsync(object? parameter)
@@ -97,11 +101,12 @@ public sealed partial class SettingsViewModel : ViewModelBase
         var s = _settings.Current;
         s.MaxMemoryMb = Math.Max(512, MaxMemoryMb);
         s.JavaPath = string.IsNullOrWhiteSpace(JavaPath) ? null : JavaPath.Trim();
-        s.PlayerName = string.IsNullOrWhiteSpace(PlayerName) ? "Steve" : PlayerName.Trim();
+        s.MicrosoftClientId = string.IsNullOrWhiteSpace(MicrosoftClientId) ? null : MicrosoftClientId.Trim();
         s.VersionManifestUrl = string.IsNullOrWhiteSpace(VersionManifestUrl)
             ? "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json"
             : VersionManifestUrl.Trim();
         s.DownloadThreads = Math.Clamp(DownloadThreads, 1, 32);
+        s.DownloadMirrorUrl = string.IsNullOrWhiteSpace(DownloadMirrorUrl) ? null : DownloadMirrorUrl.Trim();
 
         try
         {

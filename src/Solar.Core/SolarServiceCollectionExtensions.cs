@@ -1,6 +1,11 @@
 using Microsoft.Extensions.DependencyInjection;
+using Solar.Core.Accounts;
+using Solar.Core.Assets;
+using Solar.Core.Download;
 using Solar.Core.Instances;
 using Solar.Core.Java;
+using Solar.Core.Launch;
+using Solar.Core.Loaders;
 using Solar.Core.Minecraft;
 using Solar.Core.Paths;
 using Solar.Core.Settings;
@@ -20,8 +25,30 @@ public static class SolarServiceCollectionExtensions
         services.AddSingleton<IInstanceRepository, InstanceRepository>();
         services.AddSingleton<IJavaDetector, JavaDetector>();
 
+        services.AddSingleton<IAccountStore, AccountStore>();
+
+        // 默认配置为空；实际取值每次从 ISettingsService 读取，用户改了立即生效
+        services.AddSingleton(new AuthOptions());
+        services.AddSingleton<IMicrosoftAuthService, MicrosoftAuthService>();
+
+        services.AddSingleton<IAssetIndexService, AssetIndexService>();
+        services.AddSingleton<IGameDownloader, GameDownloader>();
+        services.AddSingleton<IGameLauncher, GameLauncher>();
+        services.AddSingleton<LaunchContextFactory>();
+        services.AddSingleton<IGameLaunchService, GameLaunchService>();
+
         services.AddHttpClient<IVersionManifestService, VersionManifestService>(ConfigureHttpClient);
         services.AddHttpClient<IVersionResolver, VersionResolver>(ConfigureHttpClient);
+        services.AddHttpClient<IAssetIndexService, AssetIndexService>(ConfigureHttpClient);
+
+        // 加载器元数据与 installer 下载走独立 client：
+        // installer jar 有 7~9MB，超时要比普通请求宽松
+        services.AddHttpClient<ILoaderVersionService, LoaderVersionService>(ConfigureHttpClient);
+        services.AddHttpClient<ILoaderInstaller, LoaderInstaller>(client =>
+        {
+            ConfigureHttpClient(client);
+            client.Timeout = TimeSpan.FromMinutes(15);
+        });
 
         return services;
     }

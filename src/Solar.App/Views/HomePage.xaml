@@ -6,7 +6,13 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:views="using:Solar.App.Views"
+    xmlns:conv="using:Solar.App.Converters"
     mc:Ignorable="d">
+
+    <Page.Resources>
+        <conv:VisibleWhenTrueConverter x:Key="VisibleWhenTrue" />
+        <conv:InvertBoolConverter x:Key="InvertBool" />
+    </Page.Resources>
 
     <ScrollViewer>
         <StackPanel
@@ -45,20 +51,52 @@
                             Style="{StaticResource CaptionTextBlockStyle}"
                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                             Text="{x:Bind ViewModel.SelectedInstanceSummary, Mode=OneWay}" />
+
+                        <InfoBar
+                            IsClosable="False"
+                            IsOpen="{x:Bind ViewModel.IsSignedIn, Mode=OneWay, Converter={StaticResource InvertBool}}"
+                            Message="尚未登录微软账户，请先到「账户」页登录"
+                            Severity="Warning" />
                     </StackPanel>
 
-                    <Button
+                    <StackPanel
                         Grid.Column="1"
-                        MinWidth="160"
                         VerticalAlignment="Bottom"
-                        Command="{x:Bind ViewModel.LaunchCommand}"
-                        Style="{StaticResource AccentButtonStyle}">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <FontIcon FontSize="16" Glyph="&#xE768;" />
-                            <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="启动游戏" />
-                        </StackPanel>
-                    </Button>
+                        Orientation="Horizontal"
+                        Spacing="8">
+                        <Button
+                            MinWidth="160"
+                            Command="{x:Bind ViewModel.LaunchCommand}"
+                            IsEnabled="{x:Bind ViewModel.IsLaunching, Mode=OneWay, Converter={StaticResource InvertBool}}"
+                            Style="{StaticResource AccentButtonStyle}">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon FontSize="16" Glyph="&#xE768;" />
+                                <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="启动游戏" />
+                            </StackPanel>
+                        </Button>
+                        <Button
+                            Command="{x:Bind ViewModel.CancelLaunchCommand}"
+                            Content="取消"
+                            Visibility="{x:Bind ViewModel.IsLaunching, Mode=OneWay, Converter={StaticResource VisibleWhenTrue}}" />
+                    </StackPanel>
                 </Grid>
+            </Border>
+
+            <!-- 下载/启动进度：只在启动过程中出现 -->
+            <Border
+                Style="{StaticResource SolarCardStyle}"
+                Visibility="{x:Bind ViewModel.HasLaunchProgress, Mode=OneWay, Converter={StaticResource VisibleWhenTrue}}">
+                <StackPanel Spacing="8">
+                    <ProgressBar
+                        Maximum="1"
+                        Value="{x:Bind ViewModel.LaunchProgress, Mode=OneWay}"
+                        Visibility="{x:Bind ViewModel.IsLaunching, Mode=OneWay, Converter={StaticResource VisibleWhenTrue}}" />
+                    <TextBlock
+                        Style="{StaticResource CaptionTextBlockStyle}"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Text="{x:Bind ViewModel.LaunchStatus, Mode=OneWay}"
+                        TextTrimming="CharacterEllipsis" />
+                </StackPanel>
             </Border>
 
             <!-- 信息卡片：两列等宽，窄窗口下由 NavigationView 自身收缩，卡片保持最小可读宽度 -->
@@ -76,15 +114,22 @@
                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                             Text="{x:Bind ViewModel.JavaStatus, Mode=OneWay}"
                             TextWrapping="Wrap" />
+                        <TextBlock
+                            Style="{StaticResource CaptionTextBlockStyle}"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}">
+                            <Run Text="实例数量 " />
+                            <Run Text="{x:Bind ViewModel.Instances.Count, Mode=OneWay}" />
+                        </TextBlock>
                     </StackPanel>
                 </Border>
 
                 <Border Grid.Column="1" Style="{StaticResource SolarCardStyle}">
                     <StackPanel Spacing="8">
-                        <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="实例数量" />
+                        <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="当前账户" />
                         <TextBlock
                             Style="{StaticResource SubtitleTextBlockStyle}"
-                            Text="{x:Bind ViewModel.Instances.Count, Mode=OneWay}" />
+                            Text="{x:Bind ViewModel.AccountSummary, Mode=OneWay}"
+                            TextTrimming="CharacterEllipsis" />
                     </StackPanel>
                 </Border>
             </Grid>

@@ -10,6 +10,10 @@
     <PackageReference Include="Microsoft.Extensions.Http" />
     <PackageReference Include="Microsoft.Extensions.Logging" />
     <PackageReference Include="Microsoft.Extensions.Options" />
+    <PackageReference Include="CmlLib.Core" />
+    <PackageReference Include="CmlLib.Core.Auth.Microsoft" />
+    <PackageReference Include="XboxAuthNet.Game.Msal" />
+    <PackageReference Include="Microsoft.Identity.Client" />
   </ItemGroup>
 
 </Project>

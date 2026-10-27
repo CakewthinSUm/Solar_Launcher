@@ -23,6 +23,16 @@ public sealed class VisibleWhenTextConverter : IValueConverter
         throw new NotSupportedException();
 }
 
+/// <summary>bool 取反，用于“进行中时禁用按钮”这类绑定。</summary>
+public sealed class InvertBoolConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, string language) =>
+        value is not true;
+
+    public object ConvertBack(object value, Type targetType, object parameter, string language) =>
+        value is not true;
+}
+
 /// <summary>模组加载器的枚举值 → 中文显示名。</summary>
 public sealed class ModLoaderDisplayConverter : IValueConverter
 {

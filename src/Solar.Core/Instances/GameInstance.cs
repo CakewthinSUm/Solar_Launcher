@@ -29,6 +29,9 @@ public sealed class GameInstance
     /// <summary>实际要启动的版本目录名（如 <c>1.21.4-forge-54.0.1</c>）；为空时等于 MinecraftVersion。</summary>
     public string? VersionId { get; set; }
 
+    /// <summary>加载器是否已安装完成。未安装时启动会先触发安装。</summary>
+    public bool LoaderInstalled { get; set; }
+
     /// <summary>覆盖全局的 Java 路径。</summary>
     public string? JavaPath { get; set; }
 

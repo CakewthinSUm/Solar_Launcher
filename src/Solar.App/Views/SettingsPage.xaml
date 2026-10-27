@@ -60,24 +60,6 @@
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <StackPanel Grid.Column="0" Spacing="2">
-                                <TextBlock Text="玩家昵称" />
-                                <TextBlock
-                                    Style="{StaticResource CaptionTextBlockStyle}"
-                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                    Text="离线模式使用的玩家名" />
-                            </StackPanel>
-                            <TextBox
-                                Grid.Column="1"
-                                Width="240"
-                                Text="{x:Bind ViewModel.PlayerName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                        </Grid>
-
-                        <Grid ColumnSpacing="16">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <StackPanel Grid.Column="0" Spacing="2">
                                 <TextBlock Text="下载线程数" />
                                 <TextBlock
                                     Style="{StaticResource CaptionTextBlockStyle}"
@@ -92,6 +74,25 @@
                                 SpinButtonPlacementMode="Compact"
                                 Value="{x:Bind ViewModel.DownloadThreads, Mode=TwoWay}" />
                         </Grid>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- 账户 -->
+            <StackPanel Spacing="8">
+                <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="账户" />
+                <Border Style="{StaticResource SolarCardStyle}">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="微软应用客户端 ID" />
+                        <TextBlock
+                            Style="{StaticResource CaptionTextBlockStyle}"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            Text="在 Azure 门户注册应用后获得。应用类型选「移动和桌面应用」，启用公共客户端流，重定向 URI 填 http://localhost，并在 aka.ms/mce-reviewappid 提交审核。"
+                            TextWrapping="Wrap" />
+                        <TextBox
+                            FontFamily="Consolas"
+                            PlaceholderText="00000000-0000-0000-0000-000000000000"
+                            Text="{x:Bind ViewModel.MicrosoftClientId, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                     </StackPanel>
                 </Border>
             </StackPanel>
@@ -149,6 +150,18 @@
                                 Text="可替换为国内镜像以加速" />
                         </StackPanel>
                         <TextBox Text="{x:Bind ViewModel.VersionManifestUrl, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+                        <StackPanel Spacing="2">
+                            <TextBlock Text="下载镜像" />
+                            <TextBlock
+                                Style="{StaticResource CaptionTextBlockStyle}"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Text="留空直连 Mojang。例如 BMCLAPI：https://bmclapi2.bangbang93.com"
+                                TextWrapping="Wrap" />
+                        </StackPanel>
+                        <TextBox
+                            PlaceholderText="直连"
+                            Text="{x:Bind ViewModel.DownloadMirrorUrl, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                     </StackPanel>
                 </Border>
             </StackPanel>

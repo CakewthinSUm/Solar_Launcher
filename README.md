@@ -75,7 +75,83 @@ Windows App SDK 以自包含方式随输出一起分发，终端用户无需单�
 - [x] 版本清单拉取与本地缓存（可在设置中换成国内镜像）
 - [x] 版本 JSON 下载、`inheritsFrom` 合并、rules 平台求值
 - [x] Java 自动探测与版本匹配
-- [ ] 依赖（libraries / assets / natives）下载与校验
-- [ ] 启动参数拼装与游戏进程启动
-- [ ] 账户系统（离线 / 微软登录）
-- [ ] 模组加载器安装（Forge / NeoForge / Fabric / Quilt）
+- [x] 依赖（libraries / assets / natives）下载与 SHA1 校验
+- [x] 启动参数拼装与游戏进程启动
+- [x] 下载镜像（BMCLAPI）与实例级 Java / 内存覆盖
+- [x] 微软正版登录（设备码流程、多账户、令牌静默刷新）
+- [x] 模组加载器安装（Fabric / Quilt / Forge / NeoForge）
+
+## 模组加载器
+
+| 加载器 | 安装方式 |
+| --- | --- |
+| Fabric / Quilt | 元数据接口直接返回带 `inheritsFrom` 的 profile JSON |
+| Forge / NeoForge | 下载 installer jar，取出 `version.json`，再执行客户端 processor |
+
+Forge / NeoForge 的 installer 不是简单的解压：它需要跑若干 processor
+（重命名原版 jar、打二进制补丁）才能产出可用的 client artifact。
+这些 processor 用 Java 执行，参数里混有三种占位符形态——
+`{KEY}` 引用数据表、`[group:artifact:version@ext]` 内联 maven 坐标、
+`'literal'` 单引号字面量，全部在 `LoaderInstaller` 里处理。
+
+安装时机是**首次启动该实例时**，不是创建实例时——installer 要下载几百 MB，
+建实例时同步等待体验很差。
+
+## 账户
+
+只支持**微软正版账户**，不提供离线登录。
+
+登录走 OAuth 设备码流程：点「登录」后启动器显示一个一次性代码，
+在浏览器打开 `microsoft.com/link` 输入即可，无需在启动器内嵌浏览器。
+
+令牌链（OAuth → Xbox Live → XSTS → Minecraft Services）由
+[CmlLib.Core.Auth.Microsoft](https://github.com/CmlLib/CmlLib.Core.Auth.Microsoft)
+完成，它基于 MSAL.NET 并自行缓存与刷新令牌。
+`SolarData/accounts.json` 只存用户名、UUID、XUID 等展示信息，
+不含任何令牌；令牌在 `SolarData/msa-accounts.json`。
+
+### 必须自行注册 Azure 应用
+
+启动器**不内置**客户端 ID。使用前需要：
+
+1. 在 [Azure 门户](https://portal.azure.com) 注册应用
+2. 应用类型选「移动和桌面应用」，启用「允许公共客户端流」
+3. 重定向 URI 填 `http://localhost`
+4. 在 [aka.ms/mce-reviewappid](https://aka.ms/mce-reviewappid) 提交审核
+   （否则调用 Minecraft API 会返回 403）
+5. 把客户端 ID 填进「设置 → 账户」
+
+用别人注册的客户端 ID 违反微软的使用条款。
+
+## 下载引擎
+
+依赖下载使用 [CmlLib.Core](https://github.com/CmlLib/CmlLib.Core) 的 `ParallelGameInstaller`：
+它用 TPL Dataflow 把"校验"和"下载"分成两级流水线，各自独立并行度，
+并内置 SHA1 校验与背压。我们只使用它的下载部分，版本解析、参数拼装、
+进程启动全部是 `Solar.Core` 自己的实现。
+
+镜像通过 `MirrorRewritingHandler` 在 HTTP 层重写 URL：
+只重写 `libraries.minecraft.net`（→ `/maven/`）与
+`resources.download.minecraft.net`（→ `/assets/`），
+`piston-data` 等路径保持直连，因为镜像对它们的支持不完整。
+
+## 端到端验证
+
+```bash
+# 真实下载一个版本的全部依赖（不需要登录）
+dotnet run --project tools/Solar.Smoke -- 1.21.4 %TEMP%\solar-smoke --prepare-only
+
+# 下载并启动，60 秒后若仍在运行则判定成功（需要先登录）
+dotnet run --project tools/Solar.Smoke -- 1.21.4 %TEMP%\solar-smoke
+
+# 验证微软登录全流程：设备码 → Xbox → XSTS → Minecraft → 静默刷新
+dotnet run --project tools/Solar.AuthProbe -- <你的客户端ID>
+
+# 验证加载器安装（不给版本号则列出可选项并选最新）
+dotnet run --project tools/Solar.LoaderProbe -- fabric 1.21.4
+dotnet run --project tools/Solar.LoaderProbe -- forge 1.21.4 54.1.22
+
+# 验证装好的加载器版本能否真正启动（用合成账户，不需要登录）
+dotnet run --project tools/Solar.LaunchProbe -- fabric-loader-0.20.1-1.21.4
+dotnet run --project tools/Solar.LaunchProbe -- 1.21.4-forge-54.1.22
+```
