@@ -1,6 +1,8 @@
+using Microsoft.Extensions.Logging.Abstractions;
 using Solar.Core.Accounts;
 using Solar.Core.Instances;
 using Solar.Core.Launch;
+using Solar.Core.Memory;
 using Solar.Core.Minecraft;
 using Solar.Core.Models;
 using Solar.Core.Paths;
@@ -94,6 +96,24 @@ public sealed class GameDirectoryTests : IDisposable
     }
 
     [Fact]
+    public void LaunchContextCarriesResolvedMemory()
+    {
+        // 内存分配结果必须真的进到启动上下文，否则设置页改了也不生效
+        var settings = new FakeSettings();
+        settings.Current.MemoryAllocationMode = MemoryAllocationMode.Manual;
+        settings.Current.MaxMemoryMb = 6144;
+
+        var context = CreateFactory(settings).Create(
+            new GameInstance { Id = "inst" },
+            CreateVersion(),
+            "java.exe",
+            new AccountSession("Steve", "uuid", "0", "", "msa"));
+
+        Assert.Equal(6144, context.MaxMemoryMb);
+        Assert.Contains("-Xmx6144M", new ArgumentBuilder().BuildJvmArguments(context));
+    }
+
+    [Fact]
     public void UnsetSettingUsesDefaultForLaunch()
     {
         var settings = new FakeSettings();
@@ -108,8 +128,17 @@ public sealed class GameDirectoryTests : IDisposable
         Assert.Equal(_paths.DefaultMinecraft, context.GameDirectory);
     }
 
-    private LaunchContextFactory CreateFactory(FakeSettings settings) =>
-        new(_paths, settings, new InstanceGameDirectory(_paths, settings));
+    private LaunchContextFactory CreateFactory(FakeSettings settings)
+    {
+        var gameDirectories = new InstanceGameDirectory(_paths, settings);
+        var memory = new MemoryAllocationService(
+            settings,
+            gameDirectories,
+            new FakeMemoryInfo(16384, 12288),
+            NullLogger<MemoryAllocationService>.Instance);
+
+        return new(_paths, settings, gameDirectories, memory);
+    }
 
     private static ResolvedVersion CreateVersion() => new()
     {
@@ -124,6 +153,11 @@ public sealed class GameDirectoryTests : IDisposable
         public Task LoadAsync(CancellationToken ct = default) => Task.CompletedTask;
 
         public Task SaveAsync(CancellationToken ct = default) => Task.CompletedTask;
+    }
+
+    private sealed class FakeMemoryInfo(int totalMb, int availableMb) : ISystemMemoryInfo
+    {
+        public SystemMemoryInfo GetCurrent() => new(totalMb, availableMb);
     }
 
     public void Dispose()

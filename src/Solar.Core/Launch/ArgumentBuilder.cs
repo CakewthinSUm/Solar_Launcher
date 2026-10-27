@@ -31,6 +31,12 @@ public sealed class LaunchContext
     public string AssetsDirectory { get; init; } = "";
     public string LogConfigPath { get; init; } = "";
 
+    /// <summary>
+    /// 实际使用的堆上限（MB），由 <see cref="LaunchContextFactory"/> 结合设置里的
+    /// 分配方式与实例级覆盖算好。这里不再关心它从哪来。
+    /// </summary>
+    public int MaxMemoryMb { get; init; } = 4096;
+
     /// <summary>要传给游戏的分辨率；为空时由游戏自己决定。</summary>
     public (int Width, int Height)? Resolution { get; init; }
 
@@ -51,7 +57,7 @@ public sealed class ArgumentBuilder
         var result = new List<string>();
 
         // 内存与平台相关参数放在最前面，用户/版本参数可以覆盖它们
-        result.Add($"-Xmx{context.Instance.MaxMemoryMb ?? context.Settings.MaxMemoryMb}M");
+        result.Add($"-Xmx{context.MaxMemoryMb}M");
         result.Add($"-Djava.library.path={context.NativesDirectory}");
         result.Add("-Dminecraft.launcher.brand=SolarLauncher");
         result.Add("-Dminecraft.launcher.version=0.1.0");

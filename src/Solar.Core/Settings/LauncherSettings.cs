@@ -1,9 +1,14 @@
+using Solar.Core.Memory;
+
 namespace Solar.Core.Settings;
 
 /// <summary>全局启动器设置，持久化到 <c>SolarData/settings.json</c>。</summary>
 public sealed class LauncherSettings
 {
-    /// <summary>游戏内存上限（MB）。</summary>
+    /// <summary>内存分配方式：自动按内存与模组数量计算，或使用 <see cref="MaxMemoryMb"/>。</summary>
+    public MemoryAllocationMode MemoryAllocationMode { get; set; } = MemoryAllocationMode.Automatic;
+
+    /// <summary>手动模式下游戏内存上限（MB）；自动模式下不使用。</summary>
     public int MaxMemoryMb { get; set; } = 4096;
 
     /// <summary>
