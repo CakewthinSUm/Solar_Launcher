@@ -12,6 +12,7 @@ public sealed class LaunchContextFactory(
     AppPaths paths,
     ISettingsService settings,
     InstanceGameDirectory gameDirectories,
+    GameFileLocator fileLocator,
     IMemoryAllocationService memory)
 {
     public LaunchContext Create(
@@ -32,6 +33,7 @@ public sealed class LaunchContextFactory(
             Version = version,
             Paths = paths,
             Settings = settings.Current,
+            FileLocator = fileLocator,
             JavaPath = javaPath,
             PlayerName = account.Username,
             Uuid = account.Uuid,

@@ -15,6 +15,12 @@ public sealed class LaunchContext
     public required AppPaths Paths { get; init; }
     public required LauncherSettings Settings { get; init; }
 
+    /// <summary>
+    /// 库与版本文件的查找器：SolarShared 与游戏目录两处都查。
+    /// 为空时只认 <see cref="AppPaths.Libraries"/> 与 <see cref="AppPaths.Versions"/>。
+    /// </summary>
+    public GameFileLocator? FileLocator { get; init; }
+
     public required string JavaPath { get; init; }
     public required string PlayerName { get; init; }
     public required string Uuid { get; init; }
@@ -133,14 +139,33 @@ public sealed class ArgumentBuilder
             // 与下载端共用同一套路径推导，避免两边不一致
             if (library.ResolveDownload() is { } download)
             {
-                entries.Add(Path.Combine(context.Paths.Libraries, download.RelativePath));
+                entries.Add(ResolveLibraryPath(context, download.RelativePath));
             }
         }
 
-        entries.Add(Path.Combine(context.Paths.Versions, context.Version.Id, context.Version.Id + ".jar"));
+        // 加载器版本的 JSON 一般不指向自己的 jar，真正要进 classpath 的是父版本的 jar。
+        // 解析链的最后一个就是根版本（原版）。
+        var jarVersionId = context.Version.Chain.Count > 0
+            ? context.Version.Chain[^1].Id
+            : context.Version.Id;
+
+        if (ResolveVersionJar(context, jarVersionId) is { } jarPath)
+        {
+            entries.Add(jarPath);
+        }
 
         return string.Join(Path.PathSeparator, entries);
     }
+
+    private static string ResolveLibraryPath(LaunchContext context, string relativePath) =>
+        context.FileLocator?.ResolveLibrary(relativePath)
+        ?? Path.Combine(context.Paths.Libraries, relativePath);
+
+    /// <summary>版本 jar 的位置；没有查找器时按 Solar 自己的目录拼。</summary>
+    private static string? ResolveVersionJar(LaunchContext context, string versionId) =>
+        context.FileLocator is { } locator
+            ? locator.FindVersionJar(versionId)
+            : Path.Combine(context.Paths.Versions, versionId, versionId + ".jar");
 
     private static IEnumerable<string> Expand(IEnumerable<ArgumentEntry> entries, LaunchContext context)
     {
@@ -208,7 +233,10 @@ public sealed class ArgumentBuilder
 
         "user_type" => context.UserType,
         "user_properties" => "{}",
-        "version_name" => context.Version.Id,
+        // 实例设置了自定义标题时覆盖 version_name：游戏的窗口标题取自 --version 参数的值
+        "version_name" => string.IsNullOrWhiteSpace(context.Instance.CustomWindowTitle)
+            ? context.Version.Id
+            : context.Instance.CustomWindowTitle.Trim(),
         "version_type" => context.VersionType,
         "game_directory" => context.GameDirectory,
         "assets_root" => context.AssetsDirectory,

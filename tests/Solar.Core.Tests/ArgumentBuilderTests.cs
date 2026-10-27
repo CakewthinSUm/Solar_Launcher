@@ -245,4 +245,53 @@ public class ArgumentBuilderTests
         Assert.Contains("1280", args);
         Assert.Contains("720", args);
     }
+
+    [Fact]
+    public void CustomWindowTitleOverridesVersionName()
+    {
+        var context = CreateContext();
+        context.Instance.CustomWindowTitle = "我的世界";
+
+        Assert.Equal("我的世界", ArgumentBuilder.Substitute("${version_name}", context));
+    }
+
+    [Fact]
+    public void BlankCustomWindowTitleFallsBackToVersionId()
+    {
+        var context = CreateContext();
+        context.Instance.CustomWindowTitle = "   ";
+
+        Assert.Equal("1.21.4", ArgumentBuilder.Substitute("${version_name}", context));
+    }
+
+    [Fact]
+    public void CustomWindowTitleIsTrimmed()
+    {
+        var context = CreateContext();
+        context.Instance.CustomWindowTitle = "  存档服  ";
+
+        Assert.Equal("存档服", ArgumentBuilder.Substitute("${version_name}", context));
+    }
+
+    [Fact]
+    public void CustomWindowTitleChangesGameArguments()
+    {
+        // 真实场景：版本 JSON 里 --version ${version_name}，启动后的窗口标题用它
+        var detail = new VersionDetail
+        {
+            Id = "1.21.4",
+            MainClass = "net.minecraft.client.main.Main",
+            Arguments = new Arguments
+            {
+                Game = [new ArgumentEntry { Value = "--version" }, new ArgumentEntry { Value = "${version_name}" }],
+            },
+        };
+
+        var context = CreateContext(detail);
+        context.Instance.CustomWindowTitle = "整合包：星辰";
+
+        var args = new ArgumentBuilder().BuildGameArguments(context);
+
+        Assert.Equal(["--version", "整合包：星辰"], args);
+    }
 }

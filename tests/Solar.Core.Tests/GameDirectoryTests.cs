@@ -130,14 +130,14 @@ public sealed class GameDirectoryTests : IDisposable
 
     private LaunchContextFactory CreateFactory(FakeSettings settings)
     {
-        var gameDirectories = new InstanceGameDirectory(_paths, settings);
+        var directories = new InstanceGameDirectory(_paths, settings);
         var memory = new MemoryAllocationService(
             settings,
-            gameDirectories,
+            directories,
             new FakeMemoryInfo(16384, 12288),
             NullLogger<MemoryAllocationService>.Instance);
 
-        return new(_paths, settings, gameDirectories, memory);
+        return new(_paths, settings, directories, new GameFileLocator(_paths, directories), memory);
     }
 
     private static ResolvedVersion CreateVersion() => new()

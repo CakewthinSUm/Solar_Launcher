@@ -42,6 +42,13 @@ public sealed class GameInstance
     /// <summary>覆盖全局的 Java 路径。</summary>
     public string? JavaPath { get; set; }
 
+    /// <summary>
+    /// 自定义游戏窗口标题。游戏把标题拼成 "Minecraft* &lt;--version 参数值&gt;"，
+    /// 而该值来自版本 JSON 的 <c>${version_name}</c> 占位符，覆盖它即可改标题。
+    /// 为空时保持默认（版本 id）。
+    /// </summary>
+    public string? CustomWindowTitle { get; set; }
+
     /// <summary>覆盖全局的内存上限（MB）。</summary>
     public int? MaxMemoryMb { get; set; }
 
