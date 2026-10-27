@@ -26,6 +26,8 @@
         <TitleBar
             x:Name="AppTitleBar"
             Title="Solar Launcher"
+            BackRequested="AppTitleBar_BackRequested"
+            IsBackButtonVisible="True"
             IsPaneToggleButtonVisible="True"
             PaneToggleRequested="AppTitleBar_PaneToggleRequested">
             <TitleBar.IconSource>
@@ -86,7 +88,7 @@
                 </NavigationViewItem>
             </NavigationView.MenuItems>
 
-            <Frame x:Name="ContentFrame" />
+            <Frame x:Name="ContentFrame" Navigated="ContentFrame_Navigated" />
         </NavigationView>
     </Grid>
 </Window>
