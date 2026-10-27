@@ -41,8 +41,8 @@ public sealed class InstanceRepository(AppPaths paths) : IInstanceRepository
 
     public async Task SaveAsync(GameInstance instance, CancellationToken ct = default)
     {
+        // 游戏目录（.minecraft）是全局共享的，不属于实例，这里只建实例自己的目录
         Directory.CreateDirectory(paths.GetInstanceDirectory(instance.Id));
-        Directory.CreateDirectory(paths.GetInstanceMinecraftDirectory(instance.Id));
 
         await JsonFile.WriteAsync(paths.GetInstanceFile(instance.Id, FileName), instance, ct).ConfigureAwait(false);
 

@@ -76,6 +76,50 @@
                         </Grid>
                     </StackPanel>
                 </Border>
+
+                <!-- 游戏目录：所有实例共用的 .minecraft -->
+                <Border Style="{StaticResource SolarCardStyle}">
+                    <StackPanel Spacing="8">
+                        <StackPanel Spacing="2">
+                            <TextBlock Text="游戏目录（.minecraft）" />
+                            <TextBlock
+                                Style="{StaticResource CaptionTextBlockStyle}"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Text="所有实例共用的存档、模组与配置目录。可直接指向官方启动器的 .minecraft 以复用已有内容；留空则使用程序目录下的 .minecraft。"
+                                TextWrapping="Wrap" />
+                        </StackPanel>
+
+                        <Grid ColumnSpacing="8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBox
+                                Grid.Column="0"
+                                FontFamily="Consolas"
+                                PlaceholderText="默认"
+                                Text="{x:Bind ViewModel.MinecraftDirectory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                            <Button
+                                Grid.Column="1"
+                                Command="{x:Bind ViewModel.BrowseMinecraftDirectoryCommand}"
+                                Content="浏览…" />
+                            <Button
+                                Grid.Column="2"
+                                Command="{x:Bind ViewModel.UseDefaultMinecraftDirectoryCommand}"
+                                Content="恢复默认" />
+                        </Grid>
+
+                        <TextBlock
+                            Style="{StaticResource CaptionTextBlockStyle}"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            IsTextSelectionEnabled="True"
+                            TextWrapping="Wrap">
+                            <Run Text="实际使用：" />
+                            <Run Text="{x:Bind ViewModel.EffectiveMinecraftDirectory, Mode=OneWay}" />
+                        </TextBlock>
+                    </StackPanel>
+                </Border>
             </StackPanel>
 
             <!-- 账户 -->

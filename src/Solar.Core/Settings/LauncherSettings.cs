@@ -6,6 +6,13 @@ public sealed class LauncherSettings
     /// <summary>游戏内存上限（MB）。</summary>
     public int MaxMemoryMb { get; set; } = 4096;
 
+    /// <summary>
+    /// 游戏目录（.minecraft）。所有实例共用其中的存档、模组与配置。
+    /// 留空表示使用程序目录下的 .minecraft；空值才能保持便携性，
+    /// 所以填成默认值时也按空值保存。
+    /// </summary>
+    public string? MinecraftDirectory { get; set; }
+
     /// <summary>自定义 Java 路径；为空时自动探测。</summary>
     public string? JavaPath { get; set; }
 

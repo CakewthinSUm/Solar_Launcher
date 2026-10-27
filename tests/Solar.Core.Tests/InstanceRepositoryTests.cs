@@ -36,7 +36,7 @@ public sealed class InstanceRepositoryTests : IDisposable
         Assert.Equal("测试实例", loaded!.Name);
         Assert.Equal(ModLoader.Fabric, loaded.Loader);
         Assert.Equal("1.21.4", loaded.EffectiveVersionId);
-        Assert.True(Directory.Exists(_paths.GetInstanceMinecraftDirectory("abc123")));
+        Assert.True(Directory.Exists(_paths.GetInstanceDirectory("abc123")));
     }
 
     [Fact]

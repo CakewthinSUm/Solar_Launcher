@@ -9,6 +9,7 @@ obj/
 SolarData/
 SolarShared/
 SolarInstances/
+.minecraft/
 
 ## 发布输出
 publish/

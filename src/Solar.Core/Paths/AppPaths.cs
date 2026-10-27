@@ -15,6 +15,12 @@ public sealed class AppPaths
     /// <summary>共享资源（assets、libraries、versions、java），可被多个游戏目录共用。</summary>
     public string Shared => Path.Combine(Root, "SolarShared");
 
+    /// <summary>
+    /// 默认游戏目录：程序目录下的 <c>.minecraft</c>。
+    /// 用户可在设置里改到别处（例如接管官方启动器的目录），此时以设置为准。
+    /// </summary>
+    public string DefaultMinecraft => Path.Combine(Root, ".minecraft");
+
     /// <summary>每个“游戏目录/实例”的父目录。</summary>
     public string Instances => Path.Combine(Root, "SolarInstances");
 
@@ -43,8 +49,21 @@ public sealed class AppPaths
 
     public string GetInstanceDirectory(string instanceId) => Path.Combine(Instances, instanceId);
 
-    public string GetInstanceMinecraftDirectory(string instanceId) =>
-        Path.Combine(GetInstanceDirectory(instanceId), ".minecraft");
+    /// <summary>
+    /// 解析实际使用的游戏目录（.minecraft）。设置为空时用默认的
+    /// <see cref="DefaultMinecraft"/>；支持 <c>%APPDATA%</c> 这类环境变量；
+    /// 相对路径按程序目录解析，而不是随进程工作目录变化，保证便携版行为一致。
+    /// </summary>
+    public string ResolveMinecraftDirectory(string? configured)
+    {
+        if (string.IsNullOrWhiteSpace(configured))
+        {
+            return DefaultMinecraft;
+        }
+
+        var expanded = Environment.ExpandEnvironmentVariables(configured.Trim());
+        return Path.GetFullPath(expanded, Root);
+    }
 
     public string GetInstanceFile(string instanceId, string fileName) =>
         Path.Combine(GetInstanceDirectory(instanceId), fileName);

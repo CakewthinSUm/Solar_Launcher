@@ -28,7 +28,7 @@
             <TextBlock
                 Style="{StaticResource BodyTextBlockStyle}"
                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                Text="每个实例拥有独立的存档、模组与配置" />
+                Text="每个实例可选择不同版本与加载器，共用同一份游戏目录" />
         </StackPanel>
 
         <!-- 新建实例表单 -->
