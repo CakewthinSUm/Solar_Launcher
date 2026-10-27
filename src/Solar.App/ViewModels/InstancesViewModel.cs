@@ -204,7 +204,8 @@ public sealed partial class InstancesViewModel : ViewModelBase
             return;
         }
 
-        if (!await _dialogs.ShowConfirmAsync("删除实例", $"确定要删除“{instance.Name}”吗？该实例的游戏目录会被一并删除。", "删除", "取消"))
+        // 游戏目录是所有实例共用的，删实例只清掉它自己的记录与 natives
+        if (!await _dialogs.ShowConfirmAsync("删除实例", $"确定要删除“{instance.Name}”吗？\n存档与模组在共享的游戏目录里，不会被删除。", "删除", "取消"))
         {
             return;
         }

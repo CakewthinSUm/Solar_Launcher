@@ -17,6 +17,10 @@ public sealed class LaunchContextFactory(
         AccountSession account,
         string? logConfigPath = null)
     {
+        // 游戏目录是全局设置：所有实例共用同一份 .minecraft（存档、模组、配置）。
+        // natives 仍按实例隔离，不同版本的原生库不能混用。
+        var gameDirectory = paths.ResolveMinecraftDirectory(settings.Current.MinecraftDirectory);
+
         return new LaunchContext
         {
             Instance = instance,
@@ -29,7 +33,7 @@ public sealed class LaunchContextFactory(
             AccessToken = account.AccessToken,
             Xuid = account.Xuid ?? "",
             UserType = account.UserType,
-            GameDirectory = paths.GetInstanceMinecraftDirectory(instance.Id),
+            GameDirectory = gameDirectory,
             NativesDirectory = Path.Combine(paths.GetInstanceDirectory(instance.Id), "natives"),
             AssetsDirectory = paths.Assets,
             LogConfigPath = logConfigPath ?? "",

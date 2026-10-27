@@ -54,8 +54,13 @@ tests/
 ```
 SolarData/          设置、账户、日志、版本清单缓存
 SolarShared/        共享资源：versions / libraries / assets / runtime
-SolarInstances/     每个实例一个目录，内含 .minecraft 与 instance.json
+SolarInstances/     每个实例一个目录，内含 natives 与 instance.json
+.minecraft/         游戏目录：存档、模组、配置（默认位置，可在设置中改）
 ```
+
+游戏目录（`.minecraft`）是**全局共享**的，所有实例都指向同一份，
+因此换实例不会丢存档。把它指向官方启动器的 `.minecraft` 就能直接复用已有的模组与存档；
+不同版本的 natives 仍按实例隔离在 `SolarInstances/<id>/natives`。
 
 ## 开发
 
