@@ -74,8 +74,14 @@
                     OnContent="开" />
             </Grid>
 
+            <!--
+                点一行进入创建实例页：装什么版本、带哪些组件都在那里选。
+                SelectionMode=None + IsItemClickEnabled 让整行可点，但不高亮选中态。
+            -->
             <ListView
                 Grid.Row="2"
+                IsItemClickEnabled="True"
+                ItemClick="Version_Click"
                 ItemsSource="{x:Bind ViewModel.Versions, Mode=OneWay}"
                 SelectionMode="None">
                 <ListView.ItemTemplate>
@@ -84,6 +90,7 @@
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <TextBlock
                                 Grid.Column="0"
@@ -91,9 +98,16 @@
                                 Text="{x:Bind Id}" />
                             <TextBlock
                                 Grid.Column="1"
+                                VerticalAlignment="Center"
                                 Style="{StaticResource CaptionTextBlockStyle}"
                                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                 Text="{x:Bind Type}" />
+                            <FontIcon
+                                Grid.Column="2"
+                                VerticalAlignment="Center"
+                                FontSize="12"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Glyph="&#xE76C;" />
                         </Grid>
                     </DataTemplate>
                 </ListView.ItemTemplate>

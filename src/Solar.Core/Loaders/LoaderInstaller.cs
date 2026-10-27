@@ -26,7 +26,8 @@ public interface ILoaderInstaller
         string loaderVersion,
         string javaPath,
         IProgress<LoaderInstallProgress>? progress = null,
-        CancellationToken ct = default);
+        CancellationToken ct = default,
+        string? scratchInstanceId = null);
 }
 
 /// <summary>
@@ -62,26 +63,34 @@ public sealed class LoaderInstaller(
         string loaderVersion,
         string javaPath,
         IProgress<LoaderInstallProgress>? progress = null,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        string? scratchInstanceId = null)
     {
         // 先确保原版就绪：加载器的版本 JSON 依赖它，processor 也需要原版 jar
         progress?.Report(new LoaderInstallProgress("正在准备原版文件", 0, 1));
         var vanilla = await resolver.ResolveAsync(minecraftVersion, ct).ConfigureAwait(false);
-        var instance = new GameInstance { Id = "installer-temp", MinecraftVersion = minecraftVersion };
+
+        // 预下载时 natives 会解压到实例目录；创建流程传真实实例 Id，
+        // 避免留下 installer-temp 这种没人清理的目录。
+        var instance = new GameInstance
+        {
+            Id = scratchInstanceId ?? "installer-temp",
+            MinecraftVersion = minecraftVersion,
+        };
         await downloader.DownloadAsync(instance, vanilla, null, ct).ConfigureAwait(false);
 
         return loader switch
         {
             ModLoader.Fabric => await InstallFabricLikeAsync(
-                FabricProfile, "fabric", minecraftVersion, loaderVersion, progress, ct).ConfigureAwait(false),
+                FabricProfile, "fabric", minecraftVersion, loaderVersion, instance, progress, ct).ConfigureAwait(false),
             ModLoader.Quilt => await InstallFabricLikeAsync(
-                QuiltProfile, "quilt", minecraftVersion, loaderVersion, progress, ct).ConfigureAwait(false),
+                QuiltProfile, "quilt", minecraftVersion, loaderVersion, instance, progress, ct).ConfigureAwait(false),
             ModLoader.Forge => await InstallForgeLikeAsync(
                 string.Format(ForgeInstallerUrl, minecraftVersion, loaderVersion),
-                minecraftVersion, javaPath, progress, ct).ConfigureAwait(false),
+                minecraftVersion, javaPath, instance, progress, ct).ConfigureAwait(false),
             ModLoader.NeoForge => await InstallForgeLikeAsync(
                 string.Format(NeoForgeInstallerUrl, loaderVersion),
-                minecraftVersion, javaPath, progress, ct).ConfigureAwait(false),
+                minecraftVersion, javaPath, instance, progress, ct).ConfigureAwait(false),
             _ => throw new NotSupportedException($"不支持的加载器: {loader}"),
         };
     }
@@ -92,6 +101,7 @@ public sealed class LoaderInstaller(
         string loaderName,
         string minecraftVersion,
         string loaderVersion,
+        GameInstance scratchInstance,
         IProgress<LoaderInstallProgress>? progress,
         CancellationToken ct)
     {
@@ -111,8 +121,7 @@ public sealed class LoaderInstaller(
         // 加载器自己的库（含它引用的原版库）交给下载器补齐
         progress?.Report(new LoaderInstallProgress("正在下载加载器库", 0, 1));
         var resolved = await resolver.ResolveAsync(versionId, ct).ConfigureAwait(false);
-        var instance = new GameInstance { Id = "installer-temp", MinecraftVersion = minecraftVersion };
-        await downloader.DownloadAsync(instance, resolved, null, ct).ConfigureAwait(false);
+        await downloader.DownloadAsync(scratchInstance, resolved, null, ct).ConfigureAwait(false);
 
         logger.LogInformation("{Loader} {Version} 安装完成: {Id}", loaderName, loaderVersion, versionId);
         return versionId;
@@ -123,6 +132,7 @@ public sealed class LoaderInstaller(
         string installerUrl,
         string minecraftVersion,
         string javaPath,
+        GameInstance scratchInstance,
         IProgress<LoaderInstallProgress>? progress,
         CancellationToken ct)
     {
@@ -153,8 +163,7 @@ public sealed class LoaderInstaller(
             // 先补齐版本 JSON 声明的库
             progress?.Report(new LoaderInstallProgress("正在下载加载器库", 0, 1));
             var resolved = await resolver.ResolveAsync(versionId, ct).ConfigureAwait(false);
-            var instance = new GameInstance { Id = "installer-temp", MinecraftVersion = minecraftVersion };
-            await downloader.DownloadAsync(instance, resolved, null, ct).ConfigureAwait(false);
+            await downloader.DownloadAsync(scratchInstance, resolved, null, ct).ConfigureAwait(false);
 
             // 再跑 processor 产出客户端 artifact
             var profileEntry = archive.GetEntry("install_profile.json");

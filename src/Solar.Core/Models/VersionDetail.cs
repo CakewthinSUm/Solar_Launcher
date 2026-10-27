@@ -160,6 +160,35 @@ public sealed class Library
     }
 
     /// <summary>
+    /// 只按 maven 坐标推导 <c>libraries/</c> 下的相对路径，不需要 <c>url</c>。
+    /// <para>
+    /// OptiFine 安装器写出的版本 JSON 里库只有名字没有 url（文件由它自己放进
+    /// libraries 目录），下载器无从解析；但 classpath 仍然需要它们，
+    /// 所以按坐标推路径、文件存在就直接用。
+    /// </para>
+    /// </summary>
+    public string? GetMavenRelativePath()
+    {
+        var (group, artifactName, version, classifier) = ParseName();
+        if (string.IsNullOrEmpty(group) || string.IsNullOrEmpty(artifactName) || string.IsNullOrEmpty(version))
+        {
+            return null;
+        }
+
+        var fileName = $"{artifactName}-{version}";
+        if (!string.IsNullOrEmpty(classifier))
+        {
+            fileName += "-" + classifier;
+        }
+
+        return Path.Combine(
+            group.Replace('.', Path.DirectorySeparatorChar),
+            artifactName,
+            version,
+            fileName + ".jar");
+    }
+
+    /// <summary>
     /// 判断这个库的 natives 分类符是否适用于当前架构。
     /// <para>
     /// 1.19 起 natives 的架构后缀写在分类符里（<c>natives-windows</c>、

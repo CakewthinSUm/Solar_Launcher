@@ -64,6 +64,25 @@ SolarInstances/     每个实例一个目录，内含 natives、instance.json
 把它指向官方启动器的 `.minecraft` 就能直接复用已有的模组与存档。
 不同版本的 natives 始终按实例隔离在 `SolarInstances/<id>/natives`。
 
+### 下载与创建实例
+
+「下载 → Minecraft」列出全部版本。点一个版本进入**创建实例页**（参考 PCL 的「自动安装」）：
+
+- 顶部可选游戏版本、改实例名；
+- 中间是组件卡片：Forge / NeoForge / Fabric / Quilt 四选一，
+  选中 Fabric 或 Quilt 后可加 **Fabric API**，
+  另有 **OptiFine**、**OptiFabric**、**LiteLoader**（1.12.2 及更早）；
+- 不兼容的组合会直接把卡片置灰并写明原因，切换加载器时冲突项自动清掉；
+- LiteLoader 还要求本机装了 Java 8：它依赖的 launchwrapper 在 Java 9+ 上会抛
+  `ClassCastException`，所以没检测到 Java 8 时这张卡片直接禁用；
+- 点「开始下载」后在同页显示阶段进度，**创建即装完**，回到实例列表就能直接启动。
+
+OptiFine 的装法随组合变化：没有模组加载器时跑官方安装器生成独立版本；
+有加载器时直接作为 Mod 放进 `mods`（1.13 起 OptiFine 本身就是 Mod）。
+
+版本隔离的默认值在「设置 → 游戏 → 新建实例的版本隔离」里：每次询问 / 总是开启 / 总是关闭。
+默认「每次询问」，创建页上的开关就是那次询问，点开始下载时把选择记住。
+
 ### 管理
 
 侧边栏「管理」下是四个子项：
@@ -117,6 +136,7 @@ Windows App SDK 以自包含方式随输出一起分发，终端用户无需单�
 - [x] 实例级版本隔离（独立游戏目录，可把共享内容复制过来）
 - [x] 「管理」下的 Mods / 资源包 / 光影 列表、导入、删除
 - [x] 内存分配：自动按物理内存 / 可用内存 / 模组数量计算，或手动用滑条指定
+- [x] 下载页点版本进入创建实例页：选加载器 / Fabric API / OptiFine / LiteLoader，创建时一次装完
 
 ## 模组加载器
 
@@ -124,6 +144,8 @@ Windows App SDK 以自包含方式随输出一起分发，终端用户无需单�
 | --- | --- |
 | Fabric / Quilt | 元数据接口直接返回带 `inheritsFrom` 的 profile JSON |
 | Forge / NeoForge | 下载 installer jar，取出 `version.json`，再执行客户端 processor |
+| OptiFine | 跑官方 `optifine.Installer`（原版 jar 的差分补丁只能由它打），收集产出的库与版本 JSON |
+| LiteLoader | 写一份 `inheritsFrom` + launchwrapper 的 profile JSON，库由下载器补齐 |
 
 Forge / NeoForge 的 installer 不是简单的解压：它需要跑若干 processor
 （重命名原版 jar、打二进制补丁）才能产出可用的 client artifact。
@@ -187,6 +209,13 @@ dotnet run --project tools/Solar.AuthProbe -- <你的客户端ID>
 # 验证加载器安装（不给版本号则列出可选项并选最新）
 dotnet run --project tools/Solar.LoaderProbe -- fabric 1.21.4
 dotnet run --project tools/Solar.LoaderProbe -- forge 1.21.4 54.1.22
+
+# 验证附加组件：OptiFine 会真跑安装器，LiteLoader 会装成可启动的版本
+dotnet run --project tools/Solar.LoaderProbe -- optifine 1.20.1
+dotnet run --project tools/Solar.LoaderProbe -- liteloader 1.12.2
+
+# 只验证 Fabric API 的列表与下载地址
+dotnet run --project tools/Solar.LoaderProbe -- fabricapi 1.21.4
 
 # 验证装好的加载器版本能否真正启动（用合成账户，不需要登录）
 dotnet run --project tools/Solar.LaunchProbe -- fabric-loader-0.20.1-1.21.4

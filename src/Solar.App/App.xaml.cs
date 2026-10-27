@@ -62,6 +62,7 @@ public partial class App : Application
         services.AddTransient<HomeViewModel>();
         services.AddTransient<InstancesViewModel>();
         services.AddTransient<InstanceSetupViewModel>();
+        services.AddTransient<InstanceCreateViewModel>();
         services.AddTransient<DownloadViewModel>();
         services.AddTransient<ContentViewModel>();
         services.AddTransient<SettingsViewModel>();
@@ -69,6 +70,7 @@ public partial class App : Application
         services.AddTransient<HomePage>();
         services.AddTransient<InstancesPage>();
         services.AddTransient<InstanceSetupPage>();
+        services.AddTransient<InstanceCreatePage>();
         services.AddTransient<DownloadPage>();
         services.AddTransient<ContentPage>();
         services.AddTransient<SettingsPage>();

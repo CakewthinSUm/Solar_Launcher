@@ -63,6 +63,10 @@ public sealed partial class SettingsViewModel : ViewModelBase
     [ObservableProperty]
     private string _detectedJava = "未检测";
 
+    /// <summary>0 = 每次询问，1 = 总是开启，2 = 总是关闭。ComboBox 只认索引。</summary>
+    [ObservableProperty]
+    private int _newInstanceIsolationIndex;
+
     public SettingsViewModel(
         ISettingsService settings,
         IJavaDetector javaDetector,
@@ -142,6 +146,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
         VersionManifestUrl = s.VersionManifestUrl;
         DownloadThreads = s.DownloadThreads;
         DownloadMirrorUrl = s.DownloadMirrorUrl ?? "";
+        NewInstanceIsolationIndex = (int)s.NewInstanceIsolation;
     }
 
     /// <summary>
@@ -323,6 +328,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
             : VersionManifestUrl.Trim();
         s.DownloadThreads = Math.Clamp(DownloadThreads, 1, 32);
         s.DownloadMirrorUrl = string.IsNullOrWhiteSpace(DownloadMirrorUrl) ? null : DownloadMirrorUrl.Trim();
+        s.NewInstanceIsolation = (VersionIsolationDefault)Math.Clamp(NewInstanceIsolationIndex, 0, 2);
 
         try
         {

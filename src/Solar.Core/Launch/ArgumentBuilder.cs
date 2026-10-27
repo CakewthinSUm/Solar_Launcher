@@ -97,15 +97,19 @@ public sealed class ArgumentBuilder
     {
         var result = new List<string>();
 
+        // 1.13 以前没有 arguments 字段，用的是空格分隔的字符串模板。
+        // 这段要单独处理而不能用 else 分支：OptiFine / LiteLoader 的 profile 是
+        // 「旧版原版参数 + arguments.game 里的 tweakClass」这种混合形态，
+        // 合并后两个字段会同时存在，漏掉任何一边都会导致启动参数不完整。
+        if (!string.IsNullOrWhiteSpace(context.Version.Detail.MinecraftArguments))
+        {
+            result.AddRange(SplitArguments(context.Version.Detail.MinecraftArguments)
+                .Select(a => Substitute(a, context)));
+        }
+
         if (context.Version.Detail.Arguments is { } arguments)
         {
             result.AddRange(Expand(arguments.Game, context));
-        }
-        else if (!string.IsNullOrWhiteSpace(context.Version.Detail.MinecraftArguments))
-        {
-            // 1.13 以前没有 arguments 字段，用的是空格分隔的字符串模板
-            result.AddRange(SplitArguments(context.Version.Detail.MinecraftArguments));
-            result = result.Select(a => Substitute(a, context)).ToList();
         }
 
         // 老版本模板里没有分辨率参数，需要补上
@@ -140,6 +144,18 @@ public sealed class ArgumentBuilder
             if (library.ResolveDownload() is { } download)
             {
                 entries.Add(ResolveLibraryPath(context, download.RelativePath));
+                continue;
+            }
+
+            // OptiFine 安装器写出的库只有坐标没有 url（文件由它自己放进 libraries），
+            // 这类按坐标推路径，文件存在就进 classpath。
+            if (library.GetMavenRelativePath() is { } relative)
+            {
+                var path = ResolveLibraryPath(context, relative);
+                if (File.Exists(path))
+                {
+                    entries.Add(path);
+                }
             }
         }
 

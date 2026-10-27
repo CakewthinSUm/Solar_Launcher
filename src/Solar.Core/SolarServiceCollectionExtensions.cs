@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Solar.Core.Accounts;
+using Solar.Core.Addons;
 using Solar.Core.Assets;
 using Solar.Core.Content;
 using Solar.Core.Download;
@@ -57,6 +58,17 @@ public static class SolarServiceCollectionExtensions
             ConfigureHttpClient(client);
             client.Timeout = TimeSpan.FromMinutes(15);
         });
+
+        // 附加组件（OptiFine / LiteLoader / Modrinth）与创建实例的编排
+        services.AddSingleton<IInstanceCreationService, InstanceCreationService>();
+        services.AddSingleton<ILiteLoaderInstaller, LiteLoaderInstaller>();
+        services.AddHttpClient<IOptiFineService, OptiFineService>(client =>
+        {
+            ConfigureHttpClient(client);
+            client.Timeout = TimeSpan.FromMinutes(15);
+        });
+        services.AddHttpClient<ILiteLoaderService, LiteLoaderService>(ConfigureHttpClient);
+        services.AddHttpClient<IModrinthService, ModrinthService>(ConfigureHttpClient);
 
         return services;
     }
