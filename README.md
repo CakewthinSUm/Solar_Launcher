@@ -25,6 +25,7 @@ src/
     Minecraft/           版本清单下载与缓存、版本 JSON 解析与 inheritsFrom 合并
     Instances/           游戏实例模型与持久化
     Content/             实例游戏目录里的 Mods / 资源包 / 光影 读写
+    Mods/                模组在线目录（Modrinth / CurseForge）、依赖解析、下载安装
     Java/                Java 探测与版本选择
     Settings/            全局设置
   Solar.App/             WinUI 3 界面层
@@ -79,6 +80,8 @@ SolarInstances/     每个实例一个目录，内含 natives、instance.json
 
 OptiFine 的装法随组合变化：没有模组加载器时跑官方安装器生成独立版本；
 有加载器时直接作为 Mod 放进 `mods`（1.13 起 OptiFine 本身就是 Mod）。
+Fabric API 与 OptiFabric 复用模组数据层（`Solar.Core/Mods/`），
+与「管理 → Mods」共用同一套源、镜像降级与 SHA1 校验。
 
 版本隔离的默认值在「设置 → 游戏 → 新建实例的版本隔离」里：每次询问 / 总是开启 / 总是关闭。
 默认「每次询问」，创建页上的开关就是那次询问，点开始下载时把选择记住。
@@ -136,7 +139,25 @@ Windows App SDK 以自包含方式随输出一起分发，终端用户无需单�
 - [x] 实例级版本隔离（独立游戏目录，可把共享内容复制过来）
 - [x] 「管理」下的 Mods / 资源包 / 光影 列表、导入、删除
 - [x] 内存分配：自动按物理内存 / 可用内存 / 模组数量计算，或手动用滑条指定
+- [x] 模组数据层（Modrinth + CurseForge 双源、跨源去重、依赖解析、SHA1 校验安装）
+- [ ] 模组下载界面（搜索 / 详情 / 安装对话框）
 - [x] 下载页点版本进入创建实例页：选加载器 / Fabric API / OptiFine / LiteLoader，创建时一次装完
+
+## 模组下载
+
+数据层在 `Solar.Core/Mods/`，两个源统一成同一套模型，UI 层不需要分支。
+
+| 能力 | 说明 |
+| --- | --- |
+| 数据源 | Modrinth 与 CurseForge，默认走 MCIM 镜像（`mod.mcimirror.top`） |
+| 降级 | 两源并行，任一不可用仍返回另一边的结果，并在结果里标出失败的源 |
+| 去重 | 同名 + 加载器有交集 + 更新时差 ≤7 天 视为同一项目，保留 CurseForge 那条 |
+| 依赖 | 安装时递归展开必选前置（深度上限 5，带环检测），可选前置只展示 |
+| 安装 | 写入实例实际使用的 `mods/`，保留上游文件名，SHA1 校验后原子落盘 |
+
+与 PCL 的三处取舍：**不做**中文词表搜索（v1 只支持英文/原名）；版本列表用服务端的
+`gameVersion` + `modLoaderType` 过滤而不是一次拉全量；安装时会把必选前置一并装好。
+详见 [docs/mod-download-design.md](docs/mod-download-design.md)。
 
 ## 模组加载器
 
@@ -220,4 +241,14 @@ dotnet run --project tools/Solar.LoaderProbe -- fabricapi 1.21.4
 # 验证装好的加载器版本能否真正启动（用合成账户，不需要登录）
 dotnet run --project tools/Solar.LaunchProbe -- fabric-loader-0.20.1-1.21.4
 dotnet run --project tools/Solar.LaunchProbe -- 1.21.4-forge-54.1.22
+
+# 验证模组数据层（搜索 / 详情 / 依赖清单 / 真实下载安装）
+dotnet run --project tools/Solar.ModProbe -- search sodium fabric 1.21.4
+dotnet run --project tools/Solar.ModProbe -- detail modrinth AANobbMI fabric 1.21.4
+dotnet run --project tools/Solar.ModProbe -- plan modrinth PtjYWJkn fabric 1.21.4
+dotnet run --project tools/Solar.ModProbe -- install curseforge 394468 fabric 1.21.4
 ```
+
+模组源默认走 MCIM 镜像（`mod.mcimirror.top`），它同时代理 Modrinth 与 CurseForge；
+CurseForge 官方 API 需要自备 Key，没有 Key 时会自动只用镜像。
+排查网络问题时加 `SOLAR_PROBE_VERBOSE=1` 可以看到每次换源的详细原因。

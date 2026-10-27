@@ -186,7 +186,7 @@ public class ComponentRulesTests
             Loader = ModLoader.NeoForge,
             LoaderVersion = "21.4.1",
             OptiFine = Build(Modern),
-            OptiFabric = new AddonModVersion("id", "1.0", "optifabric.jar", "https://x/y.jar", null),
+            OptiFabric = Addon("optifabric.jar"),
         };
 
         var normalized = ComponentRules.Normalize(selection, Modern);
@@ -202,7 +202,7 @@ public class ComponentRulesTests
         {
             Loader = ModLoader.Fabric,
             LoaderVersion = "0.16.9",
-            FabricApi = new AddonModVersion("id", "0.115.0", "fabric-api.jar", "https://x/y.jar", null),
+            FabricApi = Addon("fabric-api.jar"),
         };
 
         var normalized = ComponentRules.Normalize(selection, Modern);
@@ -251,6 +251,9 @@ public class ComponentRulesTests
 
     private static OptiFineBuild Build(string mc, string type = "HD_U", string patch = "I6") =>
         new(mc, type, patch, $"OptiFine_{mc}_{type}_{patch}.jar", null);
+
+    private static AddonModVersion Addon(string fileName) =>
+        new("1.0", new Solar.Core.Mods.ModFile(fileName, $"https://example.invalid/{fileName}", null, 0));
 
     private static LiteLoaderBuild Lite(string mc) =>
         new(mc, $"{mc}-SNAPSHOT", "com.mumfrey.liteloader.launch.LiteLoaderTweaker", []);

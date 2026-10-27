@@ -39,6 +39,24 @@ public sealed class LauncherSettings
     /// </summary>
     public string? DownloadMirrorUrl { get; set; }
 
+    /// <summary>
+    /// Mod 来源（Modrinth / CurseForge）的访问偏好。
+    /// 默认「官方优先」：直连能通时延迟最低，超时后自动降级到镜像。
+    /// </summary>
+    public Mods.ModSourcePreference ModSourcePreference { get; set; } = Mods.ModSourcePreference.Auto;
+
+    /// <summary>
+    /// Mod 源镜像根地址。默认 MCIM，它同时代理 Modrinth 与 CurseForge
+    /// （后者不需要 API Key，这是国内可用 CurseForge 的唯一途径）。
+    /// </summary>
+    public string? ModMirrorUrl { get; set; } = "https://mod.mcimirror.top";
+
+    /// <summary>
+    /// 自备的 CurseForge API Key。留空时官方 API 一律 403，只能走镜像。
+    /// 启动器不分发 Key——那违反 CurseForge 的使用条款。
+    /// </summary>
+    public string? CurseForgeApiKey { get; set; }
+
     /// <summary>启动后是否自动关闭启动器。</summary>
     public bool CloseLauncherAfterLaunch { get; set; }
 

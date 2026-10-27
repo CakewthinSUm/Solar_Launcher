@@ -218,8 +218,8 @@ static async Task<int> ProbeLiteLoaderAsync(IServiceProvider provider, string mc
 
 static async Task<int> ProbeFabricApiAsync(IServiceProvider provider, string mcVersion)
 {
-    var modrinth = provider.GetRequiredService<IModrinthService>();
-    var versions = await modrinth.GetVersionsAsync("fabric-api", mcVersion, "fabric");
+    var addons = provider.GetRequiredService<IAddonCatalog>();
+    var versions = await addons.GetFabricApiAsync(mcVersion, ModLoader.Fabric);
 
     if (versions.Count == 0)
     {

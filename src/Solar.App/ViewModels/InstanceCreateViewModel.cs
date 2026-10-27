@@ -26,7 +26,7 @@ public sealed partial class InstanceCreateViewModel : ViewModelBase
     private readonly ILoaderVersionService _loaderVersions;
     private readonly IOptiFineService _optiFine;
     private readonly ILiteLoaderService _liteLoader;
-    private readonly IModrinthService _modrinth;
+    private readonly IAddonCatalog _addons;
     private readonly IInstanceCreationService _creation;
     private readonly IJavaDetector _javaDetector;
     private readonly InstanceGameDirectory _gameDirectories;
@@ -87,7 +87,7 @@ public sealed partial class InstanceCreateViewModel : ViewModelBase
         ILoaderVersionService loaderVersions,
         IOptiFineService optiFine,
         ILiteLoaderService liteLoader,
-        IModrinthService modrinth,
+        IAddonCatalog addons,
         IInstanceCreationService creation,
         IJavaDetector javaDetector,
         InstanceGameDirectory gameDirectories,
@@ -99,7 +99,7 @@ public sealed partial class InstanceCreateViewModel : ViewModelBase
         _loaderVersions = loaderVersions;
         _optiFine = optiFine;
         _liteLoader = liteLoader;
-        _modrinth = modrinth;
+        _addons = addons;
         _creation = creation;
         _javaDetector = javaDetector;
         _gameDirectories = gameDirectories;
@@ -539,14 +539,14 @@ public sealed partial class InstanceCreateViewModel : ViewModelBase
             return;
         }
 
-        var loader = Selection.Loader == ModLoader.Quilt ? "quilt" : "fabric";
+        var loader = Selection.Loader == ModLoader.Quilt ? ModLoader.Quilt : ModLoader.Fabric;
 
         try
         {
             FabricApiCard.IsLoading = true;
             FabricApiCard.LoadError = null;
 
-            var versions = await _modrinth.GetVersionsAsync("fabric-api", MinecraftVersion, loader, ct);
+            var versions = await _addons.GetFabricApiAsync(MinecraftVersion, loader, ct);
             ct.ThrowIfCancellationRequested();
 
             FabricApiCard.Options.Clear();
@@ -587,7 +587,7 @@ public sealed partial class InstanceCreateViewModel : ViewModelBase
             OptiFabricCard.IsLoading = true;
             OptiFabricCard.LoadError = null;
 
-            var versions = await _modrinth.GetVersionsAsync("optifabric", MinecraftVersion, "fabric", ct);
+            var versions = await _addons.GetOptiFabricAsync(MinecraftVersion, ct);
             ct.ThrowIfCancellationRequested();
 
             OptiFabricCard.Options.Clear();

@@ -37,6 +37,7 @@ public sealed class InstanceCreationTests : IDisposable
         _loaderInstaller,
         new FakeOptiFine(),
         new FakeLiteLoaderInstaller(),
+        new FakeModInstaller(_paths),
         new InstanceGameDirectory(_paths, new FakeSettings()),
         new FakeJavaDetector(),
         new HttpClient(new FakeHandler()),
@@ -101,7 +102,9 @@ public sealed class InstanceCreationTests : IDisposable
                     Loader = ModLoader.Fabric,
                     LoaderVersion = "0.16.9",
                     FabricApi = new AddonModVersion(
-                        "id", "0.119.4+1.21.4", "fabric-api.jar", "https://example.invalid/fabric-api.jar", null),
+                        "0.119.4+1.21.4",
+                        new Solar.Core.Mods.ModFile(
+                            "fabric-api.jar", "https://example.invalid/fabric-api.jar", null, 0)),
                 },
                 VersionIsolation: true));
 
@@ -297,6 +300,43 @@ public sealed class InstanceCreationTests : IDisposable
             IProgress<LoaderInstallProgress>? progress = null,
             CancellationToken ct = default) =>
             Task.FromResult($"{minecraftVersion}-LiteLoader");
+    }
+
+    /// <summary>
+    /// 附加 Mod 现在走 <see cref="Solar.Core.Mods.IModInstaller"/>。这里照它的落点规则
+    /// （实例实际使用的游戏目录下的 mods/）把文件写出去，让隔离相关的断言仍然有效。
+    /// </summary>
+    private sealed class FakeModInstaller(AppPaths paths) : Solar.Core.Mods.IModInstaller
+    {
+        private readonly InstanceGameDirectory _gameDirectories =
+            new(paths, new FakeSettings());
+
+        public string GetModsDirectory(GameInstance instance) =>
+            Path.Combine(_gameDirectories.Resolve(instance), "mods");
+
+        public bool IsInstalled(GameInstance instance, Solar.Core.Mods.ModFile file) =>
+            File.Exists(Path.Combine(GetModsDirectory(instance), file.FileName));
+
+        public Task<Solar.Core.Mods.ModInstallResult> InstallAsync(
+            GameInstance instance,
+            Solar.Core.Mods.ModInstallPlan plan,
+            bool overwrite = false,
+            IProgress<Solar.Core.Download.DownloadProgress>? progress = null,
+            CancellationToken ct = default)
+        {
+            var directory = GetModsDirectory(instance);
+            Directory.CreateDirectory(directory);
+
+            var files = new List<string>();
+            foreach (var item in plan.Pending)
+            {
+                var name = item.Version!.File.FileName;
+                File.WriteAllText(Path.Combine(directory, name), "stub");
+                files.Add(name);
+            }
+
+            return Task.FromResult(new Solar.Core.Mods.ModInstallResult(files.Count, 0, files));
+        }
     }
 
     private sealed class FakeJavaDetector : IJavaDetector

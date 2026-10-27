@@ -4,6 +4,7 @@ using Solar.Core.Download;
 using Solar.Core.Java;
 using Solar.Core.Loaders;
 using Solar.Core.Minecraft;
+using Solar.Core.Mods;
 using Solar.Core.Paths;
 
 namespace Solar.Core.Instances;
@@ -58,6 +59,7 @@ public sealed class InstanceCreationService(
     ILoaderInstaller loaderInstaller,
     IOptiFineService optiFine,
     ILiteLoaderInstaller liteLoaderInstaller,
+    IModInstaller modInstaller,
     InstanceGameDirectory gameDirectories,
     IJavaDetector javaDetector,
     HttpClient http,
@@ -230,50 +232,75 @@ public sealed class InstanceCreationService(
         IProgress<InstanceCreateProgress>? progress,
         CancellationToken ct)
     {
-        var mods = new List<(string Name, string Url, string? Sha1)>();
+        // 前两个走 IModInstaller：它带镜像降级与 SHA1 校验，和「管理 → Mods」是同一套逻辑。
+        var managed = new List<ModInstallItem>();
 
         if (components.FabricApi is { } fabricApi)
         {
-            mods.Add((fabricApi.FileName, fabricApi.Url, fabricApi.Sha1));
+            managed.Add(ToInstallItem(fabricApi, "Fabric API"));
         }
 
         if (components.OptiFabric is { } optiFabric)
         {
-            mods.Add((optiFabric.FileName, optiFabric.Url, optiFabric.Sha1));
+            managed.Add(ToInstallItem(optiFabric, "OptiFabric"));
         }
 
+        if (managed.Count > 0)
+        {
+            progress?.Report(new InstanceCreateProgress(
+                InstanceCreateStage.InstallingMods, "正在下载附加 Mod…"));
+
+            var plan = new ModInstallPlan(managed);
+            var result = await modInstaller
+                .InstallAsync(instance, plan, overwrite: false, WrapDownloadProgress(progress), ct)
+                .ConfigureAwait(false);
+
+            instance.CompanionMods.AddRange(result.Files);
+        }
+
+        // OptiFine 作为 Mod 时只有 BMCLAPI 一个来源，且没有可校验的哈希，单独下载
         if (components.OptiFine is { } optifine && components.OptiFineAsMod)
         {
-            mods.Add((optifine.FileName, OptiFineService.GetInstallerUrlFor(optifine), null));
-        }
+            var directory = Path.Combine(gameDirectories.Resolve(instance), "mods");
+            Directory.CreateDirectory(directory);
 
-        if (mods.Count == 0)
-        {
-            return;
-        }
-
-        var directory = Path.Combine(gameDirectories.Resolve(instance), "mods");
-        Directory.CreateDirectory(directory);
-
-        foreach (var (name, url, sha1) in mods)
-        {
-            ct.ThrowIfCancellationRequested();
-            progress?.Report(new InstanceCreateProgress(
-                InstanceCreateStage.InstallingMods, $"正在下载 {name}…"));
-
-            var target = Path.Combine(directory, name);
-            if (File.Exists(target))
+            var target = Path.Combine(directory, optifine.FileName);
+            if (!File.Exists(target))
             {
-                instance.CompanionMods.Add(name);
-                continue;
+                progress?.Report(new InstanceCreateProgress(
+                    InstanceCreateStage.InstallingMods, $"正在下载 {optifine.FileName}…"));
+
+                await DownloadFileAsync(OptiFineService.GetInstallerUrlFor(optifine), target, ct)
+                    .ConfigureAwait(false);
             }
 
-            await DownloadFileAsync(url, target, ct).ConfigureAwait(false);
-            instance.CompanionMods.Add(name);
-
-            _ = sha1;   // Modrinth 给了 sha1，但这两个来源都可能改文件，不强制校验
+            instance.CompanionMods.Add(optifine.FileName);
         }
     }
+
+    /// <summary>
+    /// 把一个附加 Mod 包成安装项。项目信息只用于日志与提示，安装器只用得到版本里的文件。
+    /// </summary>
+    private static ModInstallItem ToInstallItem(AddonModVersion addon, string title) =>
+        new(
+            new ModProject
+            {
+                Source = ModSource.Modrinth,
+                Id = addon.FileName,
+                Title = title,
+            },
+            new ModVersion
+            {
+                Source = ModSource.Modrinth,
+                Id = addon.FileName,
+                ProjectId = addon.FileName,
+                Name = addon.VersionNumber,
+                VersionNumber = addon.VersionNumber,
+                File = addon.File,
+            },
+            ModDependencyKind.Required,
+            AlreadyInstalled: false,
+            IsAvailable: true);
 
     private async Task<string> SelectJavaAsync(int? requiredMajor, CancellationToken ct)
     {

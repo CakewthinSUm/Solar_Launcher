@@ -20,14 +20,18 @@ public sealed record OptiFineBuild(
     public override string ToString() => DisplayVersion;
 }
 
-/// <summary>Modrinth 上的一个 Mod 版本（Fabric API / OptiFabric）。</summary>
-public sealed record AddonModVersion(
-    string Id,
-    string VersionNumber,
-    string FileName,
-    string Url,
-    string? Sha1)
+/// <summary>
+/// 一个可直接放进 mods 的附加 Mod（Fabric API / OptiFabric）。
+/// 直接包一层 <see cref="Mods.ModFile"/>，下载与校验复用模组那套逻辑。
+/// </summary>
+public sealed record AddonModVersion(string VersionNumber, Mods.ModFile File)
 {
+    public string FileName => File.FileName;
+
+    public string Url => File.Url;
+
+    public string? Sha1 => File.Sha1;
+
     public override string ToString() => VersionNumber;
 }
 
