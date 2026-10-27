@@ -6,6 +6,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- 模组源的 facets 拼接、去重规则等是纯函数，公开出去会污染 API，
+         但对测试必须可见，否则只能靠打真网来验证。 -->
+    <InternalsVisibleTo Include="Solar.Core.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
     <PackageReference Include="Microsoft.Extensions.Http" />
     <PackageReference Include="Microsoft.Extensions.Logging" />

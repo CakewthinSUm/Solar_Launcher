@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Solar.Core.Accounts;
 using Solar.Core.Assets;
 using Solar.Core.Download;
@@ -7,6 +8,7 @@ using Solar.Core.Java;
 using Solar.Core.Launch;
 using Solar.Core.Loaders;
 using Solar.Core.Minecraft;
+using Solar.Core.Mods;
 using Solar.Core.Paths;
 using Solar.Core.Settings;
 
@@ -51,7 +53,47 @@ public static class SolarServiceCollectionExtensions
             client.Timeout = TimeSpan.FromMinutes(15);
         });
 
+        AddModServices(services);
+
         return services;
+    }
+
+    /// <summary>
+    /// 模组下载相关的服务。
+    /// <para>
+    /// <see cref="ModHttp"/> 负责“换源重试”，它内部的单次请求自己设 10 秒超时，
+    /// 所以这里的 HttpClient 超时只是兜底，不能设得比单次超时还短。
+    /// 文件下载走 <see cref="ModInstaller"/> 里独立的 client，不经过这里。
+    /// </para>
+    /// </summary>
+    private static void AddModServices(IServiceCollection services)
+    {
+        services.AddSingleton<ModEndpoints>();
+        services.AddSingleton<ModCache>();
+
+        // 目录与安装器都是单例，ModHttp 也必须跟着单例，
+        // 否则会变成“单例持有瞬时依赖”。HttpClient 由工厂创建，底层 handler 仍会被池化。
+        services.AddHttpClient(ModHttpClientName, ConfigureModHttpClient);
+        services.AddSingleton(sp => new ModHttp(
+            sp.GetRequiredService<IHttpClientFactory>().CreateClient(ModHttpClientName),
+            sp.GetRequiredService<ModEndpoints>(),
+            sp.GetRequiredService<ILogger<ModHttp>>()));
+
+        services.AddSingleton<IModCatalog, ModrinthCatalog>();
+        services.AddSingleton<IModCatalog, CurseForgeCatalog>();
+        services.AddSingleton<IModCatalogService, ModCatalogService>();
+        services.AddSingleton<IModInstaller, ModInstaller>();
+    }
+
+    /// <summary>模组 API 客户端的名字，与文件下载用的 client 区分开。</summary>
+    private const string ModHttpClientName = "mods";
+
+    private static void ConfigureModHttpClient(HttpClient client)
+    {
+        // Modrinth 明确要求 UA 能识别调用方，通用的库字符串容易被限流。
+        client.DefaultRequestHeaders.UserAgent.ParseAdd(
+            "SolarLauncher/0.1 (+https://github.com/CakewthinSUm/Solar_Launcher)");
+        client.Timeout = TimeSpan.FromMinutes(2);
     }
 
     private static void ConfigureHttpClient(HttpClient client)

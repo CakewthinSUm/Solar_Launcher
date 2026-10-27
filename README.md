@@ -99,6 +99,24 @@ Windows App SDK 以自包含方式随输出一起分发，终端用户无需单�
 - [x] 微软正版登录（设备码流程、多账户、令牌静默刷新）
 - [x] 模组加载器安装（Fabric / Quilt / Forge / NeoForge）
 - [x] 实例级版本隔离（独立游戏目录，可把共享内容复制过来）
+- [x] 模组数据层（Modrinth + CurseForge 双源、跨源去重、依赖解析、SHA1 校验安装）
+- [ ] 模组下载界面（搜索 / 详情 / 安装对话框）
+
+## 模组下载
+
+数据层在 `Solar.Core/Mods/`，两个源统一成同一套模型，UI 层不需要分支。
+
+| 能力 | 说明 |
+| --- | --- |
+| 数据源 | Modrinth 与 CurseForge，默认走 MCIM 镜像（`mod.mcimirror.top`） |
+| 降级 | 两源并行，任一不可用仍返回另一边的结果，并在结果里标出失败的源 |
+| 去重 | 同名 + 加载器有交集 + 更新时差 ≤7 天 视为同一项目，保留 CurseForge 那条 |
+| 依赖 | 安装时递归展开必选前置（深度上限 5，带环检测），可选前置只展示 |
+| 安装 | 写入实例实际使用的 `mods/`，保留上游文件名，SHA1 校验后原子落盘 |
+
+与 PCL 的三处取舍：**不做**中文词表搜索（v1 只支持英文/原名）；版本列表用服务端的
+`gameVersion` + `modLoaderType` 过滤而不是一次拉全量；安装时会把必选前置一并装好。
+详见 [docs/mod-download-design.md](docs/mod-download-design.md)。
 
 ## 模组加载器
 
@@ -173,4 +191,14 @@ dotnet run --project tools/Solar.LoaderProbe -- forge 1.21.4 54.1.22
 # 验证装好的加载器版本能否真正启动（用合成账户，不需要登录）
 dotnet run --project tools/Solar.LaunchProbe -- fabric-loader-0.20.1-1.21.4
 dotnet run --project tools/Solar.LaunchProbe -- 1.21.4-forge-54.1.22
+
+# 验证模组数据层（搜索 / 详情 / 依赖清单 / 真实下载安装）
+dotnet run --project tools/Solar.ModProbe -- search sodium fabric 1.21.4
+dotnet run --project tools/Solar.ModProbe -- detail modrinth AANobbMI fabric 1.21.4
+dotnet run --project tools/Solar.ModProbe -- plan modrinth PtjYWJkn fabric 1.21.4
+dotnet run --project tools/Solar.ModProbe -- install curseforge 394468 fabric 1.21.4
 ```
+
+模组源默认走 MCIM 镜像（`mod.mcimirror.top`），它同时代理 Modrinth 与 CurseForge；
+CurseForge 官方 API 需要自备 Key，没有 Key 时会自动只用镜像。
+排查网络问题时加 `SOLAR_PROBE_VERBOSE=1` 可以看到每次换源的详细原因。
