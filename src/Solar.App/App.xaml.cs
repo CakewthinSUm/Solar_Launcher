@@ -61,12 +61,12 @@ public partial class App : Application
 
         services.AddTransient<HomeViewModel>();
         services.AddTransient<InstancesViewModel>();
-        services.AddTransient<VersionsViewModel>();
+        services.AddTransient<DownloadViewModel>();
         services.AddTransient<SettingsViewModel>();
         services.AddTransient<AccountsViewModel>();
         services.AddTransient<HomePage>();
         services.AddTransient<InstancesPage>();
-        services.AddTransient<VersionsPage>();
+        services.AddTransient<DownloadPage>();
         services.AddTransient<SettingsPage>();
         services.AddTransient<AccountsPage>();
 

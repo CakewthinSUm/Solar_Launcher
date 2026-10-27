@@ -54,10 +54,25 @@
                         <FontIcon Glyph="&#xE7B8;" />
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
-                <NavigationViewItem Content="版本" Tag="versions">
+                <!--
+                    下载是一个可展开的父项：NavigationViewItem 自带展开/收起箭头，
+                    展开后露出六个子项，每项都导航到同一个下载页，只靠 Tag 区分分区。
+                -->
+                <NavigationViewItem
+                    x:Name="DownloadNavItem"
+                    Content="下载"
+                    Tag="download">
                     <NavigationViewItem.Icon>
                         <FontIcon Glyph="&#xE81C;" />
                     </NavigationViewItem.Icon>
+                    <NavigationViewItem.MenuItems>
+                        <NavigationViewItem x:Name="MinecraftNavItem" Content="Minecraft" Tag="download-minecraft" />
+                        <NavigationViewItem Content="Mod" Tag="download-mod" />
+                        <NavigationViewItem Content="光影" Tag="download-shaders" />
+                        <NavigationViewItem Content="整合包" Tag="download-modpacks" />
+                        <NavigationViewItem Content="资源包" Tag="download-resourcepacks" />
+                        <NavigationViewItem Content="数据包" Tag="download-datapacks" />
+                    </NavigationViewItem.MenuItems>
                 </NavigationViewItem>
                 <NavigationViewItem Content="账户" Tag="accounts">
                     <NavigationViewItem.Icon>
