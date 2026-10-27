@@ -157,6 +157,19 @@ public class AccountErrorTranslationTests
     }
 
     [Fact]
+    public void MinecraftServiceForbiddenMapsToClientNotApproved()
+    {
+        // 真实场景：OAuth/Xbox/XSTS 全过，最后 api.minecraftservices.com 只回一个裸 403。
+        // 用户需要知道这不是账户问题，而是应用没通过审核。
+        var ex = new InvalidOperationException("403: Forbidden");
+        var translated = MicrosoftAuthService.Translate(ex);
+
+        Assert.Equal(AccountErrorKind.ClientNotApproved, translated.Kind);
+        Assert.Contains("mce-reviewappid", translated.Message);
+        Assert.Contains("Minecraft 服务拒绝", translated.Message);
+    }
+
+    [Fact]
     public void UnknownErrorFallsBack()
     {
         var ex = new InvalidOperationException("something odd");

@@ -338,6 +338,20 @@ public sealed class MicrosoftAuthService(
                 ex);
         }
 
+        // 走到这一步说明 OAuth、Xbox Live、XSTS 都成功了，
+        // 只是 api.minecraftservices.com 拒绝签发令牌。最常见的原因是
+        // 这个客户端 ID 没有通过 Minecraft 的审核，服务器只回一个裸 403。
+        if (text.Contains("403", StringComparison.Ordinal)
+            && text.Contains("Forbidden", StringComparison.OrdinalIgnoreCase))
+        {
+            return new AccountException(
+                AccountErrorKind.ClientNotApproved,
+                "微软账户验证已通过，但 Minecraft 服务拒绝了该应用的访问（403）。"
+                + "这通常表示该客户端 ID 尚未通过 Minecraft 应用审核："
+                + "请到 https://aka.ms/mce-reviewappid 提交申请，审核通过后再试。",
+                ex);
+        }
+
         return new AccountException(AccountErrorKind.Unknown, ex.Message, ex);
     }
 }
