@@ -81,17 +81,32 @@ public sealed class VersionResolver(
             Time = FirstNonNull(chain, v => v.Time),
         };
 
+        // 去重键是 group:artifact[:classifier]，不含版本号。
+        // 同一个 artifact 的不同版本（如原版要 asm 9.6、Fabric 要 asm 9.10.1）
+        // 必须只保留一个，否则 classpath 上会出现重复类，
+        // Fabric 的 Knot 会直接报 "duplicate ASM classes found on classpath" 拒绝启动。
+        //
+        // 按"父在前"的原始顺序输出，但子版本（chain[0]）声明的库要覆盖父版本的同名项，
+        // 因此先收集父版本，遇到子版本时原地替换。
         var libraries = new List<Library>();
-        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var indexByKey = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
         for (var i = chain.Count - 1; i >= 0; i--)
         {
             foreach (var library in chain[i].Libraries)
             {
-                // 同名库以更具体的版本为准，跳过父版本里的重复项。
-                if (seen.Add(library.Name))
+                var key = GetArtifactKey(library.Name);
+
+                if (indexByKey.TryGetValue(key, out var existing))
                 {
-                    libraries.Add(library);
+                    // 越往后处理越具体，直接覆盖即可：
+                    // 父版本先收集，子版本后到，天然实现"子覆盖父"
+                    libraries[existing] = library;
+                    continue;
                 }
+
+                indexByKey[key] = libraries.Count;
+                libraries.Add(library);
             }
         }
 
@@ -112,6 +127,23 @@ public sealed class VersionResolver(
         result.Downloads = chain.Select(v => v.Downloads).FirstOrDefault(d => d is { Count: > 0 });
         result.MinecraftArguments = FirstNonNull(chain, v => v.MinecraftArguments);
         return result;
+    }
+
+    /// <summary>
+    /// 库的去重键：<c>group:artifact[:classifier]</c>，不含版本号。
+    /// 保留分类符是必要的——<c>lwjgl</c> 与 <c>lwjgl:natives-windows</c> 是两个不同的库。
+    /// </summary>
+    public static string GetArtifactKey(string mavenName)
+    {
+        var parts = mavenName.Split(':');
+        if (parts.Length < 2)
+        {
+            return mavenName;
+        }
+
+        return parts.Length >= 4
+            ? $"{parts[0]}:{parts[1]}:{parts[3]}"
+            : $"{parts[0]}:{parts[1]}";
     }
 
     private static T? FirstNonNull<T>(IReadOnlyList<VersionDetail> chain, Func<VersionDetail, T?> selector)

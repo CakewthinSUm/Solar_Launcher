@@ -82,6 +82,13 @@ public sealed class Library
     public LibraryExtract? Extract { get; set; }
 
     /// <summary>
+    /// Fabric/Quilt 把校验信息平铺在库对象上，而不是放在 downloads.artifact 里。
+    /// </summary>
+    public string? Sha1 { get; set; }
+
+    public long Size { get; set; }
+
+    /// <summary>
     /// 老格式（1.18 及以前）的 natives 映射，如 <c>{"windows": "natives-windows"}</c>。
     /// 注意这里必须是对象而不是字符串，否则老版本 JSON 会反序列化失败。
     /// 1.19 起该字段不再出现，分类符直接写在 <see cref="Name"/> 里。
@@ -100,6 +107,56 @@ public sealed class Library
         var version = parts.Length > 2 ? parts[2] : "";
         var classifier = parts.Length > 3 ? parts[3] : null;
         return (group, artifact, version, classifier);
+    }
+
+    /// <summary>
+    /// 解析这个库的下载地址与本地相对路径。
+    /// <para>
+    /// 两种格式并存：
+    /// </para>
+    /// <list type="bullet">
+    /// <item>官方格式：<c>downloads.artifact</c> 直接给出 path 与完整 url。</item>
+    /// <item>Fabric/Quilt 格式：只有 <c>url</c>（仓库根地址）与 maven 坐标，
+    /// 路径要按 <c>group/artifact/version/artifact-version.jar</c> 推导。</item>
+    /// </list>
+    /// 第二种如果按第一种处理，库会被整个跳过——Fabric 实例因此无法启动。
+    /// </summary>
+    public (string RelativePath, string Url)? ResolveDownload()
+    {
+        if (Downloads?.Artifact is { } artifact && !string.IsNullOrEmpty(artifact.Path))
+        {
+            return (artifact.Path, artifact.Url ?? "");
+        }
+
+        if (string.IsNullOrEmpty(Url))
+        {
+            return null;
+        }
+
+        var (group, artifactName, version, classifier) = ParseName();
+        if (string.IsNullOrEmpty(group) || string.IsNullOrEmpty(artifactName) || string.IsNullOrEmpty(version))
+        {
+            return null;
+        }
+
+        var fileName = $"{artifactName}-{version}";
+        if (!string.IsNullOrEmpty(classifier))
+        {
+            fileName += "-" + classifier;
+        }
+
+        fileName += ".jar";
+
+        var relative = Path.Combine(
+            group.Replace('.', Path.DirectorySeparatorChar),
+            artifactName,
+            version,
+            fileName);
+
+        // url 是仓库根地址，拼上相对路径即可
+        var url = Url.EndsWith('/') ? Url + relative.Replace('\\', '/') : Url + "/" + relative.Replace('\\', '/');
+
+        return (relative, url);
     }
 
     /// <summary>

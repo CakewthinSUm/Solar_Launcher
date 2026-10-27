@@ -150,4 +150,8 @@ dotnet run --project tools/Solar.AuthProbe -- <你的客户端ID>
 # 验证加载器安装（不给版本号则列出可选项并选最新）
 dotnet run --project tools/Solar.LoaderProbe -- fabric 1.21.4
 dotnet run --project tools/Solar.LoaderProbe -- forge 1.21.4 54.1.22
+
+# 验证装好的加载器版本能否真正启动（用合成账户，不需要登录）
+dotnet run --project tools/Solar.LaunchProbe -- fabric-loader-0.20.1-1.21.4
+dotnet run --project tools/Solar.LaunchProbe -- 1.21.4-forge-54.1.22
 ```

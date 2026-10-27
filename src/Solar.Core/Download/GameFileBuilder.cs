@@ -71,14 +71,18 @@ public sealed class GameFileBuilder(AppPaths paths)
             var isNewStyleNative =
                 coordinate.Classifier?.StartsWith("natives", StringComparison.OrdinalIgnoreCase) == true;
 
-            if (library.Downloads?.Artifact is { } artifact && !string.IsNullOrEmpty(artifact.Path))
+            // 同时支持官方格式（downloads.artifact）与 Fabric/Quilt 的
+            // 仓库根地址格式（url + maven 坐标推导路径）
+            if (library.ResolveDownload() is { } download)
             {
+                var (relativePath, url) = download;
+
                 yield return new GameFile(library.Name)
                 {
-                    Path = Path.Combine(paths.Libraries, artifact.Path),
-                    Url = artifact.Url,
-                    Hash = artifact.Sha1,
-                    Size = artifact.Size,
+                    Path = Path.Combine(paths.Libraries, relativePath),
+                    Url = url,
+                    Hash = library.Downloads?.Artifact?.Sha1 ?? library.Sha1,
+                    Size = library.Downloads?.Artifact?.Size ?? library.Size,
                     UpdateTask = isNewStyleNative
                         ? [new NativeExtractTask(nativesDirectory, library.Extract?.Exclude)]
                         : [],

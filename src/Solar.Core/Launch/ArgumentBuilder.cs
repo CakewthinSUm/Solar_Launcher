@@ -124,9 +124,10 @@ public sealed class ArgumentBuilder
                 continue;
             }
 
-            if (library.Downloads?.Artifact is { Path: { Length: > 0 } relativePath })
+            // 与下载端共用同一套路径推导，避免两边不一致
+            if (library.ResolveDownload() is { } download)
             {
-                entries.Add(Path.Combine(context.Paths.Libraries, relativePath));
+                entries.Add(Path.Combine(context.Paths.Libraries, download.RelativePath));
             }
         }
 
