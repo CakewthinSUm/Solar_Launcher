@@ -41,6 +41,7 @@
             IsSettingsVisible="True"
             OpenPaneLength="240"
             PaneDisplayMode="Left"
+            ItemInvoked="NavView_ItemInvoked"
             SelectionChanged="NavView_SelectionChanged">
 
             <NavigationView.MenuItems>
@@ -57,10 +58,14 @@
                 <!--
                     下载是一个可展开的父项：NavigationViewItem 自带展开/收起箭头，
                     展开后露出六个子项，每项都导航到同一个下载页，只靠 Tag 区分分区。
+                    SelectsOnInvoked=False 让父项只负责展开/收起、不参与选中——
+                    否则点击它会把「下载」本身选上，出现父项高亮、页面却是子项内容的情况，
+                    而且它自己的选中处理会把刚展开的子项又收回去。
                 -->
                 <NavigationViewItem
                     x:Name="DownloadNavItem"
                     Content="下载"
+                    SelectsOnInvoked="False"
                     Tag="download">
                     <NavigationViewItem.Icon>
                         <FontIcon Glyph="&#xE81C;" />

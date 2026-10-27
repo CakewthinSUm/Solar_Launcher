@@ -45,6 +45,19 @@ public sealed partial class MainWindow : Window
     private void AppTitleBar_PaneToggleRequested(TitleBar sender, object args) =>
         NavView.IsPaneOpen = !NavView.IsPaneOpen;
 
+    /// <summary>
+    /// 父项「下载」是 <c>SelectsOnInvoked=False</c>：点击它只展开子项、自己不参与选中。
+    /// 展开交给 NavigationView 自己做（这一步是可靠的），这里把选中项交给 Minecraft 子项，
+    /// 否则会出现「子项全部展开、侧边栏却没有任何高亮」的状态。
+    /// </summary>
+    private void NavView_ItemInvoked(NavigationView sender, NavigationViewItemInvokedEventArgs args)
+    {
+        if (args.InvokedItemContainer is NavigationViewItem { Tag: "download" })
+        {
+            NavView.SelectedItem = MinecraftNavItem;
+        }
+    }
+
     private void NavView_SelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
     {
         if (args.IsSettingsSelected)
@@ -62,13 +75,8 @@ public sealed partial class MainWindow : Window
                     NavigateTo(typeof(AccountsPage), null);
                     break;
 
-                // 父项「下载」被直接选中时展开子项，并把选中项交给 Minecraft 分区，
-                // 免得父项高亮、页面却和子项状态对不上。
                 // 子项的 Tag 形如 download-shaders，后缀就是下载页的分区键。
-                case "download":
-                    DownloadNavItem.IsExpanded = true;
-                    NavView.SelectedItem = MinecraftNavItem;
-                    break;
+                // 父项「下载」是 SelectsOnInvoked=False，永远不会成为 SelectedItem。
                 case not null when tag.StartsWith("download-", StringComparison.Ordinal):
                     NavigateTo(typeof(DownloadPage), tag["download-".Length..]);
                     break;
