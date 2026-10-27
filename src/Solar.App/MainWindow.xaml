@@ -35,6 +35,12 @@
             </TitleBar.IconSource>
         </TitleBar>
 
+        <!--
+            PaneDisplayMode="Auto" 是 NavigationView 的自适应模式：宽度 ≥ ExpandedModeThresholdWidth（1008）
+            展开带文字，介于两个阈值之间只显示图标，小于 CompactModeThresholdWidth（641）只剩菜单按钮。
+            写死 Left 等于关掉自适应，侧栏在任何宽度下都是同一个状态。
+            手动收起会被 NavigationView 记住（内部的强制收起标记），拉宽也不会自动弹开。
+        -->
         <NavigationView
             x:Name="NavView"
             Grid.Row="1"
@@ -42,7 +48,7 @@
             IsPaneToggleButtonVisible="False"
             IsSettingsVisible="True"
             OpenPaneLength="240"
-            PaneDisplayMode="Left"
+            PaneDisplayMode="Auto"
             ItemInvoked="NavView_ItemInvoked"
             SelectionChanged="NavView_SelectionChanged">
 
