@@ -59,10 +59,24 @@
                         <FontIcon Glyph="&#xE80F;" />
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
-                <NavigationViewItem Content="实例" Tag="instances">
+                <!--
+                    管理：与「下载」同样是可展开的父项，四个子项分别是实例与三类游戏内容。
+                    子项 Tag 以 manage- 开头，后缀就是页面要打开的分区。
+                -->
+                <NavigationViewItem
+                    x:Name="ManageNavItem"
+                    Content="管理"
+                    SelectsOnInvoked="False"
+                    Tag="manage">
                     <NavigationViewItem.Icon>
                         <FontIcon Glyph="&#xE7B8;" />
                     </NavigationViewItem.Icon>
+                    <NavigationViewItem.MenuItems>
+                        <NavigationViewItem x:Name="ManageInstancesNavItem" Content="实例" Tag="manage-instances" />
+                        <NavigationViewItem Content="Mods" Tag="manage-mods" />
+                        <NavigationViewItem Content="资源包" Tag="manage-resourcepacks" />
+                        <NavigationViewItem Content="光影" Tag="manage-shaderpacks" />
+                    </NavigationViewItem.MenuItems>
                 </NavigationViewItem>
                 <!--
                     下载是一个可展开的父项：NavigationViewItem 自带展开/收起箭头，

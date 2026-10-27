@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
 using Solar.App.Services;
 using Solar.Core.Java;
+using Solar.Core.Memory;
 using Solar.Core.Paths;
 using Solar.Core.Settings;
 
@@ -12,12 +13,33 @@ public sealed partial class SettingsViewModel : ViewModelBase
 {
     private readonly ISettingsService _settings;
     private readonly IJavaDetector _javaDetector;
+    private readonly IMemoryAllocationService _memory;
     private readonly IDialogService _dialogs;
     private readonly AppPaths _paths;
     private readonly ILogger<SettingsViewModel> _logger;
 
+    /// <summary>0 = 自动分配，1 = 手动配置。RadioButtons 只认索引。</summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsAutomaticMemory))]
+    [NotifyPropertyChangedFor(nameof(IsManualMemory))]
+    private int _memoryModeIndex;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(MemoryLimitText))]
+    [NotifyPropertyChangedFor(nameof(MemorySliderValue))]
     private int _maxMemoryMb;
+
+    [ObservableProperty]
+    private int _memorySliderMaximum = MemoryAllocator.MaximumMb;
+
+    [ObservableProperty]
+    private int _memorySliderMinimum = MemoryAllocator.MinimumMb;
+
+    [ObservableProperty]
+    private string _systemMemoryText = "正在检测…";
+
+    [ObservableProperty]
+    private string _autoMemoryPreview = "";
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(EffectiveMinecraftDirectory))]
@@ -44,20 +66,50 @@ public sealed partial class SettingsViewModel : ViewModelBase
     public SettingsViewModel(
         ISettingsService settings,
         IJavaDetector javaDetector,
+        IMemoryAllocationService memory,
         IDialogService dialogs,
         AppPaths paths,
         ILogger<SettingsViewModel> logger)
     {
         _settings = settings;
         _javaDetector = javaDetector;
+        _memory = memory;
         _dialogs = dialogs;
         _paths = paths;
         _logger = logger;
 
         LoadFromSettings();
+        RefreshMemoryInfo();
     }
 
     public string DataRoot => _paths.Root;
+
+    public bool IsAutomaticMemory => MemoryModeIndex == 0;
+
+    public bool IsManualMemory => MemoryModeIndex == 1;
+
+    /// <summary>滑条旁的数值，按 GB/MB 显示更直观。</summary>
+    public string MemoryLimitText => MaxMemoryMb >= 1024
+        ? $"{MaxMemoryMb} MB（约 {MaxMemoryMb / 1024.0:0.#} GB）"
+        : $"{MaxMemoryMb} MB";
+
+    /// <summary>
+    /// Slider 的值是 double，而设置里存的是整数 MB。
+    /// x:Bind 是强类型的，不经过转换器就无法在两者之间双向绑定，所以在这里做桥接。
+    /// </summary>
+    public double MemorySliderValue
+    {
+        get => MaxMemoryMb;
+        set
+        {
+            // 滑条按 StepFrequency 取值，浮点误差可能让它停在 4095.999…，四舍五入回整数
+            var rounded = (int)Math.Round(value);
+            if (rounded != MaxMemoryMb)
+            {
+                MaxMemoryMb = MemoryAllocator.Clamp(rounded);
+            }
+        }
+    }
 
     /// <summary>
     /// 实际会用的目录，直接显示给用户看。
@@ -82,7 +134,8 @@ public sealed partial class SettingsViewModel : ViewModelBase
     private void LoadFromSettings()
     {
         var s = _settings.Current;
-        MaxMemoryMb = s.MaxMemoryMb;
+        MemoryModeIndex = s.MemoryAllocationMode == MemoryAllocationMode.Manual ? 1 : 0;
+        MaxMemoryMb = MemoryAllocator.Clamp(s.MaxMemoryMb);
         JavaPath = s.JavaPath ?? "";
         MinecraftDirectory = s.MinecraftDirectory ?? "";
         MicrosoftClientId = s.MicrosoftClientId ?? "";
@@ -91,10 +144,54 @@ public sealed partial class SettingsViewModel : ViewModelBase
         DownloadMirrorUrl = s.DownloadMirrorUrl ?? "";
     }
 
+    /// <summary>
+    /// 读取物理内存，刷新自动分配的预览值。
+    /// 滑条上限不超过物理内存，但不强行压低用户已存的值——
+    /// 换到内存更小的机器上打开设置时，不该悄悄把用户设好的 16GB 改成 8GB。
+    /// </summary>
+    private void RefreshMemoryInfo()
+    {
+        try
+        {
+            var info = _memory.GetSystemMemory();
+            if (info.TotalMb <= 0)
+            {
+                SystemMemoryText = "未能检测到物理内存";
+                AutoMemoryPreview = "";
+                return;
+            }
+
+            SystemMemoryText = $"物理内存 {FormatMb(info.TotalMb)}，当前可用 {FormatMb(info.AvailableMb)}";
+
+            // 滑条上限取物理内存总量（向下取整到 512MB）。
+            // 必须把当前值也算进去：Slider 会把超出上限的 Value 拉回上限并回写绑定，
+            // 那等于又悄悄改掉了用户的设置。
+            MemorySliderMaximum = Math.Clamp(
+                Math.Max(info.TotalMb / 512 * 512, MaxMemoryMb),
+                MemoryAllocator.MinimumMb,
+                MemoryAllocator.MaximumMb);
+
+            // 预览按共享游戏目录里的模组数量估算；实例开启隔离后用的是自己的目录，实际值可能不同
+            var mods = MemoryAllocationService.CountMods(
+                _paths.ResolveMinecraftDirectory(_settings.Current.MinecraftDirectory));
+            var recommended = MemoryAllocator.Recommend(info.TotalMb, info.AvailableMb, mods);
+            AutoMemoryPreview = $"当前会分配 {FormatMb(recommended)}（按共享游戏目录里的 {mods} 个模组估算）";
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "读取物理内存失败");
+            SystemMemoryText = "未能检测到物理内存";
+            AutoMemoryPreview = "";
+        }
+    }
+
+    private static string FormatMb(int mb) => mb >= 1024 ? $"{mb / 1024.0:0.#} GB" : $"{mb} MB";
+
     public override async Task OnNavigatedToAsync(object? parameter)
     {
         await _settings.LoadAsync();
         LoadFromSettings();
+        RefreshMemoryInfo();
         await DetectJavaAsync();
     }
 
@@ -216,7 +313,8 @@ public sealed partial class SettingsViewModel : ViewModelBase
         }
 
         var s = _settings.Current;
-        s.MaxMemoryMb = Math.Max(512, MaxMemoryMb);
+        s.MemoryAllocationMode = IsManualMemory ? MemoryAllocationMode.Manual : MemoryAllocationMode.Automatic;
+        s.MaxMemoryMb = MemoryAllocator.Clamp(MaxMemoryMb);
         s.MinecraftDirectory = minecraftDirectory;
         s.JavaPath = string.IsNullOrWhiteSpace(JavaPath) ? null : JavaPath.Trim();
         s.MicrosoftClientId = string.IsNullOrWhiteSpace(MicrosoftClientId) ? null : MicrosoftClientId.Trim();

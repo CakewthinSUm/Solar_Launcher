@@ -46,6 +46,31 @@
                 <Setter Property="Padding" Value="16" />
             </Style>
 
+            <!--
+                主页「启动游戏」按钮的主色。
+                Windows 不像 Material Design 3 那样提供一整套由种子色推导的动态色板，
+                但系统主题字典里有两类可以直接用的颜色：
+                  · 强调色（SystemAccentColor / AccentFillColor*）——跟随用户在「设置 → 个性化」里选的主题色
+                  · 系统语义色（SystemFillColorSuccess / Caution / Critical / Attention）——固定色相，随浅色/深色主题换明度
+                启动是「开始做一件事」，用系统语义色里的成功绿比强调色更醒目，
+                也和各页面其它强调色按钮（保存、登录）区分开。
+                这里不写死任何色值：Color 取 ThemeResource SystemFillColorSuccess，
+                主题切换时会跟着重新解析；悬停/按下沿用 WinUI 对强调色的做法，用降低不透明度表示。
+            -->
+            <SolidColorBrush x:Key="SolarLaunchButtonBackgroundBrush" Color="{ThemeResource SystemFillColorSuccess}" />
+            <SolidColorBrush
+                x:Key="SolarLaunchButtonBackgroundPointerOverBrush"
+                Color="{ThemeResource SystemFillColorSuccess}"
+                Opacity="0.9" />
+            <SolidColorBrush
+                x:Key="SolarLaunchButtonBackgroundPressedBrush"
+                Color="{ThemeResource SystemFillColorSuccess}"
+                Opacity="0.8" />
+            <SolidColorBrush
+                x:Key="SolarLaunchButtonBackgroundDisabledBrush"
+                Color="{ThemeResource SystemFillColorSuccess}"
+                Opacity="0.35" />
+
             <!-- 页面内容的标准内边距与间距（4px 网格） -->
             <Thickness x:Key="SolarPagePadding">24,16,24,16</Thickness>
             <x:Double x:Key="SolarSectionSpacing">24</x:Double>

@@ -2,11 +2,13 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Solar.Core.Accounts;
 using Solar.Core.Assets;
+using Solar.Core.Content;
 using Solar.Core.Download;
 using Solar.Core.Instances;
 using Solar.Core.Java;
 using Solar.Core.Launch;
 using Solar.Core.Loaders;
+using Solar.Core.Memory;
 using Solar.Core.Minecraft;
 using Solar.Core.Mods;
 using Solar.Core.Paths;
@@ -26,6 +28,11 @@ public static class SolarServiceCollectionExtensions
         services.AddSingleton<ISettingsService, SettingsService>();
         services.AddSingleton<IInstanceRepository, InstanceRepository>();
         services.AddSingleton<InstanceGameDirectory>();
+        services.AddSingleton<IContentManager, ContentManager>();
+        services.AddSingleton<GameFileLocator>();
+        services.AddSingleton<IVersionScanner, VersionScanner>();
+        services.AddSingleton<ISystemMemoryInfo, WindowsSystemMemoryInfo>();
+        services.AddSingleton<IMemoryAllocationService, MemoryAllocationService>();
         services.AddSingleton<IJavaDetector, JavaDetector>();
 
         services.AddSingleton<IAccountStore, AccountStore>();

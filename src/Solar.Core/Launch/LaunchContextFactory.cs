@@ -1,16 +1,19 @@
 using Solar.Core.Accounts;
 using Solar.Core.Instances;
+using Solar.Core.Memory;
 using Solar.Core.Minecraft;
 using Solar.Core.Paths;
 using Solar.Core.Settings;
 
 namespace Solar.Core.Launch;
 
-/// <summary>拼装启动上下文。把"该用什么 Java、目录在哪、用哪个账户"集中在一处。</summary>
+/// <summary>拼装启动上下文。把"该用什么 Java、目录在哪、用哪个账户、给多少内存"集中在一处。</summary>
 public sealed class LaunchContextFactory(
     AppPaths paths,
     ISettingsService settings,
-    InstanceGameDirectory gameDirectories)
+    InstanceGameDirectory gameDirectories,
+    GameFileLocator fileLocator,
+    IMemoryAllocationService memory)
 {
     public LaunchContext Create(
         Instances.GameInstance instance,
@@ -30,6 +33,7 @@ public sealed class LaunchContextFactory(
             Version = version,
             Paths = paths,
             Settings = settings.Current,
+            FileLocator = fileLocator,
             JavaPath = javaPath,
             PlayerName = account.Username,
             Uuid = account.Uuid,
@@ -41,6 +45,7 @@ public sealed class LaunchContextFactory(
             AssetsDirectory = paths.Assets,
             LogConfigPath = logConfigPath ?? "",
             Resolution = (854, 480),
+            MaxMemoryMb = memory.Resolve(instance),
         };
     }
 }

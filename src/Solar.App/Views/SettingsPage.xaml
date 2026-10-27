@@ -29,31 +29,76 @@
             <StackPanel Spacing="8">
                 <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="游戏" />
 
+                <!-- 内存分配：自动 / 手动 -->
+                <Border Style="{StaticResource SolarCardStyle}">
+                    <StackPanel Spacing="12">
+                        <StackPanel Spacing="2">
+                            <TextBlock Text="内存分配" />
+                            <TextBlock
+                                Style="{StaticResource CaptionTextBlockStyle}"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Text="决定启动游戏时给 JVM 的堆内存上限（-Xmx）"
+                                TextWrapping="Wrap" />
+                        </StackPanel>
+
+                        <RadioButtons MaxColumns="2" SelectedIndex="{x:Bind ViewModel.MemoryModeIndex, Mode=TwoWay}">
+                            <RadioButton Content="自动分配" />
+                            <RadioButton Content="手动配置" />
+                        </RadioButtons>
+
+                        <!-- 自动：说明算法与当前估算值 -->
+                        <StackPanel
+                            Spacing="4"
+                            Visibility="{x:Bind ViewModel.IsAutomaticMemory, Mode=OneWay, Converter={StaticResource VisibleWhenTrue}}">
+                            <TextBlock
+                                Style="{StaticResource CaptionTextBlockStyle}"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Text="根据物理内存、当前可用内存和实例的模组数量自动计算；每次启动都会重新估算，后台程序多时会相应少给一些。"
+                                TextWrapping="Wrap" />
+                            <TextBlock
+                                Style="{StaticResource CaptionTextBlockStyle}"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Text="{x:Bind ViewModel.SystemMemoryText, Mode=OneWay}"
+                                TextWrapping="Wrap" />
+                            <TextBlock
+                                Style="{StaticResource CaptionTextBlockStyle}"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Text="{x:Bind ViewModel.AutoMemoryPreview, Mode=OneWay}"
+                                TextWrapping="Wrap" />
+                        </StackPanel>
+
+                        <!-- 手动：滑条 -->
+                        <StackPanel
+                            Spacing="4"
+                            Visibility="{x:Bind ViewModel.IsManualMemory, Mode=OneWay, Converter={StaticResource VisibleWhenTrue}}">
+                            <Grid ColumnSpacing="12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <Slider
+                                    Grid.Column="0"
+                                    Maximum="{x:Bind ViewModel.MemorySliderMaximum, Mode=OneWay}"
+                                    Minimum="{x:Bind ViewModel.MemorySliderMinimum}"
+                                    StepFrequency="512"
+                                    Value="{x:Bind ViewModel.MemorySliderValue, Mode=TwoWay}" />
+                                <TextBlock
+                                    Grid.Column="1"
+                                    MinWidth="150"
+                                    VerticalAlignment="Center"
+                                    Text="{x:Bind ViewModel.MemoryLimitText, Mode=OneWay}" />
+                            </Grid>
+                            <TextBlock
+                                Style="{StaticResource CaptionTextBlockStyle}"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Text="{x:Bind ViewModel.SystemMemoryText, Mode=OneWay}"
+                                TextWrapping="Wrap" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
                 <Border Style="{StaticResource SolarCardStyle}">
                     <StackPanel Spacing="16">
-                        <Grid ColumnSpacing="16">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <StackPanel Grid.Column="0" Spacing="2">
-                                <TextBlock Text="最大内存" />
-                                <TextBlock
-                                    Style="{StaticResource CaptionTextBlockStyle}"
-                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                    Text="分配给游戏的最大堆内存（MB）" />
-                            </StackPanel>
-                            <NumberBox
-                                Grid.Column="1"
-                                Width="160"
-                                LargeChange="1024"
-                                Maximum="32768"
-                                Minimum="512"
-                                SmallChange="512"
-                                SpinButtonPlacementMode="Compact"
-                                Value="{x:Bind ViewModel.MaxMemoryMb, Mode=TwoWay}" />
-                        </Grid>
-
                         <Grid ColumnSpacing="16">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />

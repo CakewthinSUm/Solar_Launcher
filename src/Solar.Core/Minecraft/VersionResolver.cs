@@ -37,12 +37,19 @@ public interface IVersionResolver
 public sealed class VersionResolver(
     HttpClient http,
     AppPaths paths,
+    GameFileLocator locator,
     IVersionManifestService manifestService,
     ILogger<VersionResolver> logger) : IVersionResolver
 {
+    /// <summary>新下载的落点：Solar 自己的 versions 目录。</summary>
     public string GetVersionDirectory(string versionId) => Path.Combine(paths.Versions, versionId);
     public string GetVersionJsonPath(string versionId) => Path.Combine(GetVersionDirectory(versionId), versionId + ".json");
-    public string GetVersionJarPath(string versionId) => Path.Combine(GetVersionDirectory(versionId), versionId + ".jar");
+
+    /// <summary>
+    /// 已存在的版本 jar。加载器版本的 JSON 通常没有自己的 jar，
+    /// 真正要进 classpath 的是父版本（原版）的 jar，所以找不到时返回 null。
+    /// </summary>
+    public string? GetVersionJarPath(string versionId) => locator.FindVersionJar(versionId);
 
     public async Task<ResolvedVersion> ResolveAsync(string versionId, CancellationToken ct = default)
     {
@@ -161,11 +168,15 @@ public sealed class VersionResolver(
 
     private async Task<VersionDetail> LoadOrDownloadAsync(string versionId, CancellationToken ct)
     {
-        var path = GetVersionJsonPath(versionId);
-        var cached = await JsonFile.ReadAsync<VersionDetail>(path, ct).ConfigureAwait(false);
-        if (cached is not null)
+        // 先找已存在的 JSON：Solar 自己下过的那份，或接管过来的游戏目录里的那份
+        var existing = locator.FindVersionJson(versionId);
+        if (existing is not null)
         {
-            return cached;
+            var cached = await JsonFile.ReadAsync<VersionDetail>(existing, ct).ConfigureAwait(false);
+            if (cached is not null)
+            {
+                return cached;
+            }
         }
 
         // 通过清单服务获取，它会先看缓存再联网，避免"没打开过版本页就无法启动"

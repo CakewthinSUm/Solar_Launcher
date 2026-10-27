@@ -15,6 +15,7 @@ namespace Solar.App.ViewModels;
 public sealed partial class HomeViewModel : ViewModelBase
 {
     private readonly IInstanceRepository _instances;
+    private readonly IVersionScanner _scanner;
     private readonly IJavaDetector _javaDetector;
     private readonly IGameLaunchService _launchService;
     private readonly IAccountStore _accounts;
@@ -46,6 +47,7 @@ public sealed partial class HomeViewModel : ViewModelBase
 
     public HomeViewModel(
         IInstanceRepository instances,
+        IVersionScanner scanner,
         IJavaDetector javaDetector,
         IGameLaunchService launchService,
         IAccountStore accounts,
@@ -53,6 +55,7 @@ public sealed partial class HomeViewModel : ViewModelBase
         ILogger<HomeViewModel> logger)
     {
         _instances = instances;
+        _scanner = scanner;
         _javaDetector = javaDetector;
         _launchService = launchService;
         _accounts = accounts;
@@ -69,7 +72,7 @@ public sealed partial class HomeViewModel : ViewModelBase
 
     public string SelectedInstanceSummary => SelectedInstance is { } instance
         ? $"{instance.MinecraftVersion} · {instance.DisplayLoader}"
-        : "先到“实例”页创建一个实例";
+        : "先到“管理 → 实例”创建一个实例";
 
     public override async Task OnNavigatedToAsync(object? parameter)
     {
@@ -89,6 +92,18 @@ public sealed partial class HomeViewModel : ViewModelBase
         {
             IsBusy = true;
             ErrorMessage = null;
+
+            // 主页是打开后最先看到的页面，在这里导入游戏目录里的版本，
+            // 用户不必先去实例页也能直接启动已有版本。
+            // 失败不影响主页：扫描只是补充，读不到版本时照常显示已有实例。
+            try
+            {
+                await _scanner.ImportAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "扫描游戏目录失败，跳过导入");
+            }
 
             var instances = await _instances.GetAllAsync();
             Instances.Clear();
@@ -131,7 +146,7 @@ public sealed partial class HomeViewModel : ViewModelBase
     {
         if (SelectedInstance is not { } instance)
         {
-            StatusMessage = "还没有可启动的实例，请先到“实例”页创建一个。";
+            StatusMessage = "还没有可启动的实例，请先到“管理 → 实例”创建一个。";
             return;
         }
 

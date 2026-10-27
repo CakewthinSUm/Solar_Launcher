@@ -12,11 +12,17 @@ namespace Solar.Core.Download;
 /// 把已解析的版本转换成下载引擎认识的 <see cref="GameFile"/> 列表。
 /// 这里只负责"要下什么、下到哪"，并发与校验交给 CmlLib 的安装器。
 /// </summary>
-public sealed class GameFileBuilder(AppPaths paths)
+public sealed class GameFileBuilder(AppPaths paths, GameFileLocator? locator = null)
 {
     private const string ResourcesHost = "https://resources.download.minecraft.net";
 
-    /// <summary>游戏本体 jar，放在 <c>versions/&lt;id&gt;/&lt;id&gt;.jar</c>。</summary>
+    /// <summary>
+    /// 游戏本体 jar，放在 <c>versions/&lt;id&gt;/&lt;id&gt;.jar</c>。
+    /// <para>
+    /// 接管过来的游戏目录里已经有这个 jar 时，直接把落点指向那份：
+    /// 下载引擎会按哈希判定"已就绪"并跳过，不浪费一次复制。
+    /// </para>
+    /// </summary>
     public GameFile? BuildClientJar(ResolvedVersion version)
     {
         if (version.Detail.Downloads is not { } downloads
@@ -26,9 +32,12 @@ public sealed class GameFileBuilder(AppPaths paths)
             return null;
         }
 
+        var target = locator?.FindVersionJar(version.Id)
+                     ?? Path.Combine(paths.Versions, version.Id, version.Id + ".jar");
+
         return new GameFile("client.jar")
         {
-            Path = Path.Combine(paths.Versions, version.Id, version.Id + ".jar"),
+            Path = target,
             Url = client.Url,
             Hash = client.Sha1,
             Size = client.Size,
@@ -77,9 +86,13 @@ public sealed class GameFileBuilder(AppPaths paths)
             {
                 var (relativePath, url) = download;
 
+                // 已有的一份（SolarShared 或接管过来的游戏目录）优先，省掉重复下载
+                var target = locator?.ResolveLibrary(relativePath)
+                             ?? Path.Combine(paths.Libraries, relativePath);
+
                 yield return new GameFile(library.Name)
                 {
-                    Path = Path.Combine(paths.Libraries, relativePath),
+                    Path = target,
                     Url = url,
                     Hash = library.Downloads?.Artifact?.Sha1 ?? library.Sha1,
                     Size = library.Downloads?.Artifact?.Size ?? library.Size,
@@ -100,7 +113,8 @@ public sealed class GameFileBuilder(AppPaths paths)
                 {
                     yield return new GameFile(library.Name + ":" + classifierKey)
                     {
-                        Path = Path.Combine(paths.Libraries, nativeArtifact.Path),
+                        Path = locator?.ResolveLibrary(nativeArtifact.Path)
+                               ?? Path.Combine(paths.Libraries, nativeArtifact.Path),
                         Url = nativeArtifact.Url,
                         Hash = nativeArtifact.Sha1,
                         Size = nativeArtifact.Size,
@@ -122,6 +136,9 @@ public sealed class GameFileBuilder(AppPaths paths)
             }
 
             var prefix = obj.Hash[..2];
+
+            // 资源不跟着版本走：游戏的 --assetsDir 只有一个目录，
+            // 这里必须落在 Solar 自己的 assets 下，否则游戏会去空目录里找资源。
             yield return new GameFile(name)
             {
                 Path = Path.Combine(paths.Assets, "objects", prefix, obj.Hash),
