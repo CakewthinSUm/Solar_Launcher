@@ -13,6 +13,16 @@ public sealed class VisibleWhenTrueConverter : IValueConverter
         value is Visibility.Visible;
 }
 
+/// <summary>bool → 取反的 Visibility，用于「有内容时隐藏空状态」。</summary>
+public sealed class CollapsedWhenTrueConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, string language) =>
+        value is true ? Visibility.Collapsed : Visibility.Visible;
+
+    public object ConvertBack(object value, Type targetType, object parameter, string language) =>
+        value is not Visibility.Visible;
+}
+
 /// <summary>非空字符串 → Visible。</summary>
 public sealed class VisibleWhenTextConverter : IValueConverter
 {

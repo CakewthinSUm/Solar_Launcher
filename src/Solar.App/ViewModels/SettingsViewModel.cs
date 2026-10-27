@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Solar.App.Services;
 using Solar.Core.Java;
 using Solar.Core.Memory;
+using Solar.Core.Mods;
 using Solar.Core.Paths;
 using Solar.Core.Settings;
 
@@ -16,6 +17,9 @@ public sealed partial class SettingsViewModel : ViewModelBase
     private readonly IMemoryAllocationService _memory;
     private readonly IDialogService _dialogs;
     private readonly AppPaths _paths;
+
+    /// <summary>换源后要清掉磁盘缓存，否则还会拿到旧源的内容。</summary>
+    private readonly ModCache _modCache;
     private readonly ILogger<SettingsViewModel> _logger;
 
     /// <summary>0 = 自动分配，1 = 手动配置。RadioButtons 只认索引。</summary>
@@ -67,12 +71,24 @@ public sealed partial class SettingsViewModel : ViewModelBase
     [ObservableProperty]
     private int _newInstanceIsolationIndex;
 
+    /// <summary>0 = 官方优先，1 = 镜像优先，2 = 仅镜像。</summary>
+    [ObservableProperty]
+    private int _modSourcePreferenceIndex;
+
+    [ObservableProperty]
+    private string _modMirrorUrl = "";
+
+    /// <summary>CurseForge 官方 API 的 Key。留空时只能走镜像（镜像自带 Key）。</summary>
+    [ObservableProperty]
+    private string _curseForgeApiKey = "";
+
     public SettingsViewModel(
         ISettingsService settings,
         IJavaDetector javaDetector,
         IMemoryAllocationService memory,
         IDialogService dialogs,
         AppPaths paths,
+        ModCache modCache,
         ILogger<SettingsViewModel> logger)
     {
         _settings = settings;
@@ -80,6 +96,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
         _memory = memory;
         _dialogs = dialogs;
         _paths = paths;
+        _modCache = modCache;
         _logger = logger;
 
         LoadFromSettings();
@@ -147,6 +164,9 @@ public sealed partial class SettingsViewModel : ViewModelBase
         DownloadThreads = s.DownloadThreads;
         DownloadMirrorUrl = s.DownloadMirrorUrl ?? "";
         NewInstanceIsolationIndex = (int)s.NewInstanceIsolation;
+        ModSourcePreferenceIndex = (int)s.ModSourcePreference;
+        ModMirrorUrl = s.ModMirrorUrl ?? "";
+        CurseForgeApiKey = s.CurseForgeApiKey ?? "";
     }
 
     /// <summary>
@@ -330,9 +350,24 @@ public sealed partial class SettingsViewModel : ViewModelBase
         s.DownloadMirrorUrl = string.IsNullOrWhiteSpace(DownloadMirrorUrl) ? null : DownloadMirrorUrl.Trim();
         s.NewInstanceIsolation = (VersionIsolationDefault)Math.Clamp(NewInstanceIsolationIndex, 0, 2);
 
+        // Mod 源三项：换了任何一个，缓存里的项目与版本都属于旧源，必须清掉
+        var modSourceChanged = s.ModSourcePreference != (ModSourcePreference)Math.Clamp(ModSourcePreferenceIndex, 0, 2)
+                               || s.ModMirrorUrl != NullIfBlank(ModMirrorUrl)
+                               || s.CurseForgeApiKey != NullIfBlank(CurseForgeApiKey);
+
+        s.ModSourcePreference = (ModSourcePreference)Math.Clamp(ModSourcePreferenceIndex, 0, 2);
+        s.ModMirrorUrl = NullIfBlank(ModMirrorUrl);
+        s.CurseForgeApiKey = NullIfBlank(CurseForgeApiKey);
+
         try
         {
             await _settings.SaveAsync();
+
+            if (modSourceChanged)
+            {
+                _modCache.Clear();
+            }
+
             StatusMessage = "设置已保存";
             await _dialogs.ShowMessageAsync("已保存", "设置已保存。");
         }
@@ -342,4 +377,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
             await _dialogs.ShowMessageAsync("保存失败", ex.Message);
         }
     }
+
+    private static string? NullIfBlank(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

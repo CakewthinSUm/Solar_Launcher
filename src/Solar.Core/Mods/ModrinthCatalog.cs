@@ -184,10 +184,13 @@ public sealed class ModrinthCatalog(ModHttp http, ModCache cache) : IModCatalog
         CancellationToken ct = default)
     {
         var cacheKey = BuildVersionCacheKey(projectId, query);
+
+        // 缓存里存的是过滤后的完整列表，Limit 只在返回时截断。
+        // 否则先来一次 Limit=10 的调用会把缓存写成十条，之后要 100 条也只能拿到十条。
         var cached = await cache.ReadVersionsAsync(Source, cacheKey, ct).ConfigureAwait(false);
         if (cached is not null)
         {
-            return cached;
+            return cached.Take(Math.Max(1, query.Limit)).ToList();
         }
 
         var builder = new System.Text.StringBuilder($"project/{Uri.EscapeDataString(projectId)}/version?include_changelog=false");
@@ -213,11 +216,10 @@ public sealed class ModrinthCatalog(ModHttp http, ModCache cache) : IModCatalog
             .Select(ToVersion)
             .Where(v => v is not null)
             .Select(v => v!)
-            .Take(Math.Max(1, query.Limit))
             .ToList();
 
         await cache.WriteVersionsAsync(Source, cacheKey, versions, ct).ConfigureAwait(false);
-        return versions;
+        return versions.Take(Math.Max(1, query.Limit)).ToList();
     }
 
     public async Task<IReadOnlyList<ModCategory>> GetCategoriesAsync(CancellationToken ct = default)

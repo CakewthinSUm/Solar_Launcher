@@ -12,8 +12,10 @@
     <!--
         六个分区由侧边栏「下载」下的子项切换，页面本身只负责按分区渲染内容，
         不再放第二层 tab，避免同一份导航出现两处入口。
+        底部不留内边距：版本列表要铺到窗口下边缘，否则滚到底会有一条空白带，
+        看起来像最后一行被截断了（内边距改由列表自己的 Padding 提供）。
     -->
-    <Grid Padding="{StaticResource SolarPagePadding}" RowSpacing="16">
+    <Grid Padding="24,16,24,0" RowSpacing="16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
@@ -83,7 +85,14 @@
                 IsItemClickEnabled="True"
                 ItemClick="Version_Click"
                 ItemsSource="{x:Bind ViewModel.Versions, Mode=OneWay}"
+                Padding="0,0,0,16"
                 SelectionMode="None">
+                <ListView.ItemContainerStyle>
+                    <Style TargetType="ListViewItem">
+                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                        <Setter Property="Padding" Value="12,0" />
+                    </Style>
+                </ListView.ItemContainerStyle>
                 <ListView.ItemTemplate>
                     <DataTemplate x:DataType="models:VersionSummary">
                         <Grid ColumnSpacing="12" Padding="0,8">

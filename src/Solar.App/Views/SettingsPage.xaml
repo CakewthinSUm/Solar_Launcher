@@ -275,6 +275,57 @@
                             Text="{x:Bind ViewModel.DownloadMirrorUrl, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                     </StackPanel>
                 </Border>
+
+                <!-- Mod 源：Modrinth / CurseForge，默认走 MCIM 镜像 -->
+                <Border Style="{StaticResource SolarCardStyle}">
+                    <StackPanel Spacing="16">
+                        <StackPanel Spacing="2">
+                            <TextBlock Text="Mod 来源" />
+                            <TextBlock
+                                Style="{StaticResource CaptionTextBlockStyle}"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Text="「下载 → Mod」的搜索与下载走这两个源。国内直连官方经常超时，默认使用 MCIM 镜像（它同时代理 Modrinth 与 CurseForge，后者不需要 API Key）。"
+                                TextWrapping="Wrap" />
+                        </StackPanel>
+
+                        <ComboBox
+                            MinWidth="240"
+                            SelectedIndex="{x:Bind ViewModel.ModSourcePreferenceIndex, Mode=TwoWay}">
+                            <ComboBoxItem Content="官方优先" />
+                            <ComboBoxItem Content="镜像优先" />
+                            <ComboBoxItem Content="仅镜像" />
+                        </ComboBox>
+
+                        <StackPanel Spacing="2">
+                            <TextBlock Text="镜像地址" />
+                            <TextBlock
+                                Style="{StaticResource CaptionTextBlockStyle}"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Text="留空则只走官方地址"
+                                TextWrapping="Wrap" />
+                        </StackPanel>
+                        <TextBox
+                            PlaceholderText="https://mod.mcimirror.top"
+                            Text="{x:Bind ViewModel.ModMirrorUrl, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+                        <StackPanel Spacing="2">
+                            <TextBlock Text="CurseForge API Key" />
+                            <TextBlock
+                                Style="{StaticResource CaptionTextBlockStyle}"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Text="选填。留空时只能通过镜像访问 CurseForge；填了才会直连官方 API。启动器不分发 Key。"
+                                TextWrapping="Wrap" />
+                        </StackPanel>
+                        <!--
+                            PasswordBox.Password 不能双向绑定，只能由代码回填与回写。
+                            页面在导航到时把设置里的 Key 填进来（见 SettingsPage.xaml.cs）。
+                        -->
+                        <PasswordBox
+                            x:Name="CurseForgeKeyBox"
+                            PasswordChanged="CurseForgeKey_PasswordChanged"
+                            PlaceholderText="留空" />
+                    </StackPanel>
+                </Border>
             </StackPanel>
 
             <!-- 关于 -->

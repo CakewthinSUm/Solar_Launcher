@@ -14,7 +14,8 @@
         <conv:VisibleWhenTrueConverter x:Key="VisibleWhenTrue" />
     </Page.Resources>
 
-    <Grid Padding="{StaticResource SolarPagePadding}" RowSpacing="16">
+    <!-- 底部不留内边距，列表铺到窗口下边缘；留白由列表自己的 Padding 给 -->
+    <Grid Padding="24,16,24,0" RowSpacing="16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
@@ -68,8 +69,15 @@
             <ListView
                 Grid.Row="1"
                 ItemsSource="{x:Bind ViewModel.Instances, Mode=OneWay}"
+                Padding="0,0,0,16"
                 SelectedItem="{x:Bind ViewModel.SelectedInstance, Mode=TwoWay}"
                 SelectionMode="Single">
+                <ListView.ItemContainerStyle>
+                    <Style TargetType="ListViewItem">
+                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                        <Setter Property="Padding" Value="12,0" />
+                    </Style>
+                </ListView.ItemContainerStyle>
                 <ListView.ItemTemplate>
                     <DataTemplate x:DataType="models:GameInstance">
                         <Grid ColumnSpacing="12" Padding="0,8">

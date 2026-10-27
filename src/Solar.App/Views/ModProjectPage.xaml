@@ -1,0 +1,267 @@
+<?xml version="1.0" encoding="utf-8"?>
+<views:PageBase
+    x:Class="Solar.App.Views.ModProjectPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:views="using:Solar.App.Views"
+    xmlns:vm="using:Solar.App.ViewModels"
+    mc:Ignorable="d">
+
+    <Grid Padding="24,16,24,0" RowSpacing="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- 头部：图标、标题、元信息、安装 -->
+        <Border Grid.Row="0" Style="{StaticResource SolarCardStyle}" Padding="20">
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <Grid
+                    Grid.Column="0"
+                    Width="64"
+                    Height="64"
+                    VerticalAlignment="Top">
+                    <!-- 占位块只在图标加载失败时出现，否则会从图标的透明区域透出来 -->
+                    <Border
+                        Background="{ThemeResource ControlFillColorSecondaryBrush}"
+                        CornerRadius="12"
+                        Visibility="{x:Bind ViewModel.HasIcon, Mode=OneWay, Converter={StaticResource CollapsedWhenTrue}}">
+                        <TextBlock
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            FontSize="24"
+                            Style="{StaticResource BodyStrongTextBlockStyle}"
+                            Text="{x:Bind ViewModel.Initial, Mode=OneWay}" />
+                    </Border>
+                    <Border CornerRadius="12" Visibility="{x:Bind ViewModel.HasIcon, Mode=OneWay, Converter={StaticResource VisibleWhenTrue}}">
+                        <Image
+                            ImageFailed="Icon_ImageFailed"
+                            Source="{x:Bind ViewModel.IconUrl, Mode=OneWay}"
+                            Stretch="UniformToFill" />
+                    </Border>
+                </Grid>
+
+                <StackPanel
+                    Grid.Column="1"
+                    VerticalAlignment="Center"
+                    Spacing="4">
+                    <TextBlock
+                        Style="{StaticResource SubtitleTextBlockStyle}"
+                        Text="{x:Bind ViewModel.Title, Mode=OneWay}"
+                        TextTrimming="CharacterEllipsis" />
+                    <TextBlock
+                        Style="{StaticResource CaptionTextBlockStyle}"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Text="{x:Bind ViewModel.MetaText, Mode=OneWay}"
+                        TextWrapping="Wrap" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock
+                            Style="{StaticResource CaptionTextBlockStyle}"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            Text="{x:Bind ViewModel.LoadersText, Mode=OneWay}" />
+                        <TextBlock
+                            Style="{StaticResource CaptionTextBlockStyle}"
+                            Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                            Text="·" />
+                        <TextBlock
+                            Style="{StaticResource CaptionTextBlockStyle}"
+                            Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                            Text="{x:Bind ViewModel.SourceText, Mode=OneWay}" />
+                    </StackPanel>
+                </StackPanel>
+
+                <StackPanel
+                    Grid.Column="2"
+                    VerticalAlignment="Center"
+                    Spacing="8">
+                    <Button
+                        MinWidth="140"
+                        Click="Install_Click"
+                        Content="安装"
+                        IsEnabled="{x:Bind ViewModel.CanInstall, Mode=OneWay}"
+                        Style="{StaticResource AccentButtonStyle}" />
+                    <HyperlinkButton
+                        Content="在网站上查看"
+                        NavigateUri="{x:Bind ViewModel.WebsiteUri, Mode=OneWay}"
+                        Visibility="{x:Bind ViewModel.WebsiteUrl, Mode=OneWay, Converter={StaticResource VisibleWhenText}}" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <StackPanel Grid.Row="1" Spacing="8">
+            <InfoBar
+                IsClosable="False"
+                IsOpen="{x:Bind ViewModel.HasCompatibilityWarning, Mode=OneWay}"
+                Message="{x:Bind ViewModel.CompatibilityWarning, Mode=OneWay}"
+                Severity="Warning" />
+            <InfoBar
+                IsClosable="True"
+                IsOpen="{x:Bind ViewModel.HasErrorMessage, Mode=OneWay}"
+                Message="{x:Bind ViewModel.ErrorMessage, Mode=OneWay}"
+                Severity="Error" />
+        </StackPanel>
+
+        <!-- 安装结果：装完或跳过时给一条成功提示 -->
+        <InfoBar
+            Grid.Row="2"
+            IsClosable="True"
+            IsOpen="{x:Bind ViewModel.HasStatusMessage, Mode=OneWay}"
+            Message="{x:Bind ViewModel.StatusMessage, Mode=OneWay}"
+            Severity="Success" />
+
+        <!-- 正文与版本列表并排：正文通常很长，版本列表需要一直可见 -->
+        <Grid Grid.Row="3" ColumnSpacing="16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="360" />
+            </Grid.ColumnDefinitions>
+
+            <ScrollViewer Grid.Column="0">
+                <StackPanel Spacing="16">
+                    <!-- 简介：CurseForge 没有正文，只能给这一行 -->
+                    <TextBlock
+                        Style="{StaticResource BodyTextBlockStyle}"
+                        Text="{x:Bind ViewModel.Summary, Mode=OneWay}"
+                        TextWrapping="Wrap" />
+
+                    <!-- 正文由 MarkdownBlockRenderer 在代码里填充 -->
+                    <RichTextBlock
+                        x:Name="BodyText"
+                        IsTextSelectionEnabled="True"
+                        TextWrapping="Wrap"
+                        Visibility="{x:Bind ViewModel.HasBody, Mode=OneWay, Converter={StaticResource VisibleWhenTrue}}" />
+
+                    <TextBlock
+                        Style="{StaticResource CaptionTextBlockStyle}"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Text="这个来源没有提供正文，可以点右上角的「在网站上查看」。"
+                        TextWrapping="Wrap"
+                        Visibility="{x:Bind ViewModel.HasBody, Mode=OneWay, Converter={StaticResource CollapsedWhenTrue}}" />
+
+                    <!-- 截图：横向滚动，高度固定，避免把正文挤到看不见 -->
+                    <StackPanel
+                        Spacing="8"
+                        Visibility="{x:Bind ViewModel.HasGallery, Mode=OneWay, Converter={StaticResource VisibleWhenTrue}}">
+                        <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="截图" />
+                        <ScrollViewer HorizontalScrollBarVisibility="Auto" HorizontalScrollMode="Enabled" VerticalScrollMode="Disabled">
+                            <ItemsControl ItemsSource="{x:Bind ViewModel.Gallery, Mode=OneWay}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel Orientation="Horizontal" Spacing="8" />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="x:String">
+                                        <Image
+                                            Width="280"
+                                            Height="158"
+                                            Source="{x:Bind}"
+                                            Stretch="UniformToFill" />
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- 版本列表 -->
+            <Grid Grid.Column="1" RowSpacing="8">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <StackPanel Grid.Row="0" Spacing="2">
+                    <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="版本" />
+                    <TextBlock
+                        Style="{StaticResource CaptionTextBlockStyle}"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Text="{x:Bind ViewModel.VersionHint, Mode=OneWay}"
+                        TextWrapping="Wrap" />
+                </StackPanel>
+
+                <ToggleSwitch
+                    Grid.Row="1"
+                    Header="显示全部版本"
+                    IsEnabled="{x:Bind ViewModel.CanFilterVersions, Mode=OneWay}"
+                    IsOn="{x:Bind ViewModel.ShowAllVersions, Mode=TwoWay}"
+                    OffContent="只看兼容"
+                    OnContent="全部" />
+
+                <ListView
+                    Grid.Row="2"
+                    ItemsSource="{x:Bind ViewModel.Versions, Mode=OneWay}"
+                    Padding="0,0,0,16"
+                    SelectedItem="{x:Bind ViewModel.SelectedVersion, Mode=TwoWay}"
+                    SelectionMode="Single">
+                    <ListView.ItemContainerStyle>
+                        <Style TargetType="ListViewItem">
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                            <Setter Property="Padding" Value="12,0" />
+                        </Style>
+                    </ListView.ItemContainerStyle>
+                    <ListView.ItemTemplate>
+                        <DataTemplate x:DataType="vm:ModVersionItemViewModel">
+                            <StackPanel Padding="0,6" Spacing="2">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <TextBlock
+                                        Style="{StaticResource BodyStrongTextBlockStyle}"
+                                        Text="{x:Bind DisplayName}"
+                                        TextTrimming="CharacterEllipsis" />
+                                    <Border
+                                        Padding="6,0"
+                                        VerticalAlignment="Center"
+                                        Background="{ThemeResource ControlFillColorSecondaryBrush}"
+                                        CornerRadius="4"
+                                        Visibility="{x:Bind IsPrerelease, Converter={StaticResource VisibleWhenTrue}}">
+                                        <TextBlock Style="{StaticResource CaptionTextBlockStyle}" Text="{x:Bind ReleaseLabel}" />
+                                    </Border>
+                                </StackPanel>
+                                <TextBlock
+                                    Style="{StaticResource CaptionTextBlockStyle}"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="{x:Bind Subtitle}"
+                                    TextTrimming="CharacterEllipsis" />
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <TextBlock
+                                        Style="{StaticResource CaptionTextBlockStyle}"
+                                        Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                        Text="{x:Bind SizeText}" />
+                                    <TextBlock
+                                        Style="{StaticResource CaptionTextBlockStyle}"
+                                        Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                        Text="{x:Bind PublishedText}" />
+                                    <TextBlock
+                                        Style="{StaticResource CaptionTextBlockStyle}"
+                                        Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                        Text="{x:Bind DependencyText}"
+                                        Visibility="{x:Bind HasDependencies, Converter={StaticResource VisibleWhenTrue}}" />
+                                </StackPanel>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+
+                <ProgressRing
+                    Grid.Row="2"
+                    Width="24"
+                    Height="24"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    IsActive="{x:Bind ViewModel.IsLoadingVersions, Mode=OneWay}" />
+            </Grid>
+        </Grid>
+    </Grid>
+</views:PageBase>

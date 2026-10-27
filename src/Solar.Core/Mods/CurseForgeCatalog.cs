@@ -235,10 +235,12 @@ public sealed class CurseForgeCatalog(ModHttp http, ModCache cache) : IModCatalo
         CancellationToken ct = default)
     {
         var cacheKey = BuildVersionCacheKey(projectId, query);
+
+        // 缓存里存的是过滤后的完整列表，Limit 只在返回时截断（理由同 ModrinthCatalog）
         var cached = await cache.ReadVersionsAsync(Source, cacheKey, ct).ConfigureAwait(false);
         if (cached is not null)
         {
-            return cached;
+            return cached.Take(Math.Max(1, query.Limit)).ToList();
         }
 
         var builder = new System.Text.StringBuilder($"mods/{Uri.EscapeDataString(projectId)}/files?pageSize=50");
@@ -266,11 +268,10 @@ public sealed class CurseForgeCatalog(ModHttp http, ModCache cache) : IModCatalo
             .Where(f => f.IsAvailable && !string.IsNullOrEmpty(f.DownloadUrl))
             .Select(ToVersion)
             .OrderByDescending(v => v.PublishedAt)
-            .Take(Math.Max(1, query.Limit))
             .ToList();
 
         await cache.WriteVersionsAsync(Source, cacheKey, versions, ct).ConfigureAwait(false);
-        return versions;
+        return versions.Take(Math.Max(1, query.Limit)).ToList();
     }
 
     public async Task<IReadOnlyList<ModCategory>> GetCategoriesAsync(CancellationToken ct = default)

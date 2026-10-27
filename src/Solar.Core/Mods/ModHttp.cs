@@ -15,8 +15,12 @@ namespace Solar.Core.Mods;
 /// </summary>
 public sealed class ModHttp(HttpClient http, ModEndpoints endpoints, ILogger<ModHttp> logger)
 {
-    /// <summary>单个候选地址的超时。搜索是交互式的，不能等太久。</summary>
-    private static readonly TimeSpan PerAttemptTimeout = TimeSpan.FromSeconds(10);
+    /// <summary>
+    /// 单个候选地址的超时。搜索是交互式的，不能等太久；
+    /// 但国内连官方 API 经常是「能连上、迟迟不回」，10 秒会经常把本来能出结果的源判死，
+    /// 所以给 15 秒。两个源是并行请求的，最坏等待时间就是这一个超时，不会翻倍。
+    /// </summary>
+    private static readonly TimeSpan PerAttemptTimeout = TimeSpan.FromSeconds(15);
 
     public async Task<T> GetJsonAsync<T>(
         Uri official,
