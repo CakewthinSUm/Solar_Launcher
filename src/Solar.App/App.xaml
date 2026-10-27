@@ -28,6 +28,13 @@
             <SolidColorBrush x:Key="TitleBarBackButtonBackgroundDisabled" Color="Transparent" />
 
             <!--
+                标题栏高度。默认 32，按钮的悬停背景只有 28 高、紧贴窗口顶边，
+                与左侧留白比例失衡。放到 40（与 MainWindow 的标题栏行高一致），
+                悬停背景变成 36 高，上下留白和左边距看起来接近了。
+            -->
+            <x:Double x:Key="TitleBarCompactHeight">40</x:Double>
+
+            <!--
                 卡片容器：遵循 WinUI 3 的 Card 视觉规范（卡片底色 + 1px 描边 + 系统控件圆角），
                 颜色全部取自 ThemeResource，自动适配浅色/深色/高对比度主题。
             -->
