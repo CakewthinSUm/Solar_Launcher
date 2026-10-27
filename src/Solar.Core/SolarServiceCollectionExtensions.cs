@@ -7,6 +7,7 @@ using Solar.Core.Instances;
 using Solar.Core.Java;
 using Solar.Core.Launch;
 using Solar.Core.Loaders;
+using Solar.Core.Memory;
 using Solar.Core.Minecraft;
 using Solar.Core.Paths;
 using Solar.Core.Settings;
@@ -28,6 +29,8 @@ public static class SolarServiceCollectionExtensions
         services.AddSingleton<IContentManager, ContentManager>();
         services.AddSingleton<GameFileLocator>();
         services.AddSingleton<IVersionScanner, VersionScanner>();
+        services.AddSingleton<ISystemMemoryInfo, WindowsSystemMemoryInfo>();
+        services.AddSingleton<IMemoryAllocationService, MemoryAllocationService>();
         services.AddSingleton<IJavaDetector, JavaDetector>();
 
         services.AddSingleton<IAccountStore, AccountStore>();

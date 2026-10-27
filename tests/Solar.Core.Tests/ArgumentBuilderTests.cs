@@ -1,5 +1,6 @@
 using Solar.Core.Instances;
 using Solar.Core.Launch;
+using Solar.Core.Memory;
 using Solar.Core.Minecraft;
 using Solar.Core.Models;
 using Solar.Core.Paths;
@@ -37,6 +38,7 @@ public class ArgumentBuilderTests
             NativesDirectory = @"C:\games\inst1\natives",
             AssetsDirectory = @"C:\shared\assets",
             Resolution = resolution,
+            MaxMemoryMb = 4096,
         };
     }
 
@@ -124,13 +126,13 @@ public class ArgumentBuilderTests
     }
 
     [Fact]
-    public void InstanceMemoryOverrideWins()
+    public void HeapLimitComesFromContext()
     {
+        // 用多少内存由 LaunchContextFactory 算好后写进上下文，参数构建器只负责拼参数
         var context = CreateContext();
-        var instance = new GameInstance { Id = "inst1", MaxMemoryMb = 8192 };
-        var overridden = new LaunchContext
+        var larger = new LaunchContext
         {
-            Instance = instance,
+            Instance = context.Instance,
             Version = context.Version,
             Paths = context.Paths,
             Settings = context.Settings,
@@ -138,10 +140,12 @@ public class ArgumentBuilderTests
             PlayerName = context.PlayerName,
             Uuid = context.Uuid,
             AccessToken = context.AccessToken,
+            MaxMemoryMb = 8192,
         };
 
-        var args = new ArgumentBuilder().BuildJvmArguments(overridden);
+        var args = new ArgumentBuilder().BuildJvmArguments(larger);
         Assert.Contains("-Xmx8192M", args);
+        Assert.DoesNotContain(args, a => a == "-Xmx4096M");
     }
 
     [Fact]
