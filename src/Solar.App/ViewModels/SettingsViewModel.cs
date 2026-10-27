@@ -32,6 +32,9 @@ public sealed partial class SettingsViewModel : ViewModelBase
     private int _downloadThreads;
 
     [ObservableProperty]
+    private string _downloadMirrorUrl = "";
+
+    [ObservableProperty]
     private string _detectedJava = "未检测";
 
     public SettingsViewModel(
@@ -60,6 +63,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
         PlayerName = s.PlayerName;
         VersionManifestUrl = s.VersionManifestUrl;
         DownloadThreads = s.DownloadThreads;
+        DownloadMirrorUrl = s.DownloadMirrorUrl ?? "";
     }
 
     public override async Task OnNavigatedToAsync(object? parameter)
@@ -102,6 +106,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
             ? "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json"
             : VersionManifestUrl.Trim();
         s.DownloadThreads = Math.Clamp(DownloadThreads, 1, 32);
+        s.DownloadMirrorUrl = string.IsNullOrWhiteSpace(DownloadMirrorUrl) ? null : DownloadMirrorUrl.Trim();
 
         try
         {

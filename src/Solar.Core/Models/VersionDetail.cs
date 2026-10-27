@@ -12,15 +12,46 @@ public sealed class VersionDetail
     public string? Assets { get; set; }
     public AssetIndexRef? AssetIndex { get; set; }
     public int? ComplianceLevel { get; set; }
-    public int? JavaVersion { get; set; }
+
+    /// <summary>
+    /// 注意这是对象而不是数字：<c>{"component":"java-runtime-delta","majorVersion":21}</c>。
+    /// 曾误声明为 int?，会导致所有版本 JSON 反序列化失败。
+    /// </summary>
+    public JavaVersionInfo? JavaVersion { get; set; }
     public string? InheritsFrom { get; set; }
     public string? MinecraftArguments { get; set; }
 
     public List<Library> Libraries { get; set; } = new();
     public Arguments? Arguments { get; set; }
     public Dictionary<string, DownloadArtifact>? Downloads { get; set; }
+
+    /// <summary>版本自带的 log4j 配置，启动时必须下载并作为 JVM 参数传入。</summary>
+    public VersionLogging? Logging { get; set; }
+
     public string? ReleaseTime { get; set; }
     public string? Time { get; set; }
+}
+
+public sealed class JavaVersionInfo
+{
+    /// <summary>Mojang 运行时组件名，如 <c>java-runtime-delta</c>；用于将来自动下载 Java。</summary>
+    public string? Component { get; set; }
+
+    public int MajorVersion { get; set; }
+}
+
+public sealed class VersionLogging
+{
+    public LoggingClient? Client { get; set; }
+}
+
+public sealed class LoggingClient
+{
+    /// <summary>参数模板，形如 <c>-Dlog4j.configurationFile=${path}</c>。</summary>
+    public string? Argument { get; set; }
+
+    public string? Type { get; set; }
+    public DownloadArtifact? File { get; set; }
 }
 
 public sealed class Arguments
@@ -49,7 +80,13 @@ public sealed class Library
     public string? ServerUrl { get; set; }
     public List<Rule>? Rules { get; set; }
     public LibraryExtract? Extract { get; set; }
-    public string? Natives { get; set; }
+
+    /// <summary>
+    /// 老格式（1.18 及以前）的 natives 映射，如 <c>{"windows": "natives-windows"}</c>。
+    /// 注意这里必须是对象而不是字符串，否则老版本 JSON 会反序列化失败。
+    /// 1.19 起该字段不再出现，分类符直接写在 <see cref="Name"/> 里。
+    /// </summary>
+    public Dictionary<string, string>? Natives { get; set; }
 
     /// <summary>Forge/NeoForge 等会在这里放额外的下载项。</summary>
     public Dictionary<string, DownloadArtifact>? Classifiers { get; set; }
@@ -63,6 +100,36 @@ public sealed class Library
         var version = parts.Length > 2 ? parts[2] : "";
         var classifier = parts.Length > 3 ? parts[3] : null;
         return (group, artifact, version, classifier);
+    }
+
+    /// <summary>
+    /// 判断这个库的 natives 分类符是否适用于当前架构。
+    /// <para>
+    /// 1.19 起 natives 的架构后缀写在分类符里（<c>natives-windows</c>、
+    /// <c>natives-windows-arm64</c>、<c>natives-windows-x86</c>），
+    /// 而它们的 rules 通常都只写 <c>allow windows</c>，不做架构区分。
+    /// 如果不按后缀再过滤一次，三个变体会同时被下载并解压，
+    /// 最终哪个 DLL 落地取决于解压顺序——可能装入 32 位 DLL，
+    /// 在 64 位 JVM 上表现为 "Can't load IA 32-bit .dll"。
+    /// </para>
+    /// </summary>
+    public bool MatchesArchitecture(string arch)
+    {
+        var classifier = ParseName().Classifier;
+        if (classifier is null || !classifier.StartsWith("natives", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        var wantsArm64 = classifier.EndsWith("-arm64", StringComparison.OrdinalIgnoreCase);
+        var wantsX86 = classifier.EndsWith("-x86", StringComparison.OrdinalIgnoreCase);
+
+        return arch switch
+        {
+            "arm64" => wantsArm64,
+            "x86" => wantsX86,
+            _ => !wantsArm64 && !wantsX86,   // x64 用不带后缀的那个
+        };
     }
 }
 
@@ -79,6 +146,9 @@ public sealed class LibraryExtract
 
 public sealed class DownloadArtifact
 {
+    /// <summary>log4j 配置文件用 id 命名，如 <c>client-1.21.2.xml</c>。</summary>
+    public string? Id { get; set; }
+
     public string? Path { get; set; }
     public string? Sha1 { get; set; }
     public long Size { get; set; }

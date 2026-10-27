@@ -17,9 +17,15 @@ public sealed class ResolvedVersion
     /// <summary>合并后的库列表（父版本在前）。</summary>
     public IReadOnlyList<Library> Libraries => Detail.Libraries;
 
-    /// <summary>按平台过滤后、需要下载的库。</summary>
+    /// <summary>
+    /// 按平台与架构过滤后、需要使用的库。
+    /// 架构过滤是必须的：natives 的三个变体（windows / -arm64 / -x86）
+    /// 在 rules 里都只写 <c>allow windows</c>，只能靠分类符后缀区分。
+    /// </summary>
     public IEnumerable<Library> GetEffectiveLibraries(RuleContext context) =>
-        Detail.Libraries.Where(l => RuleEvaluator.IsAllowed(l.Rules, context));
+        Detail.Libraries
+            .Where(l => RuleEvaluator.IsAllowed(l.Rules, context))
+            .Where(l => l.MatchesArchitecture(context.Arch));
 }
 
 public interface IVersionResolver
@@ -31,6 +37,7 @@ public interface IVersionResolver
 public sealed class VersionResolver(
     HttpClient http,
     AppPaths paths,
+    IVersionManifestService manifestService,
     ILogger<VersionResolver> logger) : IVersionResolver
 {
     public string GetVersionDirectory(string versionId) => Path.Combine(paths.Versions, versionId);
@@ -129,17 +136,14 @@ public sealed class VersionResolver(
             return cached;
         }
 
-        var manifest = await GetManifestFromCacheAsync(ct).ConfigureAwait(false)
-                       ?? throw new InvalidOperationException("本地没有版本清单，无法下载版本 JSON。");
+        // 通过清单服务获取，它会先看缓存再联网，避免"没打开过版本页就无法启动"
+        var manifest = await manifestService.GetManifestAsync(ct: ct).ConfigureAwait(false);
 
         var summary = manifest.Versions.FirstOrDefault(v => v.Id == versionId)
                       ?? throw new InvalidOperationException($"版本清单中找不到 {versionId}。");
 
         return await DownloadVersionJsonAsync(summary, ct).ConfigureAwait(false);
     }
-
-    private Task<VersionManifest?> GetManifestFromCacheAsync(CancellationToken ct) =>
-        JsonFile.ReadAsync<VersionManifest>(Path.Combine(paths.Data, "version_manifest_v2.json"), ct);
 
     public async Task<VersionDetail> DownloadVersionJsonAsync(VersionSummary summary, CancellationToken ct = default)
     {

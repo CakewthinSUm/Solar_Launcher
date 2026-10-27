@@ -1,6 +1,9 @@
 using Microsoft.Extensions.DependencyInjection;
+using Solar.Core.Assets;
+using Solar.Core.Download;
 using Solar.Core.Instances;
 using Solar.Core.Java;
+using Solar.Core.Launch;
 using Solar.Core.Minecraft;
 using Solar.Core.Paths;
 using Solar.Core.Settings;
@@ -20,8 +23,15 @@ public static class SolarServiceCollectionExtensions
         services.AddSingleton<IInstanceRepository, InstanceRepository>();
         services.AddSingleton<IJavaDetector, JavaDetector>();
 
+        services.AddSingleton<IAssetIndexService, AssetIndexService>();
+        services.AddSingleton<IGameDownloader, GameDownloader>();
+        services.AddSingleton<IGameLauncher, GameLauncher>();
+        services.AddSingleton<LaunchContextFactory>();
+        services.AddSingleton<IGameLaunchService, GameLaunchService>();
+
         services.AddHttpClient<IVersionManifestService, VersionManifestService>(ConfigureHttpClient);
         services.AddHttpClient<IVersionResolver, VersionResolver>(ConfigureHttpClient);
+        services.AddHttpClient<IAssetIndexService, AssetIndexService>(ConfigureHttpClient);
 
         return services;
     }

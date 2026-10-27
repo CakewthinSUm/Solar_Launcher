@@ -21,8 +21,11 @@ public sealed class LauncherSettings
     /// <summary>版本清单下载源，可替换为国内镜像。</summary>
     public string VersionManifestUrl { get; set; } = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json";
 
-    /// <summary>资源/库下载源，可替换为 BMCLAPI 等镜像。</summary>
-    public string ResourceBaseUrl { get; set; } = "https://resources.download.minecraft.net";
+    /// <summary>
+    /// 下载镜像根地址，留空表示直连 Mojang。
+    /// 例如 BMCLAPI：<c>https://bmclapi2.bangbang93.com</c>。
+    /// </summary>
+    public string? DownloadMirrorUrl { get; set; }
 
     /// <summary>启动后是否自动关闭启动器。</summary>
     public bool CloseLauncherAfterLaunch { get; set; }

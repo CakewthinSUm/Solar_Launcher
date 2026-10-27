@@ -21,14 +21,15 @@ public class VersionMergeTests
             Id = "1.20.1",
             MainClass = "net.minecraft.client.main.Main",
             Assets = "5",
-            JavaVersion = 17,
+            JavaVersion = new JavaVersionInfo { Component = "java-runtime-delta", MajorVersion = 17 },
         };
 
         var merged = VersionResolver.Merge([child, parent]);
 
         Assert.Equal("cpw.mods.bootstraplauncher.BootstrapLauncher", merged.MainClass);
         Assert.Equal("5", merged.Assets);
-        Assert.Equal(17, merged.JavaVersion);
+        Assert.Equal(17, merged.JavaVersion!.MajorVersion);
+        Assert.Equal("java-runtime-delta", merged.JavaVersion.Component);
         Assert.Equal("1.20.1-forge-47.2.0", merged.Id);
     }
 

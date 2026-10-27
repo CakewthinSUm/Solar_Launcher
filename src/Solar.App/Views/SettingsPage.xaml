@@ -149,6 +149,18 @@
                                 Text="可替换为国内镜像以加速" />
                         </StackPanel>
                         <TextBox Text="{x:Bind ViewModel.VersionManifestUrl, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+                        <StackPanel Spacing="2">
+                            <TextBlock Text="下载镜像" />
+                            <TextBlock
+                                Style="{StaticResource CaptionTextBlockStyle}"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Text="留空直连 Mojang。例如 BMCLAPI：https://bmclapi2.bangbang93.com"
+                                TextWrapping="Wrap" />
+                        </StackPanel>
+                        <TextBox
+                            PlaceholderText="直连"
+                            Text="{x:Bind ViewModel.DownloadMirrorUrl, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                     </StackPanel>
                 </Border>
             </StackPanel>

@@ -75,7 +75,30 @@ Windows App SDK 以自包含方式随输出一起分发，终端用户无需单�
 - [x] 版本清单拉取与本地缓存（可在设置中换成国内镜像）
 - [x] 版本 JSON 下载、`inheritsFrom` 合并、rules 平台求值
 - [x] Java 自动探测与版本匹配
-- [ ] 依赖（libraries / assets / natives）下载与校验
-- [ ] 启动参数拼装与游戏进程启动
-- [ ] 账户系统（离线 / 微软登录）
+- [x] 依赖（libraries / assets / natives）下载与 SHA1 校验
+- [x] 启动参数拼装与游戏进程启动（离线账户）
+- [x] 下载镜像（BMCLAPI）与实例级 Java / 内存覆盖
+- [ ] 账户系统（微软登录）
 - [ ] 模组加载器安装（Forge / NeoForge / Fabric / Quilt）
+
+## 下载引擎
+
+依赖下载使用 [CmlLib.Core](https://github.com/CmlLib/CmlLib.Core) 的 `ParallelGameInstaller`：
+它用 TPL Dataflow 把"校验"和"下载"分成两级流水线，各自独立并行度，
+并内置 SHA1 校验与背压。我们只使用它的下载部分，版本解析、参数拼装、
+进程启动全部是 `Solar.Core` 自己的实现。
+
+镜像通过 `MirrorRewritingHandler` 在 HTTP 层重写 URL：
+只重写 `libraries.minecraft.net`（→ `/maven/`）与
+`resources.download.minecraft.net`（→ `/assets/`），
+`piston-data` 等路径保持直连，因为镜像对它们的支持不完整。
+
+## 端到端验证
+
+```bash
+# 真实下载一个版本的全部依赖
+dotnet run --project tools/Solar.Smoke -- 1.21.4 %TEMP%\solar-smoke --prepare-only
+
+# 下载并启动，60 秒后若仍在运行则判定成功
+dotnet run --project tools/Solar.Smoke -- 1.21.4 %TEMP%\solar-smoke
+```
