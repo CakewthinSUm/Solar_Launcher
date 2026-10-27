@@ -79,7 +79,23 @@ Windows App SDK 以自包含方式随输出一起分发，终端用户无需单�
 - [x] 启动参数拼装与游戏进程启动
 - [x] 下载镜像（BMCLAPI）与实例级 Java / 内存覆盖
 - [x] 微软正版登录（设备码流程、多账户、令牌静默刷新）
-- [ ] 模组加载器安装（Forge / NeoForge / Fabric / Quilt）
+- [x] 模组加载器安装（Fabric / Quilt / Forge / NeoForge）
+
+## 模组加载器
+
+| 加载器 | 安装方式 |
+| --- | --- |
+| Fabric / Quilt | 元数据接口直接返回带 `inheritsFrom` 的 profile JSON |
+| Forge / NeoForge | 下载 installer jar，取出 `version.json`，再执行客户端 processor |
+
+Forge / NeoForge 的 installer 不是简单的解压：它需要跑若干 processor
+（重命名原版 jar、打二进制补丁）才能产出可用的 client artifact。
+这些 processor 用 Java 执行，参数里混有三种占位符形态——
+`{KEY}` 引用数据表、`[group:artifact:version@ext]` 内联 maven 坐标、
+`'literal'` 单引号字面量，全部在 `LoaderInstaller` 里处理。
+
+安装时机是**首次启动该实例时**，不是创建实例时——installer 要下载几百 MB，
+建实例时同步等待体验很差。
 
 ## 账户
 
@@ -130,4 +146,8 @@ dotnet run --project tools/Solar.Smoke -- 1.21.4 %TEMP%\solar-smoke
 
 # 验证微软登录全流程：设备码 → Xbox → XSTS → Minecraft → 静默刷新
 dotnet run --project tools/Solar.AuthProbe -- <你的客户端ID>
+
+# 验证加载器安装（不给版本号则列出可选项并选最新）
+dotnet run --project tools/Solar.LoaderProbe -- fabric 1.21.4
+dotnet run --project tools/Solar.LoaderProbe -- forge 1.21.4 54.1.22
 ```
