@@ -41,4 +41,23 @@
     <ProjectReference Include="..\Solar.Core\Solar.Core.csproj" />
   </ItemGroup>
 
+  <!--
+    dotnet publish 不会带上 WinUI 在构建期生成的 .xbf 与 SolarLauncher.pri，
+    因为它们只标了 CopyToOutputDirectory。缺了这两个，解包后的程序会在
+    MainWindow.InitializeComponent() 抛 XamlParseException 直接退出。
+    这里把构建输出里的这两类文件补进发布清单。
+  -->
+  <Target Name="AddWinUIResourcesToPublish" AfterTargets="ComputeFilesToPublish">
+    <ItemGroup>
+      <_WinUIResourceToPublish Include="$(OutDir)**\*.xbf" />
+      <!-- 只补本项目的 pri；Microsoft.*.pri 由 Windows App SDK 自己发布，重复添加会冲突 -->
+      <_WinUIResourceToPublish Include="$(OutDir)$(AssemblyName).pri" />
+      <ResolvedFileToPublish Include="@(_WinUIResourceToPublish)">
+        <RelativePath>%(RecursiveDir)%(Filename)%(Extension)</RelativePath>
+        <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+        <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+      </ResolvedFileToPublish>
+    </ItemGroup>
+  </Target>
+
 </Project>
