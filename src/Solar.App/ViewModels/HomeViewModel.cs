@@ -69,7 +69,7 @@ public sealed partial class HomeViewModel : ViewModelBase
 
     public string SelectedInstanceSummary => SelectedInstance is { } instance
         ? $"{instance.MinecraftVersion} · {instance.DisplayLoader}"
-        : "先到“实例”页创建一个实例";
+        : "先到“管理 → 实例”创建一个实例";
 
     public override async Task OnNavigatedToAsync(object? parameter)
     {
@@ -131,7 +131,7 @@ public sealed partial class HomeViewModel : ViewModelBase
     {
         if (SelectedInstance is not { } instance)
         {
-            StatusMessage = "还没有可启动的实例，请先到“实例”页创建一个。";
+            StatusMessage = "还没有可启动的实例，请先到“管理 → 实例”创建一个。";
             return;
         }
 
