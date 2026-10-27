@@ -26,10 +26,12 @@ if (!string.IsNullOrWhiteSpace(clientId))
     Console.WriteLine($"已写入客户端 ID: {clientId[..Math.Min(8, clientId.Length)]}…");
 }
 
-var options = provider.GetRequiredService<AuthOptions>();
-Console.WriteLine($"当前客户端 ID 配置: {(options.IsConfigured ? "已配置" : "未配置")}");
+// 服务实际读取的是设置里的值（AuthOptions 只是默认值兜底），
+// 所以这里也要按设置判断，否则刚写入的 ID 会被误判为未配置。
+var configured = !string.IsNullOrWhiteSpace(settings.Current.MicrosoftClientId);
+Console.WriteLine($"当前客户端 ID 配置: {(configured ? "已配置" : "未配置")}");
 
-if (!options.IsConfigured)
+if (!configured)
 {
     Console.WriteLine();
     Console.WriteLine("未配置客户端 ID，无法走完登录流程。");

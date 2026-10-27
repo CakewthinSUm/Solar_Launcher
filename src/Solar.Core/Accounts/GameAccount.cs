@@ -63,6 +63,13 @@ public enum AccountErrorKind
     ChildAccountRestricted,
     RequiresInteractiveLogin,
     ConfigurationMissing,
+
+    /// <summary>
+    /// 微软登录与 Xbox 验证都通过，但 api.minecraftservices.com 拒绝签发令牌。
+    /// 通常是客户端 ID 未通过 Minecraft 应用审核。
+    /// </summary>
+    ClientNotApproved,
+
     Unknown,
 }
 
