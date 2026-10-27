@@ -14,6 +14,7 @@ public sealed record ModLoaderOption(ModLoader Value, string Display);
 public sealed partial class InstancesViewModel : ViewModelBase
 {
     private readonly IInstanceRepository _repository;
+    private readonly IVersionScanner _scanner;
     private readonly ILoaderVersionService _loaderVersions;
     private readonly IDialogService _dialogs;
     private readonly ILogger<InstancesViewModel> _logger;
@@ -41,11 +42,13 @@ public sealed partial class InstancesViewModel : ViewModelBase
 
     public InstancesViewModel(
         IInstanceRepository repository,
+        IVersionScanner scanner,
         ILoaderVersionService loaderVersions,
         IDialogService dialogs,
         ILogger<InstancesViewModel> logger)
     {
         _repository = repository;
+        _scanner = scanner;
         _loaderVersions = loaderVersions;
         _dialogs = dialogs;
         _logger = logger;
@@ -68,7 +71,7 @@ public sealed partial class InstancesViewModel : ViewModelBase
     /// <summary>原版不需要加载器版本，选择框应隐藏。</summary>
     public bool NeedsLoaderVersion => NewInstanceLoader.Value != ModLoader.Vanilla;
 
-    public override Task OnNavigatedToAsync(object? parameter) => RefreshAsync();
+    public override Task OnNavigatedToAsync(object? parameter) => ScanAsync();
 
     partial void OnNewInstanceLoaderChanged(ModLoaderOption value)
     {
@@ -92,14 +95,7 @@ public sealed partial class InstancesViewModel : ViewModelBase
             IsBusy = true;
             ErrorMessage = null;
 
-            var items = await _repository.GetAllAsync();
-            Instances.Clear();
-            foreach (var item in items)
-            {
-                Instances.Add(item);
-            }
-
-            SelectedInstance = Instances.FirstOrDefault();
+            await ReloadAsync();
         }
         catch (Exception ex)
         {
@@ -110,6 +106,53 @@ public sealed partial class InstancesViewModel : ViewModelBase
         {
             IsBusy = false;
         }
+    }
+
+    /// <summary>
+    /// 扫描游戏目录（.minecraft）里已有的版本并导入。
+    /// 通常在进入实例页时自动跑一次，也可以手动点「扫描游戏目录」。
+    /// </summary>
+    [RelayCommand]
+    private async Task ScanAsync()
+    {
+        try
+        {
+            IsBusy = true;
+            ErrorMessage = null;
+            StatusMessage = null;
+
+            var imported = await _scanner.ImportAsync();
+            await ReloadAsync();
+
+            StatusMessage = imported.Count > 0
+                ? $"已从游戏目录导入 {imported.Count} 个版本"
+                : "游戏目录里没有新的版本";
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "扫描游戏目录失败");
+            await _dialogs.ShowMessageAsync("扫描失败", ex.Message);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    /// <summary>重新读取实例列表，保留当前选中的那个。</summary>
+    private async Task ReloadAsync()
+    {
+        var previousId = SelectedInstance?.Id;
+
+        var items = await _repository.GetAllAsync();
+        Instances.Clear();
+        foreach (var item in items)
+        {
+            Instances.Add(item);
+        }
+
+        SelectedInstance = Instances.FirstOrDefault(i => i.Id == previousId)
+                           ?? Instances.FirstOrDefault();
     }
 
     /// <summary>按当前选中的加载器与游戏版本拉取可选加载器版本。</summary>
@@ -184,7 +227,7 @@ public sealed partial class InstancesViewModel : ViewModelBase
         {
             await _repository.SaveAsync(instance);
             NewInstanceName = "";
-            await RefreshAsync();
+            await ReloadAsync();
             SelectedInstance = Instances.FirstOrDefault(i => i.Id == instance.Id);
             StatusMessage = $"已创建实例“{instance.Name}”" +
                             (loader == ModLoader.Vanilla ? "" : $"，首次启动时会安装 {instance.DisplayLoader}");
@@ -218,7 +261,7 @@ public sealed partial class InstancesViewModel : ViewModelBase
         try
         {
             await _repository.DeleteAsync(instance.Id);
-            await RefreshAsync();
+            await ReloadAsync();
             StatusMessage = $"已删除实例“{instance.Name}”";
         }
         catch (Exception ex)
