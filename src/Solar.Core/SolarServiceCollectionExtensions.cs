@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Solar.Core.Accounts;
 using Solar.Core.Assets;
+using Solar.Core.Content;
 using Solar.Core.Download;
 using Solar.Core.Instances;
 using Solar.Core.Java;
@@ -24,6 +25,7 @@ public static class SolarServiceCollectionExtensions
         services.AddSingleton<ISettingsService, SettingsService>();
         services.AddSingleton<IInstanceRepository, InstanceRepository>();
         services.AddSingleton<InstanceGameDirectory>();
+        services.AddSingleton<IContentManager, ContentManager>();
         services.AddSingleton<GameFileLocator>();
         services.AddSingleton<IVersionScanner, VersionScanner>();
         services.AddSingleton<IJavaDetector, JavaDetector>();

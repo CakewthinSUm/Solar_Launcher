@@ -27,6 +27,9 @@ public sealed partial class MainWindow : Window
     /// <summary>上次停留的下载子分区；点父项「下载」时回到这里，而不是每次都跳到 Minecraft。</summary>
     private NavigationViewItem _lastDownloadItem;
 
+    /// <summary>上次停留的管理子分区；点父项「管理」时回到这里。</summary>
+    private NavigationViewItem _lastManageItem;
+
     public MainWindow()
     {
         InitializeComponent();
@@ -41,6 +44,9 @@ public sealed partial class MainWindow : Window
 
         // 还没进过下载页时，点父项默认落在 Minecraft 分区
         _lastDownloadItem = MinecraftNavItem;
+
+        // 同理，管理默认落在「实例」
+        _lastManageItem = ManageInstancesNavItem;
 
         // 首页与导航项同一次导航，避免启动时出现两次页面切换动画
         NavigateTo(typeof(HomePage), null);
@@ -98,28 +104,49 @@ public sealed partial class MainWindow : Window
         AppTitleBar.IsBackButtonEnabled = ContentFrame.CanGoBack;
 
     /// <summary>
-    /// 父项「下载」是 <c>SelectsOnInvoked=False</c>：点击它只展开/收起，自己不参与选中。
+    /// 父项「下载」与「管理」都是 <c>SelectsOnInvoked=False</c>：点击它们只展开/收起，自己不参与选中。
     /// 页面切到上次停留的子分区，选中项则等父项展开后再补上。
     /// </summary>
     private void NavView_ItemInvoked(NavigationView sender, NavigationViewItemInvokedEventArgs args)
     {
-        if (args.InvokedItemContainer is NavigationViewItem { Tag: "download" })
+        if (args.InvokedItemContainer is not NavigationViewItem { Tag: string parentTag })
         {
-            NavigateTo(typeof(DownloadPage), _lastDownloadItem.Tag as string is { } tag
-                ? tag["download-".Length..]
-                : "minecraft");
+            return;
+        }
 
-            // 展开与补选都必须推迟到 NavigationView 处理完本次点击之后：
-            // 同步改这两个状态会和它自己的展开/选中流程打架（子项重复渲染或直接崩溃），
-            // 而父项折叠时子项容器不存在，过早设 SelectedItem 又会被丢掉。
-            var item = _lastDownloadItem;
-            DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
-            {
-                DownloadNavItem.IsExpanded = true;
-                DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () => NavView.SelectedItem = item);
-            });
+        switch (parentTag)
+        {
+            case "download":
+                NavigateTo(typeof(DownloadPage), SectionKey(_lastDownloadItem, "download-") ?? "minecraft");
+                ExpandAndSelect(DownloadNavItem, _lastDownloadItem);
+                break;
+
+            case "manage":
+                NavigateToManageSection(_lastManageItem);
+                ExpandAndSelect(ManageNavItem, _lastManageItem);
+                break;
         }
     }
+
+    /// <summary>
+    /// 展开与补选都必须推迟到 NavigationView 处理完本次点击之后：
+    /// 同步改这两个状态会和它自己的展开/选中流程打架（子项重复渲染或直接崩溃），
+    /// 而父项折叠时子项容器不存在，过早设 SelectedItem 又会被丢掉。
+    /// </summary>
+    private void ExpandAndSelect(NavigationViewItem parent, NavigationViewItem child)
+    {
+        DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
+        {
+            parent.IsExpanded = true;
+            DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () => NavView.SelectedItem = child);
+        });
+    }
+
+    /// <summary>子项 Tag 去掉前缀后的分区键，如 <c>download-shaders</c> → <c>shaders</c>。</summary>
+    private static string? SectionKey(NavigationViewItem item, string prefix) =>
+        item.Tag as string is { } tag && tag.StartsWith(prefix, StringComparison.Ordinal)
+            ? tag[prefix.Length..]
+            : null;
 
     private void NavView_SelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
     {
@@ -131,9 +158,6 @@ public sealed partial class MainWindow : Window
         {
             switch (tag)
             {
-                case "instances":
-                    NavigateTo(typeof(InstancesPage), null);
-                    break;
                 case "accounts":
                     NavigateTo(typeof(AccountsPage), null);
                     break;
@@ -147,6 +171,13 @@ public sealed partial class MainWindow : Window
 
                     NavigateTo(typeof(DownloadPage), tag["download-".Length..]);
                     break;
+
+                // 「管理」下的四个子项：实例页 + 三类内容页
+                case not null when tag.StartsWith("manage-", StringComparison.Ordinal):
+                    _lastManageItem = selected;
+                    NavigateToManageSection(selected);
+                    break;
+
                 default:
                     NavigateTo(typeof(HomePage), null);
                     break;
@@ -155,7 +186,22 @@ public sealed partial class MainWindow : Window
     }
 
     /// <summary>
-    /// 下载页的六个分区是同一个页面，只是参数不同，
+    /// 「管理」的子项：「实例」是独立的实例页，其余三项是同一个内容页的不同分区。
+    /// </summary>
+    private void NavigateToManageSection(NavigationViewItem item)
+    {
+        var key = SectionKey(item, "manage-");
+        if (key is null or "instances")
+        {
+            NavigateTo(typeof(InstancesPage), null);
+            return;
+        }
+
+        NavigateTo(typeof(ContentPage), key);
+    }
+
+    /// <summary>
+    /// 下载页与内容页的分区都是同一个页面、只是参数不同，
     /// 所以除了页面类型，参数变化时也要重新导航，否则切换子项不会刷新内容。
     /// </summary>
     private void NavigateTo(Type pageType, object? parameter)
