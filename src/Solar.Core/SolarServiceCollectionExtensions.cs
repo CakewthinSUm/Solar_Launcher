@@ -24,6 +24,8 @@ public static class SolarServiceCollectionExtensions
         services.AddSingleton<ISettingsService, SettingsService>();
         services.AddSingleton<IInstanceRepository, InstanceRepository>();
         services.AddSingleton<InstanceGameDirectory>();
+        services.AddSingleton<GameFileLocator>();
+        services.AddSingleton<IVersionScanner, VersionScanner>();
         services.AddSingleton<IJavaDetector, JavaDetector>();
 
         services.AddSingleton<IAccountStore, AccountStore>();
