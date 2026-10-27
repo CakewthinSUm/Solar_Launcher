@@ -4,6 +4,7 @@ using Solar.Core.Accounts;
 using Solar.Core.Download;
 using Solar.Core.Instances;
 using Solar.Core.Java;
+using Solar.Core.Loaders;
 using Solar.Core.Minecraft;
 using Solar.Core.Paths;
 using Solar.Core.Settings;
@@ -14,8 +15,9 @@ namespace Solar.Core.Launch;
 public enum LaunchStage
 {
     Authenticating,
-    ResolvingVersion,
     DetectingJava,
+    InstallingLoader,
+    ResolvingVersion,
     Downloading,
     Starting,
 }
@@ -49,6 +51,8 @@ public sealed class GameLaunchService(
     LaunchContextFactory contextFactory,
     IAccountStore accountStore,
     IMicrosoftAuthService authService,
+    ILoaderInstaller loaderInstaller,
+    IInstanceRepository instanceRepository,
     ILogger<GameLaunchService> logger) : IGameLaunchService
 {
     public async Task<Process> LaunchAsync(
@@ -100,17 +104,74 @@ public sealed class GameLaunchService(
         await PrepareCoreAsync(instance, downloadProgress, stageProgress, ct).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// 首次启动模组实例时按需安装加载器。
+    /// 放在启动流程里而不是创建实例时，是因为安装要下载几百 MB，
+    /// 建实例时同步等待体验很差。
+    /// </summary>
+    private async Task EnsureLoaderAsync(
+        GameInstance instance,
+        JavaRuntime java,
+        IProgress<LaunchStageChanged>? stageProgress,
+        CancellationToken ct)
+    {
+        if (instance.Loader == ModLoader.Vanilla || instance.LoaderInstalled)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(instance.LoaderVersion))
+        {
+            throw new InvalidOperationException(
+                $"实例「{instance.Name}」的 {instance.Loader} 版本未设置，无法安装加载器。");
+        }
+
+        stageProgress?.Report(new LaunchStageChanged(
+            LaunchStage.InstallingLoader,
+            $"正在安装 {instance.Loader} {instance.LoaderVersion}…"));
+
+        var installer = loaderInstaller;
+        var progress = stageProgress is null
+            ? null
+            : new Progress<LoaderInstallProgress>(p =>
+                stageProgress.Report(new LaunchStageChanged(
+                    LaunchStage.InstallingLoader,
+                    p.Total > 0 ? $"{p.Stage} ({p.Current}/{p.Total})" : p.Stage)));
+
+        var versionId = await installer.InstallAsync(
+            instance.Loader,
+            instance.MinecraftVersion,
+            instance.LoaderVersion,
+            java.Path,
+            progress,
+            ct).ConfigureAwait(false);
+
+        instance.VersionId = versionId;
+        instance.LoaderInstalled = true;
+        await instanceRepository.SaveAsync(instance, ct).ConfigureAwait(false);
+
+        logger.LogInformation("加载器安装完成: {VersionId}", versionId);
+    }
+
     private async Task<(ResolvedVersion Version, JavaRuntime Java)> PrepareCoreAsync(
         GameInstance instance,
         IProgress<DownloadProgress>? downloadProgress,
         IProgress<LaunchStageChanged>? stageProgress,
         CancellationToken ct)
     {
+        stageProgress?.Report(new LaunchStageChanged(LaunchStage.DetectingJava, "正在选择 Java…"));
+
+        // 加载器安装需要 Java，所以先确定 Java；此时版本可能还不存在
+        var java = await SelectJavaAsync(instance, requiredMajor: null, ct).ConfigureAwait(false);
+
+        await EnsureLoaderAsync(instance, java, stageProgress, ct).ConfigureAwait(false);
+
         stageProgress?.Report(new LaunchStageChanged(LaunchStage.ResolvingVersion, "正在解析版本…"));
         var version = await resolver.ResolveAsync(instance.EffectiveVersionId, ct).ConfigureAwait(false);
 
-        stageProgress?.Report(new LaunchStageChanged(LaunchStage.DetectingJava, "正在选择 Java…"));
-        var java = await SelectJavaAsync(instance, version, ct).ConfigureAwait(false);
+        // 版本解析出来后才能知道它要求的 Java 大版本，必要时重新选择
+        java = await SelectJavaAsync(instance, version.Detail.JavaVersion?.MajorVersion, ct)
+            .ConfigureAwait(false);
 
         stageProgress?.Report(new LaunchStageChanged(LaunchStage.Downloading, "正在检查并补齐文件…"));
         await downloader.DownloadAsync(instance, version, downloadProgress, ct).ConfigureAwait(false);
@@ -118,16 +179,19 @@ public sealed class GameLaunchService(
         return (version, java);
     }
 
+    /// <param name="requiredMajor">
+    /// 版本要求的大版本；为 null 时（版本尚未解析）先取最新的 Java 用于安装加载器。
+    /// </param>
     private async Task<JavaRuntime> SelectJavaAsync(
         GameInstance instance,
-        ResolvedVersion version,
+        int? requiredMajor,
         CancellationToken ct)
     {
         // 实例级覆盖优先，其次全局设置
         var explicitPath = instance.JavaPath ?? settings.Current.JavaPath;
         if (!string.IsNullOrWhiteSpace(explicitPath) && File.Exists(explicitPath))
         {
-            return await ProbeExplicitJavaAsync(explicitPath, version, ct).ConfigureAwait(false);
+            return await ProbeExplicitJavaAsync(explicitPath, requiredMajor, ct).ConfigureAwait(false);
         }
 
         var runtimes = await javaDetector.DetectAsync(ct).ConfigureAwait(false);
@@ -137,19 +201,22 @@ public sealed class GameLaunchService(
                 "没有找到可用的 Java。请先安装 Java，或在设置中手动指定 java.exe 路径。");
         }
 
-        var required = version.Detail.JavaVersion?.MajorVersion ?? 8;
+        if (requiredMajor is not { } required)
+        {
+            // 版本未解析时用最新的 Java：安装器的 processor 都是现代工具，版本越新越稳
+            return runtimes[0];
+        }
+
         var selected = javaDetector.Select(runtimes, required)
                        ?? throw new InvalidOperationException($"找不到适合 Java {required} 的运行时。");
 
-        logger.LogInformation("版本 {Version} 需要 Java {Required}，选用 {Selected}",
-            version.Id, required, selected);
-
+        logger.LogInformation("需要 Java {Required}，选用 {Selected}", required, selected);
         return selected;
     }
 
     private async Task<JavaRuntime> ProbeExplicitJavaAsync(
         string javaPath,
-        ResolvedVersion version,
+        int? requiredMajor,
         CancellationToken ct)
     {
         var runtimes = await javaDetector.DetectAsync(ct).ConfigureAwait(false);
@@ -163,7 +230,7 @@ public sealed class GameLaunchService(
 
         // 探测不到（例如目录不在搜索路径里）也照用，只是不知道版本号
         logger.LogWarning("无法探测指定 Java 的版本，直接使用: {Path}", javaPath);
-        return new JavaRuntime(javaPath, "unknown", version.Detail.JavaVersion?.MajorVersion ?? 8);
+        return new JavaRuntime(javaPath, "unknown", requiredMajor ?? 8);
     }
 
     /// <summary>log4j 配置文件路径；版本没有该字段时返回 null。</summary>

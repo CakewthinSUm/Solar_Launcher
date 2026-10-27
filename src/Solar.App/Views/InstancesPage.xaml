@@ -8,6 +8,7 @@
     xmlns:views="using:Solar.App.Views"
     xmlns:conv="using:Solar.App.Converters"
     xmlns:models="using:Solar.Core.Instances"
+    xmlns:loaders="using:Solar.Core.Loaders"
     xmlns:vm="using:Solar.App.ViewModels"
     mc:Ignorable="d">
 
@@ -32,41 +33,71 @@
 
         <!-- 新建实例表单 -->
         <Border Grid.Row="1" Style="{StaticResource SolarCardStyle}">
-            <Grid ColumnSpacing="12">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="2*" />
-                    <ColumnDefinition Width="1*" />
-                    <ColumnDefinition Width="1*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
+            <StackPanel Spacing="8">
+                <Grid ColumnSpacing="12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="2*" />
+                        <ColumnDefinition Width="1*" />
+                        <ColumnDefinition Width="1*" />
+                        <ColumnDefinition Width="1*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
 
-                <TextBox
-                    Grid.Column="0"
-                    Header="名称"
-                    PlaceholderText="例如：生存服"
-                    Text="{x:Bind ViewModel.NewInstanceName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                <TextBox
-                    Grid.Column="1"
-                    Header="游戏版本"
-                    Text="{x:Bind ViewModel.NewInstanceVersion, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                <ComboBox
-                    Grid.Column="2"
-                    Header="加载器"
-                    ItemsSource="{x:Bind ViewModel.Loaders}"
-                    SelectedItem="{x:Bind ViewModel.NewInstanceLoader, Mode=TwoWay}">
-                    <ComboBox.ItemTemplate>
-                        <DataTemplate x:DataType="vm:ModLoaderOption">
-                            <TextBlock Text="{x:Bind Display}" />
-                        </DataTemplate>
-                    </ComboBox.ItemTemplate>
-                </ComboBox>
-                <Button
-                    Grid.Column="3"
-                    VerticalAlignment="Bottom"
-                    Command="{x:Bind ViewModel.CreateCommand}"
-                    Content="新建"
-                    Style="{StaticResource AccentButtonStyle}" />
-            </Grid>
+                    <TextBox
+                        Grid.Column="0"
+                        Header="名称"
+                        PlaceholderText="例如：生存服"
+                        Text="{x:Bind ViewModel.NewInstanceName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    <TextBox
+                        Grid.Column="1"
+                        Header="游戏版本"
+                        Text="{x:Bind ViewModel.NewInstanceVersion, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    <ComboBox
+                        Grid.Column="2"
+                        Header="加载器"
+                        ItemsSource="{x:Bind ViewModel.Loaders}"
+                        SelectedItem="{x:Bind ViewModel.NewInstanceLoader, Mode=TwoWay}">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:ModLoaderOption">
+                                <TextBlock Text="{x:Bind Display}" />
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                    <ComboBox
+                        Grid.Column="3"
+                        Header="加载器版本"
+                        IsEnabled="{x:Bind ViewModel.NeedsLoaderVersion, Mode=OneWay}"
+                        ItemsSource="{x:Bind ViewModel.LoaderVersions, Mode=OneWay}"
+                        PlaceholderText="原版无需选择"
+                        SelectedItem="{x:Bind ViewModel.SelectedLoaderVersion, Mode=TwoWay}">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate x:DataType="loaders:LoaderVersion">
+                                <TextBlock Text="{x:Bind Version}" />
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                    <Button
+                        Grid.Column="4"
+                        VerticalAlignment="Bottom"
+                        Command="{x:Bind ViewModel.CreateCommand}"
+                        Content="新建"
+                        Style="{StaticResource AccentButtonStyle}" />
+                </Grid>
+
+                <StackPanel
+                    Orientation="Horizontal"
+                    Spacing="8"
+                    Visibility="{x:Bind ViewModel.NeedsLoaderVersion, Mode=OneWay, Converter={StaticResource VisibleWhenTrue}}">
+                    <ProgressRing
+                        Width="14"
+                        Height="14"
+                        IsActive="{x:Bind ViewModel.IsLoadingLoaderVersions, Mode=OneWay}" />
+                    <TextBlock
+                        Style="{StaticResource CaptionTextBlockStyle}"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Text="{x:Bind ViewModel.LoaderVersionHint, Mode=OneWay}" />
+                </StackPanel>
+            </StackPanel>
         </Border>
 
         <Grid Grid.Row="2" RowSpacing="12">

@@ -5,6 +5,7 @@ using Solar.Core.Download;
 using Solar.Core.Instances;
 using Solar.Core.Java;
 using Solar.Core.Launch;
+using Solar.Core.Loaders;
 using Solar.Core.Minecraft;
 using Solar.Core.Paths;
 using Solar.Core.Settings;
@@ -39,6 +40,15 @@ public static class SolarServiceCollectionExtensions
         services.AddHttpClient<IVersionManifestService, VersionManifestService>(ConfigureHttpClient);
         services.AddHttpClient<IVersionResolver, VersionResolver>(ConfigureHttpClient);
         services.AddHttpClient<IAssetIndexService, AssetIndexService>(ConfigureHttpClient);
+
+        // 加载器元数据与 installer 下载走独立 client：
+        // installer jar 有 7~9MB，超时要比普通请求宽松
+        services.AddHttpClient<ILoaderVersionService, LoaderVersionService>(ConfigureHttpClient);
+        services.AddHttpClient<ILoaderInstaller, LoaderInstaller>(client =>
+        {
+            ConfigureHttpClient(client);
+            client.Timeout = TimeSpan.FromMinutes(15);
+        });
 
         return services;
     }
