@@ -108,8 +108,11 @@ public sealed class GameDirectoryTests : IDisposable
         Assert.Equal(_paths.DefaultMinecraft, context.GameDirectory);
     }
 
-    private LaunchContextFactory CreateFactory(FakeSettings settings) =>
-        new(_paths, settings, new InstanceGameDirectory(_paths, settings));
+    private LaunchContextFactory CreateFactory(FakeSettings settings)
+    {
+        var directories = new InstanceGameDirectory(_paths, settings);
+        return new(_paths, settings, directories, new GameFileLocator(_paths, directories));
+    }
 
     private static ResolvedVersion CreateVersion() => new()
     {

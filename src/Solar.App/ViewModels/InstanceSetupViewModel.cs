@@ -36,6 +36,9 @@ public sealed partial class InstanceSetupViewModel : ViewModelBase
     [NotifyPropertyChangedFor(nameof(IsolationHint))]
     private bool _versionIsolation;
 
+    [ObservableProperty]
+    private string _customWindowTitle = "";
+
     public InstanceSetupViewModel(
         IInstanceRepository repository,
         InstanceGameDirectory gameDirectories,
@@ -84,6 +87,7 @@ public sealed partial class InstanceSetupViewModel : ViewModelBase
             InstanceName = _instance.Name;
             InstanceSummary = $"{_instance.MinecraftVersion} · {_instance.DisplayLoader}";
             VersionIsolation = _instance.VersionIsolation;
+            CustomWindowTitle = _instance.CustomWindowTitle ?? "";
         }
         catch (Exception ex)
         {
@@ -131,6 +135,8 @@ public sealed partial class InstanceSetupViewModel : ViewModelBase
             }
 
             _instance.VersionIsolation = VersionIsolation;
+            // 留空表示不自定义，恢复默认标题
+            _instance.CustomWindowTitle = string.IsNullOrWhiteSpace(CustomWindowTitle) ? null : CustomWindowTitle.Trim();
             await _repository.SaveAsync(_instance);
 
             StatusMessage = copyResult is { } summary

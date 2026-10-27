@@ -10,7 +10,8 @@ namespace Solar.Core.Launch;
 public sealed class LaunchContextFactory(
     AppPaths paths,
     ISettingsService settings,
-    InstanceGameDirectory gameDirectories)
+    InstanceGameDirectory gameDirectories,
+    GameFileLocator fileLocator)
 {
     public LaunchContext Create(
         Instances.GameInstance instance,
@@ -30,6 +31,7 @@ public sealed class LaunchContextFactory(
             Version = version,
             Paths = paths,
             Settings = settings.Current,
+            FileLocator = fileLocator,
             JavaPath = javaPath,
             PlayerName = account.Username,
             Uuid = account.Uuid,

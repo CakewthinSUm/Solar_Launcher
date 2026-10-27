@@ -33,6 +33,7 @@ public sealed class GameDownloader(
     AppPaths paths,
     ISettingsService settings,
     IAssetIndexService assetIndexService,
+    GameFileLocator fileLocator,
     ILogger<GameDownloader> logger) : IGameDownloader
 {
     public async Task DownloadAsync(
@@ -45,7 +46,7 @@ public sealed class GameDownloader(
         var nativesDirectory = Path.Combine(paths.GetInstanceDirectory(instance.Id), "natives");
         Directory.CreateDirectory(nativesDirectory);
 
-        var builder = new GameFileBuilder(paths);
+        var builder = new GameFileBuilder(paths, fileLocator);
         var files = new List<GameFile>();
 
         if (builder.BuildClientJar(version) is { } clientJar)

@@ -23,13 +23,27 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <StackPanel Grid.Row="0" Spacing="4">
-            <TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="实例" />
-            <TextBlock
-                Style="{StaticResource BodyTextBlockStyle}"
-                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                Text="每个实例可选择不同版本与加载器；在实例设置里可开启版本隔离，让它独占存档与模组" />
-        </StackPanel>
+        <Grid Grid.Row="0" ColumnSpacing="12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Grid.Column="0" Spacing="4">
+                <TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="实例" />
+                <TextBlock
+                    Style="{StaticResource BodyTextBlockStyle}"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    Text="每个实例可选择不同版本与加载器；游戏目录里已有的版本会自动导入。在实例设置里可开启版本隔离，让它独占存档与模组" />
+            </StackPanel>
+
+            <!-- 游戏目录里的版本变化（例如刚用官方启动器装了一个）随时可重新扫描 -->
+            <Button
+                Grid.Column="1"
+                VerticalAlignment="Center"
+                Command="{x:Bind ViewModel.ScanCommand}"
+                Content="扫描游戏目录" />
+        </Grid>
 
         <!-- 新建实例表单 -->
         <Border Grid.Row="1" Style="{StaticResource SolarCardStyle}">
