@@ -15,7 +15,8 @@
 
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="48" />
+            <!-- 与 App.xaml 里的 TitleBarCompactHeight 保持一致，否则标题栏下方会留出空白 -->
+            <RowDefinition Height="40" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
