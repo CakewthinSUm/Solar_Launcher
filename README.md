@@ -46,6 +46,13 @@
 
 ![下载](docs/images/download.png)
 
+「下载 → Mod」从 Modrinth 与 CurseForge 搜索，顶部选定的实例决定版本与加载器筛选，
+点进详情能看到正文、截图与全部历史版本，安装时会把必选前置一起装好。
+
+| Mod 列表 | Mod 详情 |
+| :---: | :---: |
+| ![Mod](docs/images/mod-download.png) | ![Mod 详情](docs/images/mod-detail.png) |
+
 ### 🧩 模组加载器
 支持 **Fabric / Quilt / Forge / NeoForge** 四大加载器，以及 **OptiFine**、**LiteLoader**、**Fabric API**、**OptiFabric** 等附加组件。
 
@@ -129,6 +136,7 @@ Forge / NeoForge 的 installer 不是简单解压：它要跑若干 processor（
 | 架构 | MVVM（CommunityToolkit.Mvvm）+ 构造函数依赖注入 |
 | 核心 | .NET 8 类库 `Solar.Core`，与 UI 完全解耦 |
 | 下载 | CmlLib.Core `ParallelGameInstaller`（只用下载部分） |
+| Mod 下载 | Modrinth / CurseForge（经 MCIM 镜像），Markdown 正文只用到极简解析器 |
 | 登录 | CmlLib.Core.Auth.Microsoft（OAuth 设备码 + MSAL.NET） |
 | 测试 | xUnit（`tests/Solar.Core.Tests`），328 个测试 |
 
@@ -282,7 +290,7 @@ dotnet run --project tools/Solar.ModProbe -- install curseforge 394468 fabric 1.
 - [x] 游戏目录版本扫描与一键导入
 - [x] 下载页选版本 → 一次装完加载器与附加组件
 - [x] 模组数据层（Modrinth + CurseForge 双源、跨源去重、依赖解析、SHA1 校验安装）
-- [ ] **模组下载界面**（搜索 / 详情 / 安装对话框）—— 数据层已完成，UI 待接入
+- [x] 模组下载界面（搜索 / 详情 / 安装对话框，按实例的版本与加载器过滤）
 - [ ] 光影 / 整合包 / 资源包 / 数据包 的在线下载
 
 ### 模组下载设计
@@ -300,6 +308,10 @@ dotnet run --project tools/Solar.ModProbe -- install curseforge 394468 fabric 1.
 与 PCL 的三处取舍：**不做**中文词表搜索（v1 只支持英文/原名）；版本列表用服务端的
 `gameVersion` + `modLoaderType` 过滤而不是一次拉全量；安装时会把必选前置一并装好。
 详见 [docs/mod-download-design.md](docs/mod-download-design.md)。
+
+界面在「下载 → Mod」：顶部选目标实例（它的游戏版本与加载器就是筛选条件），
+搜索后点一行进详情，选版本点安装，对话框里会列出必选前置、标出已存在的文件。
+Mod 源（官方 / 镜像 / CurseForge Key）在「设置 → 下载源」里改，换源会自动清掉旧缓存。
 
 ---
 

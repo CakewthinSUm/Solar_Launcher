@@ -16,6 +16,7 @@
                 导航到该页时抛 "Cannot find a resource with the given key" 并闪退。
             -->
             <conv:VisibleWhenTrueConverter x:Key="VisibleWhenTrue" />
+            <conv:CollapsedWhenTrueConverter x:Key="CollapsedWhenTrue" />
             <conv:VisibleWhenTextConverter x:Key="VisibleWhenText" />
             <conv:InvertBoolConverter x:Key="InvertBool" />
             <conv:ModLoaderDisplayConverter x:Key="ModLoaderDisplay" />

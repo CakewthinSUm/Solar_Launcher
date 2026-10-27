@@ -171,6 +171,16 @@ public class ModEndpointsTests
 
         public Task SaveAsync(CancellationToken ct = default) => Task.CompletedTask;
     }
+
+    /// <summary>没有配置镜像，<see cref="ModEndpoints.Candidates"/> 只会返回官方地址。</summary>
+    internal sealed class SettingsWithoutMirror : ISettingsService
+    {
+        public LauncherSettings Current { get; } = new() { ModMirrorUrl = null };
+
+        public Task LoadAsync(CancellationToken ct = default) => Task.CompletedTask;
+
+        public Task SaveAsync(CancellationToken ct = default) => Task.CompletedTask;
+    }
 }
 
 /// <summary>两个源之间的加载器标识换算。</summary>
@@ -684,5 +694,227 @@ public class ModCacheTests : IDisposable
         {
             Directory.Delete(_root, recursive: true);
         }
+    }
+}
+
+/// <summary>
+/// 版本列表的缓存语义。缓存里存的是过滤后的完整列表，Limit 只在返回时截断——
+/// 否则先来一次 Limit=1 的调用（例如安装清单里查前置）会把缓存写成一条，
+/// 详情页之后要 100 条也只能拿到一条，而且这个错误状态会持续一小时。
+/// </summary>
+public class ModVersionCacheTests : IDisposable
+{
+    private readonly string _root = Path.Combine(Path.GetTempPath(), "solar-modver-" + Guid.NewGuid().ToString("N")[..8]);
+
+    public ModVersionCacheTests()
+    {
+        new AppPaths(_root).EnsureCreated();
+    }
+
+    [Fact]
+    public async Task SmallLimitDoesNotPoisonTheCache()
+    {
+        var handler = new CountingHandler(ThreeVersionsJson);
+        var catalog = CreateCatalog(handler);
+
+        var first = await catalog.GetVersionsAsync("AANobbMI", new ModVersionQuery { Limit = 1 });
+        var second = await catalog.GetVersionsAsync("AANobbMI", new ModVersionQuery { Limit = 10 });
+
+        Assert.Single(first);
+        Assert.Equal(3, second.Count);
+
+        // 第二次必须命中缓存，不能再发一次请求
+        Assert.Equal(1, handler.Requests);
+    }
+
+    [Fact]
+    public async Task DifferentFiltersUseDifferentCacheEntries()
+    {
+        var handler = new CountingHandler(ThreeVersionsJson);
+        var catalog = CreateCatalog(handler);
+
+        await catalog.GetVersionsAsync("AANobbMI", new ModVersionQuery { GameVersion = "1.21.4", Limit = 10 });
+        await catalog.GetVersionsAsync("AANobbMI", new ModVersionQuery { IncludeIncompatible = true, Limit = 10 });
+
+        Assert.Equal(2, handler.Requests);
+    }
+
+    private ModrinthCatalog CreateCatalog(HttpMessageHandler handler)
+    {
+        var paths = new AppPaths(_root);
+        var logger = Microsoft.Extensions.Logging.Abstractions.NullLogger<ModHttp>.Instance;
+
+        // 不要镜像：请求直接打到假 handler，ModEndpoints 的候选列表只有一条
+        var settings = new ModEndpointsTests.SettingsWithoutMirror();
+        var http = new ModHttp(new HttpClient(handler), new ModEndpoints(settings), logger);
+        var cache = new ModCache(paths, Microsoft.Extensions.Logging.Abstractions.NullLogger<ModCache>.Instance);
+
+        return new ModrinthCatalog(http, cache);
+    }
+
+    /// <summary>三个版本的 Modrinth 响应，字段名与真实接口一致（下划线风格）。</summary>
+    private const string ThreeVersionsJson = """
+    [
+      {
+        "id": "v3", "project_id": "AANobbMI", "name": "Sodium 3", "version_number": "0.6.13",
+        "version_type": "release", "date_published": "2026-10-01T00:00:00Z", "downloads": 10,
+        "game_versions": ["1.21.4"], "loaders": ["fabric"],
+        "dependencies": [],
+        "files": [
+          { "url": "https://cdn.modrinth.com/a/sodium-3.jar", "filename": "sodium-3.jar",
+            "primary": true, "size": 100, "hashes": { "sha1": "aaa" } }
+        ]
+      },
+      {
+        "id": "v2", "project_id": "AANobbMI", "name": "Sodium 2", "version_number": "0.6.12",
+        "version_type": "beta", "date_published": "2026-09-01T00:00:00Z", "downloads": 20,
+        "game_versions": ["1.21.4"], "loaders": ["fabric"],
+        "dependencies": [],
+        "files": [
+          { "url": "https://cdn.modrinth.com/a/sodium-2.jar", "filename": "sodium-2.jar",
+            "primary": true, "size": 100, "hashes": { "sha1": "bbb" } }
+        ]
+      },
+      {
+        "id": "v1", "project_id": "AANobbMI", "name": "Sodium 1", "version_number": "0.6.11",
+        "version_type": "release", "date_published": "2026-08-01T00:00:00Z", "downloads": 30,
+        "game_versions": ["1.21.4"], "loaders": ["fabric"],
+        "dependencies": [],
+        "files": [
+          { "url": "https://cdn.modrinth.com/a/sodium-1.jar", "filename": "sodium-1.jar",
+            "primary": true, "size": 100, "hashes": { "sha1": "ccc" } }
+        ]
+      }
+    ]
+    """;
+
+    /// <summary>不关心请求内容，只数次数——用来断言缓存是否生效。</summary>
+    private sealed class CountingHandler(string json) : HttpMessageHandler
+    {
+        public int Requests { get; private set; }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+        {
+            Requests++;
+            return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+            {
+                Content = new StringContent(json, System.Text.Encoding.UTF8, "application/json"),
+            });
+        }
+    }
+
+    public void Dispose()
+    {
+        if (Directory.Exists(_root))
+        {
+            Directory.Delete(_root, recursive: true);
+        }
+    }
+}
+
+/// <summary>详情正文的极简 Markdown 解析。</summary>
+public class MarkdownLiteTests
+{
+    [Fact]
+    public void HeadingsParagraphsAndListsBecomeSeparateBlocks()
+    {
+        var blocks = Solar.Core.Text.MarkdownLite.Parse("""
+        # Sodium
+
+        A rendering engine.
+
+        - Fast
+        - Small
+        """);
+
+        Assert.Collection(
+            blocks,
+            b => Assert.Equal(Solar.Core.Text.MarkdownBlockKind.Heading, b.Kind),
+            b => Assert.Equal(Solar.Core.Text.MarkdownBlockKind.Paragraph, b.Kind),
+            b => Assert.Equal(Solar.Core.Text.MarkdownBlockKind.ListItem, b.Kind),
+            b => Assert.Equal(Solar.Core.Text.MarkdownBlockKind.ListItem, b.Kind));
+    }
+
+    [Fact]
+    public void SoftWrappedLinesAreJoinedIntoOneParagraph()
+    {
+        var blocks = Solar.Core.Text.MarkdownLite.Parse("line one\nline two\n\nnext");
+
+        Assert.Equal(2, blocks.Count);
+        Assert.Equal("line one line two", blocks[0].Text);
+    }
+
+    [Fact]
+    public void InlineBoldCodeAndLinksAreSplit()
+    {
+        var spans = Solar.Core.Text.MarkdownLite.ParseInline("a **b** `c` [d](https://example.com)");
+
+        Assert.Collection(
+            spans,
+            s => Assert.Equal(("a ", Solar.Core.Text.MarkdownSpanKind.Plain), (s.Text, s.Kind)),
+            s => Assert.Equal(("b", Solar.Core.Text.MarkdownSpanKind.Bold), (s.Text, s.Kind)),
+            s => Assert.Equal((" ", Solar.Core.Text.MarkdownSpanKind.Plain), (s.Text, s.Kind)),
+            s => Assert.Equal(("c", Solar.Core.Text.MarkdownSpanKind.Code), (s.Text, s.Kind)),
+            s => Assert.Equal((" ", Solar.Core.Text.MarkdownSpanKind.Plain), (s.Text, s.Kind)),
+            s =>
+            {
+                Assert.Equal(("d", Solar.Core.Text.MarkdownSpanKind.Link), (s.Text, s.Kind));
+                Assert.Equal("https://example.com/", s.Url);
+            });
+    }
+
+    [Fact]
+    public void ImagesAreDropped()
+    {
+        var blocks = Solar.Core.Text.MarkdownLite.Parse("before ![shot](https://x/a.png) after");
+
+        Assert.Equal("before after", Assert.Single(blocks).Text);
+        Assert.DoesNotContain(blocks, b => b.Text.Contains("a.png"));
+    }
+
+    [Fact]
+    public void LinkedBadgeImagesLoseTheWholeMarkup()
+    {
+        // Modrinth 的 README 顶部几乎都是这种：一张图片套在链接里
+        var blocks = Solar.Core.Text.MarkdownLite.Parse(
+            "[![Build](https://x/badge.svg)](https://x/ci) keep this");
+
+        var text = Assert.Single(blocks).Text;
+        Assert.Equal("keep this", text);
+        Assert.DoesNotContain("https://x", text);
+    }
+
+    [Fact]
+    public void InlineHtmlIsRemoved()
+    {
+        var blocks = Solar.Core.Text.MarkdownLite.Parse(
+            "<center> <img src=\"https://x/a.png\"> </center>\n\nReal text");
+
+        // 整行只有 HTML 的块被丢掉，只留真正的正文
+        Assert.Equal("Real text", Assert.Single(blocks).Text);
+    }
+
+    [Fact]
+    public void LessThanInProseSurvives()
+    {
+        var blocks = Solar.Core.Text.MarkdownLite.Parse("if a < b and c > d");
+
+        Assert.Equal("if a < b and c > d", Assert.Single(blocks).Text);
+    }
+
+    [Fact]
+    public void FencedCodeIsKeptVerbatim()
+    {
+        var blocks = Solar.Core.Text.MarkdownLite.Parse("```\n-x\n```");
+
+        Assert.Equal(Solar.Core.Text.MarkdownBlockKind.Code, Assert.Single(blocks).Kind);
+        Assert.Equal("-x", blocks[0].Text);
+    }
+
+    [Fact]
+    public void EmptyInputYieldsNoBlocks()
+    {
+        Assert.Empty(Solar.Core.Text.MarkdownLite.Parse(null));
+        Assert.Empty(Solar.Core.Text.MarkdownLite.Parse("   \n\n "));
     }
 }

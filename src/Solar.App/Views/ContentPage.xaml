@@ -13,7 +13,8 @@
         Mods / 资源包 / 光影共用这一页，分区由侧边栏「管理」下的子项决定，
         与下载页的做法一致：不在页面里再放一层 tab，避免同一份导航出现两处入口。
     -->
-    <Grid Padding="{StaticResource SolarPagePadding}" RowSpacing="16">
+    <!-- 底部不留内边距，列表铺到窗口下边缘；留白由列表自己的 Padding 给 -->
+    <Grid Padding="24,16,24,0" RowSpacing="16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -118,8 +119,15 @@
             <ListView
                 Grid.Row="1"
                 ItemsSource="{x:Bind ViewModel.Packs, Mode=OneWay}"
+                Padding="0,0,0,16"
                 SelectedItem="{x:Bind ViewModel.SelectedPack, Mode=TwoWay}"
                 SelectionMode="Single">
+                <ListView.ItemContainerStyle>
+                    <Style TargetType="ListViewItem">
+                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                        <Setter Property="Padding" Value="12,0" />
+                    </Style>
+                </ListView.ItemContainerStyle>
                 <ListView.ItemTemplate>
                     <DataTemplate x:DataType="content:ContentPack">
                         <Grid ColumnSpacing="12" Padding="0,8">

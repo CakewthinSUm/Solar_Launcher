@@ -117,7 +117,7 @@ public sealed partial class MainWindow : Window
         switch (parentTag)
         {
             case "download":
-                NavigateTo(typeof(DownloadPage), SectionKey(_lastDownloadItem, "download-") ?? "minecraft");
+                NavigateToDownloadSection(_lastDownloadItem);
                 ExpandAndSelect(DownloadNavItem, _lastDownloadItem);
                 break;
 
@@ -169,7 +169,7 @@ public sealed partial class MainWindow : Window
                     // 必须用 args.SelectedItem：事件触发时 sender.SelectedItem 还是旧值。
                     _lastDownloadItem = selected;
 
-                    NavigateTo(typeof(DownloadPage), tag["download-".Length..]);
+                    NavigateToDownloadSection(selected);
                     break;
 
                 // 「管理」下的四个子项：实例页 + 三类内容页
@@ -183,6 +183,23 @@ public sealed partial class MainWindow : Window
                     break;
             }
         }
+    }
+
+    /// <summary>
+    /// 「下载」的子项：「Mod」是独立页面（有自己的搜索与详情），其余五项仍是下载页的不同分区。
+    /// 不把 Mod 塞进 DownloadPage 是因为它需要一整套自己的视图模型与二级页面，
+    /// 混在一个页面里会变成两套 DataContext。
+    /// </summary>
+    private void NavigateToDownloadSection(NavigationViewItem item)
+    {
+        var key = SectionKey(item, "download-");
+        if (key == "mod")
+        {
+            NavigateTo(typeof(ModDownloadPage), null);
+            return;
+        }
+
+        NavigateTo(typeof(DownloadPage), key ?? "minecraft");
     }
 
     /// <summary>
