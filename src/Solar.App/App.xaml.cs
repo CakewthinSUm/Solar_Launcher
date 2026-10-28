@@ -58,6 +58,7 @@ public partial class App : Application
 
         services.AddSingleton<INavigationService, NavigationService>();
         services.AddSingleton<IDialogService, DialogService>();
+        services.AddSingleton<TaskbarProgressService>();
 
         services.AddTransient<HomeViewModel>();
         services.AddTransient<InstancesViewModel>();

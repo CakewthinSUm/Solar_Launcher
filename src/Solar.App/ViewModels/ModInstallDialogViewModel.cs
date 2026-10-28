@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Solar.App.Formatting;
+using Solar.App.Services;
 using Solar.Core.Download;
 using Solar.Core.Instances;
 using Solar.Core.Mods;
@@ -66,6 +67,7 @@ public sealed partial class ModInstallDialogViewModel : ViewModelBase
 {
     private readonly IModCatalogService _catalog;
     private readonly IModInstaller _installer;
+    private readonly TaskbarProgressService _taskbar;
 
     private ModProject? _project;
     private ModVersion? _version;
@@ -107,10 +109,14 @@ public sealed partial class ModInstallDialogViewModel : ViewModelBase
     /// <summary>安装完成后的结果，页面据此显示状态。</summary>
     public ModInstallResult? Result { get; private set; }
 
-    public ModInstallDialogViewModel(IModCatalogService catalog, IModInstaller installer)
+    public ModInstallDialogViewModel(
+        IModCatalogService catalog,
+        IModInstaller installer,
+        TaskbarProgressService taskbar)
     {
         _catalog = catalog;
         _installer = installer;
+        _taskbar = taskbar;
     }
 
     public async Task LoadAsync(ModProject project, ModVersion version, GameInstance instance)
@@ -184,6 +190,8 @@ public sealed partial class ModInstallDialogViewModel : ViewModelBase
                 ProgressText = string.IsNullOrEmpty(p.CurrentFile)
                     ? $"已完成 {p.CompletedFiles}/{total}"
                     : $"正在安装 {p.CompletedFiles + 1}/{total}：{p.CurrentFile}";
+
+                _taskbar.Report(total == 0 ? null : (double)p.CompletedFiles / total);
             });
 
             Result = await _installer.InstallAsync(
@@ -195,6 +203,7 @@ public sealed partial class ModInstallDialogViewModel : ViewModelBase
 
             ProgressValue = 1;
             ProgressText = $"完成：安装 {Result.Installed} 个，跳过 {Result.Skipped} 个";
+            _taskbar.Flash();
             return true;
         }
         catch (OperationCanceledException)
@@ -212,6 +221,7 @@ public sealed partial class ModInstallDialogViewModel : ViewModelBase
         finally
         {
             IsInstalling = false;
+            _taskbar.Reset();
             RefreshSummary();
         }
     }

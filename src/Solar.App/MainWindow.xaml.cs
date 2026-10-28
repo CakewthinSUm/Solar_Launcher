@@ -5,6 +5,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media.Animation;
 using Microsoft.UI.Xaml.Navigation;
+using Solar.App.Services;
 using Solar.App.Views;
 
 namespace Solar.App;
@@ -30,6 +31,8 @@ public sealed partial class MainWindow : Window
     /// <summary>上次停留的管理子分区；点父项「管理」时回到这里。</summary>
     private NavigationViewItem _lastManageItem;
 
+    private readonly TaskbarProgressService _taskbarProgress = App.GetService<TaskbarProgressService>();
+
     public MainWindow()
     {
         InitializeComponent();
@@ -41,6 +44,9 @@ public sealed partial class MainWindow : Window
         ApplyMinimumSize();
 
         App.RegisterMainWindow(this);
+
+        // 把窗口句柄交给任务栏进度服务，之后下载进度就能画在任务栏图标上
+        _taskbarProgress.Attach(WinRT.Interop.WindowNative.GetWindowHandle(this));
 
         // 还没进过下载页时，点父项默认落在 Minecraft 分区
         _lastDownloadItem = MinecraftNavItem;
