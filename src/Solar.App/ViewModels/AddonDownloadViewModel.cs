@@ -150,6 +150,9 @@ public sealed partial class AddonDownloadViewModel : ViewModelBase
     private int _sourceIndex;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowInlineBusy))]
+    [NotifyPropertyChangedFor(nameof(ShowCenterBusy))]
+    [NotifyPropertyChangedFor(nameof(ShowEmptyState))]
     private bool _isSearching;
 
     [ObservableProperty]
@@ -164,6 +167,9 @@ public sealed partial class AddonDownloadViewModel : ViewModelBase
     private string? _degradedHint;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowInlineBusy))]
+    [NotifyPropertyChangedFor(nameof(ShowCenterBusy))]
+    [NotifyPropertyChangedFor(nameof(ShowEmptyState))]
     private bool _hasResults;
 
     public AddonDownloadViewModel(
@@ -205,6 +211,18 @@ public sealed partial class AddonDownloadViewModel : ViewModelBase
     public string EmptyHint => NeedsInstance && HasNoInstances
         ? "还没有实例。先在「管理 → 实例」创建一个，搜索才能按版本与加载器过滤。"
         : Section.EmptyHint;
+
+    /// <summary>
+    /// 列表已有内容时，进度环保持在「加载更多」旁的原位，
+    /// 避免内容区在搜索时来回跳。列表为空才用中央大环。
+    /// </summary>
+    public bool ShowInlineBusy => IsSearching && HasResults;
+
+    /// <summary>列表为空时的搜索加载态：在内容区正中显示大进度环。</summary>
+    public bool ShowCenterBusy => IsSearching && !HasResults;
+
+    /// <summary>「没有结果」只在搜索结束且确实没有内容时出现，搜索中不闪出来。</summary>
+    public bool ShowEmptyState => !HasResults && !IsSearching;
 
     public override async Task OnNavigatedToAsync(object? parameter)
     {
