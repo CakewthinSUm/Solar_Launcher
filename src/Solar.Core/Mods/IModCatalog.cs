@@ -17,7 +17,9 @@ public interface IModCatalog
         ModVersionQuery query,
         CancellationToken ct = default);
 
-    Task<IReadOnlyList<ModCategory>> GetCategoriesAsync(CancellationToken ct = default);
+    Task<IReadOnlyList<ModCategory>> GetCategoriesAsync(
+        ModProjectType type = ModProjectType.Mod,
+        CancellationToken ct = default);
 }
 
 /// <summary>
@@ -41,7 +43,10 @@ public interface IModCatalogService
         CancellationToken ct = default);
 
     /// <summary>两个源的分类合并后的结果，按源分组由 UI 决定怎么展示。</summary>
-    Task<IReadOnlyList<ModCategory>> GetCategoriesAsync(ModSource source, CancellationToken ct = default);
+    Task<IReadOnlyList<ModCategory>> GetCategoriesAsync(
+        ModSource source,
+        ModProjectType type = ModProjectType.Mod,
+        CancellationToken ct = default);
 
     /// <summary>生成安装清单：目标版本 + 递归展开的必选前置。</summary>
     Task<ModInstallPlan> BuildInstallPlanAsync(

@@ -10,8 +10,7 @@
     mc:Ignorable="d">
 
     <!--
-        六个分区由侧边栏「下载」下的子项切换，页面本身只负责按分区渲染内容，
-        不再放第二层 tab，避免同一份导航出现两处入口。
+        这个页面只负责 Minecraft 版本列表；其余五个分区由 AddonDownloadPage 处理。
         底部不留内边距：版本列表要铺到窗口下边缘，否则滚到底会有一条空白带，
         看起来像最后一行被截断了（内边距改由列表自己的 Padding 提供）。
     -->
@@ -131,22 +130,5 @@
                 Severity="Error" />
         </Grid>
 
-        <!-- 其余分区：暂为占位，待接入各自的来源后替换 -->
-        <StackPanel
-            Grid.Row="1"
-            HorizontalAlignment="Center"
-            VerticalAlignment="Center"
-            Spacing="4"
-            Visibility="{x:Bind ViewModel.IsPlaceholderSection, Mode=OneWay, Converter={StaticResource VisibleWhenTrue}}">
-            <TextBlock
-                HorizontalAlignment="Center"
-                Style="{StaticResource BodyStrongTextBlockStyle}"
-                Text="{x:Bind ViewModel.SectionTitle, Mode=OneWay}" />
-            <TextBlock
-                HorizontalAlignment="Center"
-                Style="{StaticResource CaptionTextBlockStyle}"
-                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                Text="尚未接入" />
-        </StackPanel>
     </Grid>
 </views:PageBase>

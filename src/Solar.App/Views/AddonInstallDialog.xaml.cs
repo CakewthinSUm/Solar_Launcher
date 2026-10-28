@@ -15,15 +15,15 @@ namespace Solar.App.Views;
 /// 装完再手动 <see cref="ContentDialog.Hide"/>。
 /// </para>
 /// </summary>
-public sealed partial class ModInstallDialog : ContentDialog
+public sealed partial class AddonInstallDialog : ContentDialog
 {
-    public ModInstallDialog(ModProject project, ModVersion version, GameInstance instance)
-        : this(App.GetService<ModInstallDialogViewModel>(), project, version, instance)
+    public AddonInstallDialog(ModProject project, ModVersion version, GameInstance instance)
+        : this(App.GetService<AddonInstallDialogViewModel>(), project, version, instance)
     {
     }
 
-    public ModInstallDialog(
-        ModInstallDialogViewModel viewModel,
+    public AddonInstallDialog(
+        AddonInstallDialogViewModel viewModel,
         ModProject project,
         ModVersion version,
         GameInstance instance)
@@ -43,7 +43,7 @@ public sealed partial class ModInstallDialog : ContentDialog
         _ = LoadAsync(project, version, instance);
     }
 
-    public ModInstallDialogViewModel ViewModel { get; }
+    public AddonInstallDialogViewModel ViewModel { get; }
 
     /// <summary>安装成功后的结果；用户取消或失败时为 null。</summary>
     public ModInstallResult? Result { get; private set; }
@@ -65,7 +65,7 @@ public sealed partial class ModInstallDialog : ContentDialog
 
     private void OnItemChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(ModInstallItemViewModel.IsChecked))
+        if (e.PropertyName == nameof(AddonInstallItemViewModel.IsChecked))
         {
             ViewModel.RefreshSummary();
         }

@@ -37,6 +37,10 @@ internal static class CurseForgeDtos
     internal sealed class ModDto
     {
         public long Id { get; set; }
+
+        /// <summary>6=Mod、4471=整合包、12=资源包、6552=光影、6945=数据包。</summary>
+        public long? ClassId { get; set; }
+
         public string Name { get; set; } = "";
         public string? Slug { get; set; }
         public string Summary { get; set; } = "";
@@ -150,7 +154,6 @@ internal static class CurseForgeDtos
 /// </summary>
 public sealed class CurseForgeCatalog(ModHttp http, ModCache cache) : IModCatalog
 {
-    private const int ModClassId = 6;   // CurseForge 的 classId：6 = Mod
     private const int GameId = 432;     // 432 = Minecraft
 
     /// <summary>结尾斜杠必须保留，否则 <c>v1</c> 会被相对路径替换掉，全部请求 404。</summary>
@@ -168,7 +171,8 @@ public sealed class CurseForgeCatalog(ModHttp http, ModCache cache) : IModCatalo
     public async Task<ModSearchPage> SearchAsync(ModSearchQuery query, CancellationToken ct = default)
     {
         var limit = Math.Clamp(query.Limit, 1, 50);
-        var builder = new System.Text.StringBuilder("mods/search?gameId=" + GameId + "&classId=" + ModClassId);
+        var builder = new System.Text.StringBuilder(
+            "mods/search?gameId=" + GameId + "&classId=" + query.Type.ToCurseForgeClassId());
         builder.Append("&index=").Append(Math.Max(0, query.Offset));
         builder.Append("&pageSize=").Append(limit);
         builder.Append("&sortField=").Append(ToSortField(query.Sort));
@@ -184,7 +188,7 @@ public sealed class CurseForgeCatalog(ModHttp http, ModCache cache) : IModCatalo
             builder.Append("&gameVersion=").Append(Uri.EscapeDataString(query.GameVersion.Trim()));
         }
 
-        if (ModLoaderMapping.ToCurseForge(query.Loader) is { } loaderType)
+        if (query.Type.UsesLoader() && ModLoaderMapping.ToCurseForge(query.Loader) is { } loaderType)
         {
             builder.Append("&modLoaderType=").Append(loaderType);
         }
@@ -202,7 +206,7 @@ public sealed class CurseForgeCatalog(ModHttp http, ModCache cache) : IModCatalo
 
         return new ModSearchPage
         {
-            Items = response.Data.Select(ToProject).ToList(),
+            Items = response.Data.Select(dto => ToProject(dto, query.Type)).ToList(),
             TotalHits = response.Pagination?.TotalCount ?? response.Data.Count,
             Offset = response.Pagination?.Index ?? query.Offset,
             Limit = response.Pagination?.PageSize ?? limit,
@@ -224,7 +228,7 @@ public sealed class CurseForgeCatalog(ModHttp http, ModCache cache) : IModCatalo
         var dto = response.Data
                   ?? throw new InvalidOperationException($"CurseForge 上找不到项目 {projectId}。");
 
-        var project = ToProject(dto);
+        var project = ToProject(dto, ModProjectTypes.FromCurseForgeClassId(dto.ClassId));
         await cache.WriteProjectAsync(project, ct).ConfigureAwait(false);
         return project;
     }
@@ -243,6 +247,9 @@ public sealed class CurseForgeCatalog(ModHttp http, ModCache cache) : IModCatalo
             return cached.Take(Math.Max(1, query.Limit)).ToList();
         }
 
+        // 加载器只对 Mod 有效；光影/资源包的 modLoaderType 会让服务端返回空列表
+        var usesLoader = query.Type.UsesLoader();
+
         var builder = new System.Text.StringBuilder($"mods/{Uri.EscapeDataString(projectId)}/files?pageSize=50");
 
         // 服务端过滤能大幅缩小返回量：JEI 全量 3984 个文件 / 6MB，
@@ -254,7 +261,7 @@ public sealed class CurseForgeCatalog(ModHttp http, ModCache cache) : IModCatalo
                 builder.Append("&gameVersion=").Append(Uri.EscapeDataString(query.GameVersion.Trim()));
             }
 
-            if (ModLoaderMapping.ToCurseForge(query.Loader) is { } loaderType)
+            if (usesLoader && ModLoaderMapping.ToCurseForge(query.Loader) is { } loaderType)
             {
                 builder.Append("&modLoaderType=").Append(loaderType);
             }
@@ -274,26 +281,30 @@ public sealed class CurseForgeCatalog(ModHttp http, ModCache cache) : IModCatalo
         return versions.Take(Math.Max(1, query.Limit)).ToList();
     }
 
-    public async Task<IReadOnlyList<ModCategory>> GetCategoriesAsync(CancellationToken ct = default)
+    public async Task<IReadOnlyList<ModCategory>> GetCategoriesAsync(
+        ModProjectType type = ModProjectType.Mod,
+        CancellationToken ct = default)
     {
-        var cached = await cache.ReadCategoriesAsync(Source, ct).ConfigureAwait(false);
+        var classId = type.ToCurseForgeClassId();
+        var cacheKey = $"{Source}_{classId}";
+        var cached = await cache.ReadCategoriesAsync(Source, ct, cacheKey).ConfigureAwait(false);
         if (cached is not null)
         {
             return cached;
         }
 
-        var url = new Uri(Base, $"categories?gameId={GameId}&classId={ModClassId}");
+        var url = new Uri(Base, $"categories?gameId={GameId}&classId={classId}");
         var response = await http.GetCurseForgeJsonAsync<CurseForgeDtos.CategoriesResponse>(url, Json, ct)
             .ConfigureAwait(false);
 
         // 只保留顶层分类：子分类（parentCategoryId != classId）会让下拉框长到无法使用
         var categories = response.Data
-            .Where(c => c.ParentCategoryId is null or ModClassId)
+            .Where(c => c.ParentCategoryId is null || c.ParentCategoryId == classId)
             .Select(c => new ModCategory(c.Id.ToString(), c.Name, Source))
             .OrderBy(c => c.Name, StringComparer.Ordinal)
             .ToList();
 
-        await cache.WriteCategoriesAsync(Source, categories, ct).ConfigureAwait(false);
+        await cache.WriteCategoriesAsync(Source, categories, ct, cacheKey).ConfigureAwait(false);
         return categories;
     }
 
@@ -308,19 +319,24 @@ public sealed class CurseForgeCatalog(ModHttp http, ModCache cache) : IModCatalo
 
     private static string BuildVersionCacheKey(string projectId, ModVersionQuery query)
     {
+        var type = query.Type.ToString().ToLowerInvariant();
+
         if (query.IncludeIncompatible)
         {
-            return projectId + "_all";
+            return $"{type}_{projectId}_all";
         }
 
-        var loader = ModLoaderMapping.ToCurseForge(query.Loader)?.ToString() ?? "any";
+        var loader = query.Type.UsesLoader()
+            ? ModLoaderMapping.ToCurseForge(query.Loader)?.ToString() ?? "any"
+            : "any";
         var version = string.IsNullOrWhiteSpace(query.GameVersion) ? "any" : query.GameVersion.Trim();
-        return $"{projectId}_{version}_{loader}";
+        return $"{type}_{projectId}_{version}_{loader}";
     }
 
-    private static ModProject ToProject(CurseForgeDtos.ModDto dto) => new()
+    private static ModProject ToProject(CurseForgeDtos.ModDto dto, ModProjectType type) => new()
     {
         Source = ModSource.CurseForge,
+        ProjectType = type,
         Id = dto.Id.ToString(),
         Slug = dto.Slug,
         Title = dto.Name,
@@ -406,7 +422,7 @@ public sealed class CurseForgeCatalog(ModHttp http, ModCache cache) : IModCatalo
 
     private static ModVersion ToVersion(CurseForgeDtos.FileDto dto)
     {
-        var sha1 = dto.Hashes.FirstOrDefault(h => h.Algo == 1)?.Value;   // Algo 1 = SHA1
+        var sha1 = dto.Hashes?.FirstOrDefault(h => h.Algo == 1)?.Value;   // Algo 1 = SHA1
 
         return new ModVersion
         {

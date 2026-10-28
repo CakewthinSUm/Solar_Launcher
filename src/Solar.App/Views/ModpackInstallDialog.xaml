@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ContentDialog
+    x:Class="Solar.App.Views.ModpackInstallDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    Title="{x:Bind ViewModel.Header, Mode=OneWay}"
+    CloseButtonText="取消"
+    DefaultButton="Primary"
+    IsPrimaryButtonEnabled="{x:Bind ViewModel.CanInstall, Mode=OneWay}"
+    PrimaryButtonText="{x:Bind ViewModel.InstallText, Mode=OneWay}"
+    mc:Ignorable="d">
+
+    <StackPanel Width="520" Spacing="12">
+        <!-- 整合包声明的游戏版本与加载器 -->
+        <StackPanel Spacing="2">
+            <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{x:Bind ViewModel.GameText, Mode=OneWay}" />
+            <TextBlock
+                Style="{StaticResource CaptionTextBlockStyle}"
+                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                Text="{x:Bind ViewModel.FilesText, Mode=OneWay}"
+                TextWrapping="Wrap" />
+        </StackPanel>
+
+        <TextBox
+            Header="实例名"
+            PlaceholderText="新实例的名字"
+            Text="{x:Bind ViewModel.InstanceName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+        <InfoBar
+            IsClosable="False"
+            IsOpen="{x:Bind ViewModel.HasPlanWarning, Mode=OneWay}"
+            Message="{x:Bind ViewModel.PlanWarning, Mode=OneWay}"
+            Severity="Warning" />
+
+        <InfoBar
+            IsClosable="False"
+            IsOpen="{x:Bind ViewModel.HasErrorMessage, Mode=OneWay}"
+            Message="{x:Bind ViewModel.ErrorMessage, Mode=OneWay}"
+            Severity="Error" />
+
+        <!-- 准备阶段（下载整合包、解析 CF 文件）也走这条进度 -->
+        <StackPanel
+            Spacing="4"
+            Visibility="{x:Bind ViewModel.IsBusyNow, Mode=OneWay, Converter={StaticResource VisibleWhenTrue}}">
+            <ProgressBar
+                IsIndeterminate="{x:Bind ViewModel.IsProgressIndeterminate, Mode=OneWay}"
+                Maximum="1"
+                Value="{x:Bind ViewModel.ProgressValue, Mode=OneWay}" />
+            <TextBlock
+                Style="{StaticResource CaptionTextBlockStyle}"
+                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                Text="{x:Bind ViewModel.ProgressText, Mode=OneWay}"
+                TextTrimming="CharacterEllipsis" />
+        </StackPanel>
+    </StackPanel>
+</ContentDialog>
