@@ -20,6 +20,7 @@ public interface IMicrosoftAuthService
     /// <summary>
     /// 交互式登录：优先尝试静默刷新，失败则走设备码流程。
     /// 会通过 <paramref name="onDeviceCode"/> 把验证码交给 UI 展示。
+    /// 回调在后台线程上触发，UI 侧需要自行切回 UI 线程。
     /// </summary>
     Task<GameAccount> SignInAsync(
         Func<DeviceCodePrompt, Task> onDeviceCode,

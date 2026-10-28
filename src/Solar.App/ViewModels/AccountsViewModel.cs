@@ -1,9 +1,11 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
 using Solar.App.Services;
 using Solar.Core.Accounts;
+using Windows.ApplicationModel.DataTransfer;
 
 namespace Solar.App.ViewModels;
 
@@ -114,13 +116,27 @@ public sealed partial class AccountsViewModel : ViewModelBase
             DeviceCodeUri = "";
             LoginStatus = "正在向微软请求登录代码…";
 
+            // 设备码回调来自 MSAL 的后台线程，直接改属性会跨线程更新 x:Bind
+            //（TextBlock.Text 抛 RPC_E_WRONG_THREAD）。Progress 在构造时捕获
+            // UI 线程的 SynchronizationContext，Report 时自动切回去。
+            IProgress<DeviceCodePrompt> deviceCodeProgress = new Progress<DeviceCodePrompt>(prompt =>
+            {
+                DeviceCode = prompt.UserCode;
+                DeviceCodeUri = prompt.VerificationUri;
+
+                // 省掉用户手抄代码：复制到剪贴板后直接把验证页打开
+                var copied = TryCopyToClipboard(prompt.UserCode);
+                TryOpenVerificationPage(prompt.VerificationUri);
+
+                LoginStatus = copied
+                    ? "验证码已复制到剪贴板，在浏览器里粘贴并确认即可"
+                    : "请在浏览器中打开上面的网址并输入代码";
+            });
+
             var account = await _authService.SignInAsync(
                 prompt =>
                 {
-                    // 回调可能来自后台线程，Progress 会切回 UI 线程
-                    DeviceCode = prompt.UserCode;
-                    DeviceCodeUri = prompt.VerificationUri;
-                    LoginStatus = "请在浏览器中打开上面的网址并输入代码";
+                    deviceCodeProgress.Report(prompt);
                     return Task.CompletedTask;
                 },
                 _loginCts.Token);
@@ -157,6 +173,47 @@ public sealed partial class AccountsViewModel : ViewModelBase
 
     [RelayCommand]
     private void CancelSignIn() => _loginCts?.Cancel();
+
+    /// <summary>把设备码放进剪贴板；失败时不打断登录，页面上仍显示代码。</summary>
+    private bool TryCopyToClipboard(string text)
+    {
+        try
+        {
+            var package = new DataPackage { RequestedOperation = DataPackageOperation.Copy };
+            package.SetText(text);
+            Clipboard.SetContent(package);
+            // 让剪贴板内容在本程序退出后仍然有效
+            Clipboard.Flush();
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "复制设备码到剪贴板失败");
+            return false;
+        }
+    }
+
+    /// <summary>用默认浏览器打开微软的设备码验证页；失败时页面上的网址仍可手动打开。</summary>
+    private void TryOpenVerificationPage(string uri)
+    {
+        if (string.IsNullOrWhiteSpace(uri))
+        {
+            return;
+        }
+
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = uri,
+                UseShellExecute = true,
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "打开设备码验证页失败: {Uri}", uri);
+        }
+    }
 
     [RelayCommand]
     private async Task SetActiveAsync(GameAccount? account)
