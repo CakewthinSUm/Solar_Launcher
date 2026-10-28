@@ -20,6 +20,7 @@ public sealed partial class HomeViewModel : ViewModelBase
     private readonly IGameLaunchService _launchService;
     private readonly IAccountStore _accounts;
     private readonly IDialogService _dialogs;
+    private readonly TaskbarProgressService _taskbar;
     private readonly ILogger<HomeViewModel> _logger;
 
     private CancellationTokenSource? _launchCts;
@@ -52,6 +53,7 @@ public sealed partial class HomeViewModel : ViewModelBase
         IGameLaunchService launchService,
         IAccountStore accounts,
         IDialogService dialogs,
+        TaskbarProgressService taskbar,
         ILogger<HomeViewModel> logger)
     {
         _instances = instances;
@@ -60,6 +62,7 @@ public sealed partial class HomeViewModel : ViewModelBase
         _launchService = launchService;
         _accounts = accounts;
         _dialogs = dialogs;
+        _taskbar = taskbar;
         _logger = logger;
     }
 
@@ -173,9 +176,17 @@ public sealed partial class HomeViewModel : ViewModelBase
             var downloadProgress = new Progress<DownloadProgress>(p =>
             {
                 // 文件级进度和字节级进度交替上报，取更有信息量的一种
-                LaunchProgress = p.TotalBytes > 0
+                double? ratio = p.TotalBytes > 0
                     ? p.Ratio
-                    : p.TotalFiles > 0 ? (double)p.CompletedFiles / p.TotalFiles : 0;
+                    : p.TotalFiles > 0 ? (double)p.CompletedFiles / p.TotalFiles : null;
+
+                if (ratio is { } value)
+                {
+                    LaunchProgress = value;
+                }
+
+                // 总量还没算出来时给个不确定进度，任务栏上至少能看出在忙
+                _taskbar.Report(ratio);
 
                 if (!string.IsNullOrEmpty(p.CurrentFile))
                 {
@@ -183,7 +194,34 @@ public sealed partial class HomeViewModel : ViewModelBase
                 }
             });
 
-            var stageProgress = new Progress<LaunchStageChanged>(s => LaunchStatus = s.Message);
+            // 只有本次真的装过加载器时，才需要在后续阶段把任务栏从安装进度切回待定状态
+            var loaderStageSeen = false;
+
+            var stageProgress = new Progress<LaunchStageChanged>(s =>
+            {
+                LaunchStatus = s.Message;
+
+                switch (s.Stage)
+                {
+                    case LaunchStage.InstallingLoader:
+                        loaderStageSeen = true;
+                        // 加载器安装不走 DownloadProgress，用阶段自带的比例喂任务栏。
+                        // 比例为 0 表示这一步没有可细分的进度，显示滚动的待定状态。
+                        _taskbar.Report(s.Ratio > 0 ? s.Ratio : null);
+                        break;
+
+                    case LaunchStage.ResolvingVersion when loaderStageSeen:
+                        // 装完还要解析版本、补齐文件；先切回待定状态，
+                        // 否则进度条会停在安装阶段的旧比例上
+                        _taskbar.Report(null);
+                        break;
+
+                    case LaunchStage.Starting:
+                        // 补齐文件结束、转入启动游戏时闪一下任务栏，提示下载已完成
+                        _taskbar.Flash();
+                        break;
+                }
+            });
 
             var process = await _launchService.LaunchAsync(
                 instance, downloadProgress, stageProgress, _launchCts.Token);
@@ -210,6 +248,7 @@ public sealed partial class HomeViewModel : ViewModelBase
         finally
         {
             IsLaunching = false;
+            _taskbar.Reset();
             _launchCts?.Dispose();
             _launchCts = null;
         }

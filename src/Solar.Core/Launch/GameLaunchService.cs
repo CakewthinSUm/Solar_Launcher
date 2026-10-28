@@ -22,7 +22,11 @@ public enum LaunchStage
     Starting,
 }
 
-public sealed record LaunchStageChanged(LaunchStage Stage, string Message);
+/// <summary>
+/// 阶段变化。带进度类下载的阶段（如安装加载器）会在 <see cref="Ratio"/> 里给出 0~1 的比例，
+/// 其余阶段为 0——0 表示这一步没有可细分的进度，UI 应显示不确定状态而不是 0%。
+/// </summary>
+public sealed record LaunchStageChanged(LaunchStage Stage, string Message, double Ratio = 0);
 
 public interface IGameLaunchService
 {
@@ -136,7 +140,10 @@ public sealed class GameLaunchService(
             : new Progress<LoaderInstallProgress>(p =>
                 stageProgress.Report(new LaunchStageChanged(
                     LaunchStage.InstallingLoader,
-                    p.Total > 0 ? $"{p.Stage} ({p.Current}/{p.Total})" : p.Stage)));
+                    p.Total > 0 ? $"{p.Stage} ({p.Current}/{p.Total})" : p.Stage,
+                    // 只有安装步骤（processors）会给真实计数；其余子阶段是 (0, 1)，按比例算出来是 0，
+                    // 让 UI 显示不确定进度即可
+                    p.Total > 0 ? (double)p.Current / p.Total : 0)));
 
         var versionId = await installer.InstallAsync(
             instance.Loader,

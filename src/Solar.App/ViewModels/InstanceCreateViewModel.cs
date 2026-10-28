@@ -32,6 +32,7 @@ public sealed partial class InstanceCreateViewModel : ViewModelBase
     private readonly InstanceGameDirectory _gameDirectories;
     private readonly ISettingsService _settings;
     private readonly IDialogService _dialogs;
+    private readonly TaskbarProgressService _taskbar;
     private readonly ILogger<InstanceCreateViewModel> _logger;
 
     private CancellationTokenSource? _loadCts;
@@ -93,6 +94,7 @@ public sealed partial class InstanceCreateViewModel : ViewModelBase
         InstanceGameDirectory gameDirectories,
         ISettingsService settings,
         IDialogService dialogs,
+        TaskbarProgressService taskbar,
         ILogger<InstanceCreateViewModel> logger)
     {
         _manifest = manifest;
@@ -105,6 +107,7 @@ public sealed partial class InstanceCreateViewModel : ViewModelBase
         _gameDirectories = gameDirectories;
         _settings = settings;
         _dialogs = dialogs;
+        _taskbar = taskbar;
         _logger = logger;
 
         ForgeCard = new ComponentCardViewModel(ComponentKind.Forge, "Forge", "大多数整合包与老牌 Mod 使用的加载器");
@@ -822,6 +825,9 @@ public sealed partial class InstanceCreateViewModel : ViewModelBase
                 {
                     CreateProgress = p.Ratio;
                 }
+
+                // 创建实例大部分时间都花在下载上，进度也同步给任务栏
+                _taskbar.Report(p.Ratio > 0 ? p.Ratio : null);
             });
 
             var request = new InstanceCreateRequest(
@@ -834,6 +840,7 @@ public sealed partial class InstanceCreateViewModel : ViewModelBase
 
             CreateStatus = "安装完成";
             CreateProgress = 1;
+            _taskbar.Flash();
             StatusMessage = $"已创建实例“{instance.Name}”";
 
             // 由页面负责导航：Frame 在页面手里，服务层的导航器没有接上 Frame
@@ -856,6 +863,7 @@ public sealed partial class InstanceCreateViewModel : ViewModelBase
         finally
         {
             IsCreating = false;
+            _taskbar.Reset();
             _createCts?.Dispose();
             _createCts = null;
         }

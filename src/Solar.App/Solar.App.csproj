@@ -12,6 +12,8 @@
     <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == ''">win-$([System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture.ToString().ToLowerInvariant())</RuntimeIdentifier>
     <UseWinUI>true</UseWinUI>
     <WinUISDKReferences>false</WinUISDKReferences>
+    <!-- 任务栏进度条走 ITaskbarList3，需要内置 COM 互操作（.NET 5+ 默认关闭） -->
+    <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
     <!-- 便携非打包：不生成 MSIX，直接输出可运行的 exe 目录 -->
     <EnableMsixTooling>false</EnableMsixTooling>
     <WindowsPackageType>None</WindowsPackageType>
