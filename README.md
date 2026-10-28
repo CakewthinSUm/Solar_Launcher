@@ -8,7 +8,7 @@
 
 [![.NET 8](https://img.shields.io/badge/.NET-8.0-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
 [![WinUI 3](https://img.shields.io/badge/WinUI-3%20%2F%20Windows%20App%20SDK%201.8-0067C0?logo=windows&logoColor=white)](https://learn.microsoft.com/windows/apps/winui/winui3/)
-[![Version](https://img.shields.io/badge/version-0.1.0--beta-2ea44f)](../../releases)
+[![Version](https://img.shields.io/badge/version-0.1.1--beta-2ea44f)](../../releases)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%201809%2B-0078D4?logo=windows&logoColor=white)](#-快速开始)
 
 [下载](../../releases) · [功能](#-功能) · [截图](#-截图) · [开发](#-开发) · [当前进度](#-当前进度)
@@ -40,6 +40,20 @@
 `assets` 与 `libraries` 始终共享，不受隔离影响。
 
 ![实例设置](docs/images/instance-settings.png)
+
+### 🚀 启动与进度
+点启动后，启动按钮展开为底部的进度卡片：步骤条按「解析版本 → 补装依赖 → 安装加载器 → 启动游戏」
+逐项推进，下载阶段显示当前文件、已完成数量与总体进度。失败原因直接写在卡片里，
+可以重试或取消，不再弹窗挡住细节。一个实例都没有时点启动，卡片会提示先创建实例。
+
+下载与启动进度同步显示在任务栏进度条上，进入启动阶段时闪烁任务栏提醒。
+游戏窗口真正出现后，启动器按「设置 → 游戏启动后」保持不动（默认）、最小化或关闭；
+如果游戏进程提前退出，启动器保持可见并显示错误。
+
+### ⚙️ 设置
+设置页集中管理游戏目录、新建实例的隔离默认值、Java 路径、下载源与「游戏启动后」行为。
+有未保存的修改时离开页面会询问「保存 / 不保存 / 取消」，底部「重置」可把所有项恢复默认值，
+保存后生效。
 
 ### ⬇️ 下载
 版本列表来自 Mojang 官方清单，支持按版本号搜索，按版本类型（正式版 / 快照 / 预发布版 / 远古 Beta / Alpha）与发布年份筛选，选中即可创建实例。
@@ -106,8 +120,8 @@ Forge / NeoForge 的 installer 不是简单解压：它要跑若干 processor（
 ### 🔐 微软正版登录
 只支持微软正版账户，不提供离线登录。
 
-登录走 OAuth **设备码流程**：点「登录」后启动器显示一次性代码，在浏览器打开
-`microsoft.com/link` 输入即可，无需内嵌浏览器。支持多账户与令牌静默刷新。
+登录走 OAuth **设备码流程**：点「登录」后启动器显示一次性代码，同时复制到剪贴板、
+用默认浏览器打开 `microsoft.com/link`，粘贴确认即可，无需内嵌浏览器。支持多账户与令牌静默刷新。
 
 令牌链（OAuth → Xbox Live → XSTS → Minecraft Services）由
 [CmlLib.Core.Auth.Microsoft](https://github.com/CmlLib/CmlLib.Core.Auth.Microsoft) 完成。
@@ -155,7 +169,7 @@ Forge / NeoForge 的 installer 不是简单解压：它要跑若干 processor（
 | 整合包 | 解析 `.mrpack` / CurseForge manifest，创建隔离实例并下载整包 |
 | Markdown | 详情正文只用到极简解析器（标题 / 粗体 / 列表 / 链接） |
 | 登录 | CmlLib.Core.Auth.Microsoft（OAuth 设备码 + MSAL.NET） |
-| 测试 | xUnit（`tests/Solar.Core.Tests`），374 个测试 |
+| 测试 | xUnit（`tests/Solar.Core.Tests`），390 个测试 |
 
 ```
 src/
@@ -255,6 +269,22 @@ SolarInstances/     每个实例一个目录，内含 natives、instance.json
 
 ---
 
+## 🆕 更新日志
+
+### 0.1.1-beta
+
+- 启动按钮展开为底部进度卡片：分阶段步骤条、当前文件与总体进度、取消与失败重试
+- 无实例时点启动，提示移入卡片并带展开 / 收起动画
+- 下载与启动进度同步到任务栏，进入启动阶段时闪烁提醒
+- 设置新增「游戏启动后」：保持不动 / 最小化 / 关闭启动器，等游戏窗口真正出现后执行
+- 离开设置页时提示保存未保存的修改，底部新增「重置」
+- 修复微软登录点击无响应（设备码回调跨线程更新 UI），验证码自动复制并打开验证页
+- 下载页支持按版本类型与发布年份筛选
+- 补齐光影 / 整合包 / 资源包 / 数据包在线下载，并接入 Mod 下载界面
+- 内置 Azure 客户端 ID，登录不再需要手动配置
+
+---
+
 ## 🛠️ 开发
 
 ```bash
@@ -314,6 +344,8 @@ dotnet run --project tools/Solar.ModProbe -- modpack curseforge 396246 1.21.4
 - [x] Java 自动探测与版本匹配
 - [x] 依赖（libraries / assets / natives）下载与 SHA1 校验
 - [x] 启动参数拼装与游戏进程启动
+- [x] 启动进度卡片（分阶段步骤条、下载详情、取消与失败重试）
+- [x] 任务栏下载进度与完成闪烁
 - [x] 下载镜像（BMCLAPI）与实例级 Java / 内存覆盖
 - [x] 微软正版登录（设备码流程、多账户、令牌静默刷新）
 - [x] 模组加载器安装（Fabric / Quilt / Forge / NeoForge）
@@ -328,6 +360,8 @@ dotnet run --project tools/Solar.ModProbe -- modpack curseforge 396246 1.21.4
 - [x] 光影与资源包在线下载（按实例的游戏版本过滤，装进对应目录）
 - [x] 数据包在线下载（按存档安装到 `saves/<存档>/datapacks/`）
 - [x] 整合包在线下载与安装（解析 `.mrpack` / CurseForge manifest，新建隔离实例，下载全部文件并解压 overrides）
+- [x] 下载页版本筛选（版本类型 + 发布年份）
+- [x] 启动后窗口行为（保持 / 最小化 / 关闭），设置页未保存提示与重置
 - [ ] 已装内容的管理与更新检查（按 SHA1 反查项目、启用/禁用、更新）
 
 ### 内容下载设计

@@ -2,9 +2,9 @@
 # 用法:
 #   pwsh -File scripts\release.ps1
 #   pwsh -File scripts\release.ps1 -Runtime win-arm64
-#   pwsh -File scripts\release.ps1 -Version 0.1.0-beta -NoZip
+#   pwsh -File scripts\release.ps1 -Version 0.1.1-beta -NoZip
 param(
-    [string]$Version = "0.1.0-beta",
+    [string]$Version = "0.1.1-beta",
     [string[]]$Runtime = @("win-x64"),
     [string]$Configuration = "Release",
     [switch]$NoZip
