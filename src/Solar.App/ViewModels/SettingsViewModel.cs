@@ -171,7 +171,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
                    || NormalizedVersionManifestUrl != saved.VersionManifestUrl
                    || Math.Clamp(DownloadThreads, 1, 32) != saved.DownloadThreads
                    || NullIfBlank(DownloadMirrorUrl) != saved.DownloadMirrorUrl
-                   || (VersionIsolationDefault)Math.Clamp(NewInstanceIsolationIndex, 0, 2) != saved.NewInstanceIsolation
+                   || (VersionIsolationScope)Math.Clamp(NewInstanceIsolationIndex, 0, 4) != saved.NewInstanceIsolationScope
                    || (AfterLaunchAction)Math.Clamp(AfterLaunchActionIndex, 0, 2) != saved.AfterLaunchAction
                    || (ModSourcePreference)Math.Clamp(ModSourcePreferenceIndex, 0, 2) != saved.ModSourcePreference
                    || NullIfBlank(ModMirrorUrl) != saved.ModMirrorUrl
@@ -217,7 +217,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
         VersionManifestUrl = s.VersionManifestUrl;
         DownloadThreads = s.DownloadThreads;
         DownloadMirrorUrl = s.DownloadMirrorUrl ?? "";
-        NewInstanceIsolationIndex = (int)s.NewInstanceIsolation;
+        NewInstanceIsolationIndex = (int)s.NewInstanceIsolationScope;
         AfterLaunchActionIndex = (int)s.AfterLaunchAction;
         ModSourcePreferenceIndex = (int)s.ModSourcePreference;
         ModMirrorUrl = s.ModMirrorUrl ?? "";
@@ -426,7 +426,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
         s.VersionManifestUrl = NormalizedVersionManifestUrl;
         s.DownloadThreads = Math.Clamp(DownloadThreads, 1, 32);
         s.DownloadMirrorUrl = NullIfBlank(DownloadMirrorUrl);
-        s.NewInstanceIsolation = (VersionIsolationDefault)Math.Clamp(NewInstanceIsolationIndex, 0, 2);
+        s.NewInstanceIsolationScope = (VersionIsolationScope)Math.Clamp(NewInstanceIsolationIndex, 0, 4);
         s.AfterLaunchAction = (AfterLaunchAction)Math.Clamp(AfterLaunchActionIndex, 0, 2);
 
         // Mod 源三项：换了任何一个，缓存里的项目与版本都属于旧源，必须清掉

@@ -1,9 +1,11 @@
+using System.Text.Json.Serialization;
 using Solar.Core.Memory;
+using Solar.Core.Json;
 
 namespace Solar.Core.Settings;
 
 /// <summary>全局启动器设置，持久化到 <c>SolarData/settings.json</c>。</summary>
-public sealed class LauncherSettings
+public sealed class LauncherSettings : IJsonOnDeserialized
 {
     /// <summary>内存分配方式：自动按内存与模组数量计算，或使用 <see cref="MaxMemoryMb"/>。</summary>
     public MemoryAllocationMode MemoryAllocationMode { get; set; } = MemoryAllocationMode.Automatic;
@@ -61,10 +63,35 @@ public sealed class LauncherSettings
     public AfterLaunchAction AfterLaunchAction { get; set; } = AfterLaunchAction.Nothing;
 
     /// <summary>
-    /// 新建实例时版本隔离的默认值。默认「每次询问」：
-    /// 带模组加载器时建议隔离，纯原版则沿用共享目录。
+    /// 新建实例时版本隔离的默认档位（对齐 PCL 的 5 档）。默认隔离所有版本。
     /// </summary>
-    public VersionIsolationDefault NewInstanceIsolation { get; set; } = VersionIsolationDefault.Ask;
+    public VersionIsolationScope NewInstanceIsolationScope { get; set; } = VersionIsolationScope.All;
+
+    /// <summary>
+    /// [已废弃] 旧的三档设置（询问/总是/从不）。只在读取旧 settings.json 时用于一次性迁移：
+    /// OnDeserialized 里换算成 <see cref="NewInstanceIsolationScope"/> 后置 null，
+    /// 下次保存时因 WhenWritingNull 不再写出。
+    /// </summary>
+    public VersionIsolationDefault? NewInstanceIsolation { get; set; }
+
+    public void OnDeserialized()
+    {
+        if (NewInstanceIsolation is { } legacy)
+        {
+            // 注意数字错位：旧枚举 Ask=0/Always=1/Never=2 与新枚举 Off=0/Modable=1 不同，
+            // 必须按名字换算，不能按数值。
+#pragma warning disable CS0618 // 旧枚举仅在此迁移处使用
+            NewInstanceIsolationScope = legacy switch
+            {
+                VersionIsolationDefault.Always => VersionIsolationScope.All,
+                VersionIsolationDefault.Never => VersionIsolationScope.Off,
+                // 旧默认「每次询问」的用户没有表达过偏好，落到对齐 PCL 的默认行为
+                _ => VersionIsolationScope.All,
+            };
+#pragma warning restore CS0618
+            NewInstanceIsolation = null;
+        }
+    }
 }
 
 /// <summary>游戏启动成功后启动器窗口的处理方式。</summary>
@@ -81,6 +108,7 @@ public enum AfterLaunchAction
 }
 
 /// <summary>新建实例时版本隔离的处理方式。</summary>
+[Obsolete("已被 VersionIsolationScope 取代，仅在读取旧 settings.json 时使用。")]
 public enum VersionIsolationDefault
 {
     /// <summary>创建实例时问一次，可记住选择。</summary>
@@ -91,4 +119,23 @@ public enum VersionIsolationDefault
 
     /// <summary>总是关闭，不再询问。</summary>
     Never = 2,
+}
+
+/// <summary>版本隔离的全局默认档位，对齐 PCL 的 5 档。</summary>
+public enum VersionIsolationScope
+{
+    /// <summary>不隔离，全部共用游戏目录。</summary>
+    Off = 0,
+
+    /// <summary>只隔离可安装 Mod 的版本（带加载器或附加组件）。</summary>
+    Modable = 1,
+
+    /// <summary>只隔离非正式版（快照、预发布、远古 Beta/Alpha）。</summary>
+    Unstable = 2,
+
+    /// <summary>隔离可安装 Mod 的版本与非正式版。</summary>
+    ModableOrUnstable = 3,
+
+    /// <summary>隔离所有版本（PCL 的默认行为）。</summary>
+    All = 4,
 }
