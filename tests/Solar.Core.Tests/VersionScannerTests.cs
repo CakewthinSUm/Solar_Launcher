@@ -24,10 +24,12 @@ public sealed class VersionScannerTests : IDisposable
     {
         _paths = new AppPaths(_root);
         _paths.EnsureCreated();
+        // 新默认值是「隔离所有版本」，既有测试关心的是导入机制本身，显式关掉隔离
+        _settings.Current.NewInstanceIsolationScope = VersionIsolationScope.Off;
         _directories = new InstanceGameDirectory(_paths, _settings);
         _locator = new GameFileLocator(_paths, _directories);
         _repository = new InstanceRepository(_paths);
-        _scanner = new VersionScanner(_locator, _repository, NullLogger<VersionScanner>.Instance);
+        _scanner = new VersionScanner(_locator, _repository, _settings, NullLogger<VersionScanner>.Instance);
     }
 
     [Fact]
@@ -151,6 +153,7 @@ public sealed class VersionScannerTests : IDisposable
 
         // 导入的实例直接用现成的游戏目录，不能开隔离
         Assert.All(all, i => Assert.False(i.VersionIsolation));
+        Assert.All(all, i => Assert.Null(i.GameDirectoryOverride));
 
         // 文件已经装好了，不应再触发加载器安装
         Assert.All(all, i => Assert.True(i.LoaderInstalled));
@@ -158,6 +161,117 @@ public sealed class VersionScannerTests : IDisposable
         var fabric = Assert.Single(all, i => i.Loader == ModLoader.Fabric);
         Assert.Equal("fabric-loader-0.16.9-1.21.4", fabric.EffectiveVersionId);
         Assert.Equal("1.21.4", fabric.MinecraftVersion);
+    }
+
+    [Fact]
+    public async Task ImportWithScopeAllPointsGameDirectoryVersionAtItsFolder()
+    {
+        // PCL 式「版本夹即目录」：游戏目录下的版本，档位要求隔离时把游戏目录指到版本夹本身
+        _settings.Current.NewInstanceIsolationScope = VersionIsolationScope.All;
+        WriteVersion("1.21.4", VersionJson("1.21.4"));
+
+        var imported = Assert.Single(await _scanner.ImportAsync());
+
+        Assert.Equal(Path.Combine(_locator.ExternalVersions, "1.21.4"), imported.GameDirectoryOverride);
+        Assert.False(imported.VersionIsolation);
+    }
+
+    [Fact]
+    public async Task ImportWithScopeAllIsolatesSharedVersions()
+    {
+        // SolarShared/versions 下的自装版本没有「版本夹即目录」语义，需要隔离时退回实例目录
+        _settings.Current.NewInstanceIsolationScope = VersionIsolationScope.All;
+        var directory = Path.Combine(_paths.Versions, "1.21.4");
+        Directory.CreateDirectory(directory);
+        File.WriteAllText(Path.Combine(directory, "1.21.4.json"), VersionJson("1.21.4"));
+
+        var imported = Assert.Single(await _scanner.ImportAsync());
+
+        Assert.True(imported.VersionIsolation);
+        Assert.Null(imported.GameDirectoryOverride);
+    }
+
+    [Fact]
+    public async Task ImportDetectsExistingModsInVersionFolderEvenWhenScopeIsOff()
+    {
+        // 对应 PCL 的自动检测：版本夹下已有 mods（或 saves）时，无论全局档位都把游戏目录指过去
+        _settings.Current.NewInstanceIsolationScope = VersionIsolationScope.Off;
+        WriteVersion("1.20.1-forge-47.2.0", """
+            { "id": "1.20.1-forge-47.2.0", "inheritsFrom": "1.20.1",
+              "mainClass": "cpw.mods.bootstraplauncher.BootstrapLauncher" }
+            """);
+        var mods = Path.Combine(_locator.ExternalVersions, "1.20.1-forge-47.2.0", "mods");
+        Directory.CreateDirectory(mods);
+        File.WriteAllText(Path.Combine(mods, "some-mod.jar"), "jar");
+
+        var imported = Assert.Single(await _scanner.ImportAsync());
+
+        Assert.Equal(
+            Path.Combine(_locator.ExternalVersions, "1.20.1-forge-47.2.0"),
+            imported.GameDirectoryOverride);
+        Assert.False(imported.VersionIsolation);
+    }
+
+    [Fact]
+    public async Task EmptyModsFolderDoesNotTriggerIsolation()
+    {
+        // PCL 检测的是"非空"的 mods/saves：空目录不算玩家内容
+        _settings.Current.NewInstanceIsolationScope = VersionIsolationScope.Off;
+        WriteVersion("1.21.4", VersionJson("1.21.4"));
+        Directory.CreateDirectory(Path.Combine(_locator.ExternalVersions, "1.21.4", "mods"));
+
+        var imported = Assert.Single(await _scanner.ImportAsync());
+
+        Assert.Null(imported.GameDirectoryOverride);
+        Assert.False(imported.VersionIsolation);
+    }
+
+    [Fact]
+    public async Task ImportKeepsSharedWhenScopeIsOffAndNoContent()
+    {
+        _settings.Current.NewInstanceIsolationScope = VersionIsolationScope.Off;
+        WriteVersion("1.21.4", VersionJson("1.21.4"));
+
+        var imported = Assert.Single(await _scanner.ImportAsync());
+
+        Assert.False(imported.VersionIsolation);
+        Assert.Null(imported.GameDirectoryOverride);
+    }
+
+    [Fact]
+    public async Task ImportWithUnstableScopeIsolatesSnapshotButNotRelease()
+    {
+        WriteVersion("24w40a", """
+            { "id": "24w40a", "type": "snapshot", "mainClass": "net.minecraft.client.main.Main",
+              "libraries": [ { "name": "com.mojang:authlib:6.0.54" } ] }
+            """);
+        WriteVersion("1.21.4", VersionJson("1.21.4"));
+
+        _settings.Current.NewInstanceIsolationScope = VersionIsolationScope.Unstable;
+        var byScope = (await _scanner.ImportAsync()).ToDictionary(i => i.VersionId!);
+
+        // 游戏目录下的版本按 PCL 方式隔离：游戏目录指向版本夹本身
+        Assert.Equal(
+            Path.Combine(_locator.ExternalVersions, "24w40a"),
+            byScope["24w40a"].GameDirectoryOverride);
+        Assert.Null(byScope["1.21.4"].GameDirectoryOverride);
+    }
+
+    [Fact]
+    public void ClassifyKeepsVersionType()
+    {
+        var detail = new VersionDetail
+        {
+            Id = "24w40a",
+            Type = "snapshot",
+            MainClass = "net.minecraft.client.main.Main",
+        };
+
+        var scanned = VersionScanner.Classify("24w40a", detail, @"C:\game\versions\24w40a", inGameDirectory: true);
+
+        Assert.Equal("snapshot", scanned.Type);
+        Assert.Equal(@"C:\game\versions\24w40a", scanned.Directory);
+        Assert.True(scanned.InGameDirectory);
     }
 
     [Fact]

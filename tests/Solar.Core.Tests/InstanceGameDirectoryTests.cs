@@ -39,6 +39,57 @@ public sealed class InstanceGameDirectoryTests : IDisposable
     }
 
     [Fact]
+    public void OverrideTakesPrecedenceOverIsolation()
+    {
+        var versionFolder = Path.Combine(_root, "versions", "1.21.4");
+        var instance = new GameInstance
+        {
+            Id = "inst",
+            VersionIsolation = true,
+            GameDirectoryOverride = versionFolder,
+        };
+
+        Assert.Equal(versionFolder, _directories.Resolve(instance));
+    }
+
+    [Fact]
+    public void OverrideAloneIsUsedWithoutIsolationFlag()
+    {
+        var versionFolder = Path.Combine(_root, "versions", "1.21.4");
+        var instance = new GameInstance { Id = "inst", GameDirectoryOverride = versionFolder };
+
+        Assert.Equal(versionFolder, _directories.Resolve(instance));
+    }
+
+    [Fact]
+    public void RelativeOverrideResolvesAgainstRoot()
+    {
+        var instance = new GameInstance { Id = "inst", GameDirectoryOverride = "versions\\1.21.4" };
+
+        Assert.Equal(Path.Combine(_root, "versions", "1.21.4"), _directories.Resolve(instance));
+    }
+
+    [Fact]
+    public void BlankOverrideFallsBackToNormalResolution()
+    {
+        _settings.Current.MinecraftDirectory = Path.Combine(_root, "shared-mc");
+        var instance = new GameInstance { Id = "inst", GameDirectoryOverride = "   " };
+
+        Assert.Equal(Path.Combine(_root, "shared-mc"), _directories.Resolve(instance));
+    }
+
+    [Fact]
+    public void OverrideDoesNotAffectOtherInstances()
+    {
+        _settings.Current.MinecraftDirectory = Path.Combine(_root, "shared-mc");
+        var overridden = new GameInstance { Id = "a", GameDirectoryOverride = @"D:\elsewhere\versions\x" };
+        var plain = new GameInstance { Id = "b" };
+
+        Assert.Equal(@"D:\elsewhere\versions\x", _directories.Resolve(overridden));
+        Assert.Equal(Path.Combine(_root, "shared-mc"), _directories.Resolve(plain));
+    }
+
+    [Fact]
     public void CopyBringsModsAndSavesOver()
     {
         var shared = _directories.Shared;

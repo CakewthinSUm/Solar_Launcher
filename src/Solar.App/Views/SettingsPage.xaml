@@ -155,16 +155,18 @@
                             <TextBlock
                                 Style="{StaticResource CaptionTextBlockStyle}"
                                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                Text="开启隔离的实例使用自己的存档、模组与配置目录，不会与其它实例互相影响。带模组加载器的实例建议开启。"
+                                Text="开启隔离的实例使用自己的存档、模组与配置目录，不会与其它实例互相影响。非正式版指快照、预发布与远古版本。"
                                 TextWrapping="Wrap" />
                         </StackPanel>
 
                         <ComboBox
                             MinWidth="240"
                             SelectedIndex="{x:Bind ViewModel.NewInstanceIsolationIndex, Mode=TwoWay}">
-                            <ComboBoxItem Content="每次创建时询问" />
-                            <ComboBoxItem Content="总是开启" />
-                            <ComboBoxItem Content="总是关闭" />
+                            <ComboBoxItem Content="关闭版本隔离" />
+                            <ComboBoxItem Content="隔离可安装 Mod 的版本" />
+                            <ComboBoxItem Content="隔离非正式版" />
+                            <ComboBoxItem Content="隔离可安装 Mod 的版本与非正式版" />
+                            <ComboBoxItem Content="隔离所有版本" />
                         </ComboBox>
                     </StackPanel>
                 </Border>

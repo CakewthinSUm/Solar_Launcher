@@ -367,12 +367,11 @@ public sealed partial class InstanceCreateViewModel : ViewModelBase
         _applyingIsolation = true;
         try
         {
-            VersionIsolation = _settings.Current.NewInstanceIsolation switch
-            {
-                VersionIsolationDefault.Always => true,
-                VersionIsolationDefault.Never => false,
-                _ => Selection.NeedsIsolation,
-            };
+            // 对齐 PCL：按全局档位 + 版本特征（可装 Mod / 非正式版）给出建议值
+            VersionIsolation = VersionIsolationPolicy.ShouldIsolate(
+                _settings.Current.NewInstanceIsolationScope,
+                modable: Selection.NeedsIsolation,
+                unstable: VersionIsolationPolicy.IsUnstable(Version?.Type, MinecraftVersion));
         }
         finally
         {
@@ -691,10 +690,10 @@ public sealed partial class InstanceCreateViewModel : ViewModelBase
                 _autoName = true;
             }
 
-            if (!_isolationTouched && _settings.Current.NewInstanceIsolation == VersionIsolationDefault.Ask)
+            if (!_isolationTouched)
             {
-                VersionIsolation = Selection.NeedsIsolation;
-                UpdateIsolationHint();
+                // 所有档位都实时跟随默认值：切了加载器或版本后，建议值可能已经变了
+                ApplyIsolationDefault();
             }
         }
         finally
@@ -802,11 +801,6 @@ public sealed partial class InstanceCreateViewModel : ViewModelBase
             return;
         }
 
-        if (!await ConfirmIsolationAsync())
-        {
-            return;
-        }
-
         _createCts?.Dispose();
         _createCts = new CancellationTokenSource();
         var ct = _createCts.Token;
@@ -868,58 +862,6 @@ public sealed partial class InstanceCreateViewModel : ViewModelBase
             _createCts = null;
         }
     }
-
-    /// <summary>
-    /// 版本隔离设成「每次询问」时，第一次创建问一次；勾选「记住」就写回设置。
-    /// 返回 false 表示用户取消了这次创建。
-    /// </summary>
-    private async Task<bool> ConfirmIsolationAsync()
-    {
-        if (_settings.Current.NewInstanceIsolation != VersionIsolationDefault.Ask || _isolationAsked)
-        {
-            return true;
-        }
-
-        var (confirmed, remember) = await _dialogs.ShowConfirmWithCheckBoxAsync(
-            "版本隔离",
-            VersionIsolation
-                ? "这个实例会使用独立的存档、模组与配置目录，不会与其它实例互相影响。"
-                : "这个实例会与其它未开启隔离的实例共用同一份存档、模组与配置。\n" +
-                  "带 Mod 的实例之间可能互相冲突。",
-            "记住我的选择，以后不再询问",
-            "继续",
-            "取消",
-            defaultChecked: true);
-
-        if (!confirmed)
-        {
-            return false;
-        }
-
-        if (remember)
-        {
-            _settings.Current.NewInstanceIsolation = VersionIsolation
-                ? VersionIsolationDefault.Always
-                : VersionIsolationDefault.Never;
-
-            try
-            {
-                await _settings.SaveAsync();
-            }
-            catch (Exception ex)
-            {
-                // 记不住不影响这次创建
-                _logger.LogWarning(ex, "保存版本隔离默认值失败");
-            }
-        }
-
-        // 本次已经问过，创建过程中不要再问
-        _isolationAsked = true;
-        return true;
-    }
-
-    /// <summary>「每次询问」这次已经问过，同一次创建里不再重复弹窗。</summary>
-    private bool _isolationAsked;
 
     [RelayCommand]
     private void CancelCreate() => _createCts?.Cancel();

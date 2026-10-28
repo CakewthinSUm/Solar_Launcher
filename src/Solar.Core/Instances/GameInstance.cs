@@ -54,6 +54,14 @@ public sealed class GameInstance
     /// </summary>
     public bool VersionIsolation { get; set; }
 
+    /// <summary>
+    /// PCL 式游戏目录覆盖：非空时实例直接以该路径为游戏目录，
+    /// 典型值是版本文件夹本身 <c>versions/&lt;id&gt;</c>（"版本夹即目录"），
+    /// 由扫描导入设置——存档与模组本来就在版本夹里，零拷贝直接可见。
+    /// 优先级高于 <see cref="VersionIsolation"/>；为空时行为与旧版完全一致。
+    /// </summary>
+    public string? GameDirectoryOverride { get; set; }
+
     /// <summary>覆盖全局的 Java 路径。</summary>
     public string? JavaPath { get; set; }
 
@@ -107,7 +115,8 @@ public sealed class GameInstance
         }
     }
 
-    /// <summary>列表里的附加标记；未开启隔离时为空，便于直接拼在说明行末尾。</summary>
+    /// <summary>列表里的附加标记；用共享目录的实例为空，便于直接拼在说明行末尾。</summary>
     [JsonIgnore]
-    public string IsolationBadge => VersionIsolation ? " · 已隔离" : "";
+    public string IsolationBadge =>
+        GameDirectoryOverride is not null || VersionIsolation ? " · 已隔离" : "";
 }

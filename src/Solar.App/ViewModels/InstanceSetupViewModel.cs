@@ -51,16 +51,25 @@ public sealed partial class InstanceSetupViewModel : ViewModelBase
         _logger = logger;
     }
 
-    /// <summary>开关的实际效果：开启时是实例自己的目录，关闭时是共享目录。</summary>
+    /// <summary>该实例实际会用的游戏目录（覆盖优先，其次是隔离目录，最后是共享目录）。</summary>
     public string EffectiveGameDirectory => _instance is null
         ? ""
-        : VersionIsolation
-            ? _gameDirectories.GetIsolatedPath(_instance.Id)
-            : _gameDirectories.Shared;
+        : _gameDirectories.Resolve(_instance);
 
-    public string IsolationHint => VersionIsolation
-        ? "该实例使用独立的存档、模组与配置，不会读到其它实例的内容。"
-        : "与其它未开启隔离的实例共用同一份存档、模组与配置，多个带 Mod 的实例可能互相冲突。";
+    public string IsolationHint
+    {
+        get
+        {
+            if (!string.IsNullOrEmpty(_instance?.GameDirectoryOverride))
+            {
+                return "该实例以版本文件夹作为游戏目录（PCL 式隔离），存档与模组就在版本文件夹内。";
+            }
+
+            return VersionIsolation
+                ? "该实例使用独立的存档、模组与配置，不会读到其它实例的内容。"
+                : "与其它未开启隔离的实例共用同一份存档、模组与配置，多个带 Mod 的实例可能互相冲突。";
+        }
+    }
 
     public override async Task OnNavigatedToAsync(object? parameter)
     {
@@ -118,8 +127,10 @@ public sealed partial class InstanceSetupViewModel : ViewModelBase
 
             // 关闭隔离不搬文件：实例目录原样留着，下次再开启还在。
             // 开启时才问一次要不要把共享目录的现有内容带过来。
+            // 有版本夹覆盖的实例除外：它的游戏目录不是实例自己的 .minecraft，复制没有意义。
             CopySummary? copyResult = null;
-            if (!wasIsolated && VersionIsolation)
+            if (!wasIsolated && VersionIsolation
+                && string.IsNullOrEmpty(_instance.GameDirectoryOverride))
             {
                 if (await _dialogs.ShowConfirmAsync(
                         "开启版本隔离",

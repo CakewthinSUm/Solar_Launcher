@@ -21,9 +21,20 @@ public sealed class InstanceGameDirectory(AppPaths paths, ISettingsService setti
 
     public string GetIsolatedPath(string instanceId) => paths.GetInstanceMinecraftDirectory(instanceId);
 
-    /// <summary>解析实例实际使用的游戏目录。</summary>
-    public string Resolve(GameInstance instance) =>
-        instance.VersionIsolation ? GetIsolatedPath(instance.Id) : Shared;
+    /// <summary>解析实例实际使用的游戏目录：覆盖 &gt; 常规隔离 &gt; 共享目录。</summary>
+    public string Resolve(GameInstance instance)
+    {
+        var overridePath = instance.GameDirectoryOverride;
+        if (!string.IsNullOrWhiteSpace(overridePath))
+        {
+            // 相对路径按程序根目录解析，与 MinecraftDirectory 的解析规则一致（便携性）；
+            // 绝对路径（扫描导入时记录的版本夹，可能在 Root 外）原样使用。
+            var expanded = Environment.ExpandEnvironmentVariables(overridePath.Trim());
+            return Path.GetFullPath(expanded, paths.Root);
+        }
+
+        return instance.VersionIsolation ? GetIsolatedPath(instance.Id) : Shared;
+    }
 
     /// <summary>
     /// 把共享目录里属于玩家的内容复制到实例目录，用于刚开启隔离时给用户一个可用的起点。

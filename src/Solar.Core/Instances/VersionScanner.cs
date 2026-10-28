@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using Solar.Core.Json;
 using Solar.Core.Models;
 using Solar.Core.Paths;
+using Solar.Core.Settings;
 
 namespace Solar.Core.Instances;
 
@@ -13,7 +14,10 @@ public sealed record ScannedVersion(
     string VersionId,
     ModLoader Loader,
     string? LoaderVersion,
-    string MinecraftVersion)
+    string MinecraftVersion,
+    string? Type = null,
+    string? Directory = null,
+    bool InGameDirectory = false)
 {
     /// <summary>显示名：加载器版本带上加载器名，原版直接用版本号。</summary>
     public string DisplayName => Loader == ModLoader.Vanilla
@@ -37,19 +41,24 @@ public interface IVersionScanner
 /// 扫描游戏目录的 <c>versions/</c>，把里面的版本变成实例。
 /// <para>
 /// 用途是接管已有安装：用户从官方启动器或别的启动器装过的版本，
-/// 不必在 Solar 里重新下载一遍。因此导入的实例一律不开版本隔离——
-/// 它用的就是那份现成的游戏目录，存档与模组本来就在里面。
+/// 不必在 Solar 里重新下载一遍。对齐 PCL 的逻辑：
+/// 位于共享游戏目录下的版本导入时以版本文件夹本身为游戏目录
+/// （PCL 式"版本夹即目录"，存档与模组本来就在里面，零拷贝直接可见）；
+/// Solar 自装版本（SolarShared/versions）需要隔离时退回实例自己的
+/// <c>SolarInstances/&lt;id&gt;/.minecraft</c>。
 /// </para>
 /// </summary>
 public sealed partial class VersionScanner(
     GameFileLocator locator,
     IInstanceRepository repository,
+    ISettingsService settings,
     ILogger<VersionScanner> logger) : IVersionScanner
 {
     public IReadOnlyList<ScannedVersion> Scan(CancellationToken ct = default)
     {
         var result = new List<ScannedVersion>();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var externalVersions = Path.GetFullPath(locator.ExternalVersions);
 
         foreach (var root in locator.VersionRoots)
         {
@@ -57,6 +66,11 @@ public sealed partial class VersionScanner(
             {
                 continue;
             }
+
+            // 共享游戏目录下的 versions/ 才有"版本夹即目录"的语义；
+            // SolarShared/versions 里的版本夹混着共享资源，不能直接当游戏目录
+            var inGameDirectory = string.Equals(
+                Path.GetFullPath(root), externalVersions, StringComparison.OrdinalIgnoreCase);
 
             foreach (var directory in EnumerateVersionDirectories(root, ct))
             {
@@ -73,7 +87,7 @@ public sealed partial class VersionScanner(
 
                 if (TryRead(jsonPath, out var detail))
                 {
-                    result.Add(Classify(versionId, detail));
+                    result.Add(Classify(versionId, detail, directory, inGameDirectory));
                 }
                 else
                 {
@@ -106,6 +120,13 @@ public sealed partial class VersionScanner(
                 continue;
             }
 
+            var scope = settings.Current.NewInstanceIsolationScope;
+            var unstable = VersionIsolationPolicy.IsUnstable(version.Type, version.VersionId)
+                           || VersionIsolationPolicy.IsUnstable(version.Type, version.MinecraftVersion);
+            var modable = version.Loader != ModLoader.Vanilla;
+            var hasContent = version.InGameDirectory && version.Directory is not null
+                             && HasPlayerContent(version.Directory);
+
             var instance = new GameInstance
             {
                 // Id 由版本号派生，重复扫描不会产生第二份
@@ -118,10 +139,24 @@ public sealed partial class VersionScanner(
 
                 // 文件已经在这份游戏目录里了，不需要再装一次
                 LoaderInstalled = true,
-
-                // 存档与模组就在现成的游戏目录里，隔离反而会看不到它们
-                VersionIsolation = false,
             };
+
+            if (version.InGameDirectory && version.Directory is not null
+                && (hasContent || VersionIsolationPolicy.ShouldIsolate(scope, modable, unstable)))
+            {
+                // PCL 式「版本夹即目录」：内容本来就在版本夹里（或该按档位隔离），
+                // 直接把游戏目录指过去。VersionIsolation 保持 false——它专指
+                // SolarInstances/<id>/.minecraft，混用会让"复制共享内容"流程指向错误的地方。
+                instance.GameDirectoryOverride = version.Directory;
+            }
+            else if (!version.InGameDirectory && scope != Settings.VersionIsolationScope.Off
+                     && VersionIsolationPolicy.ShouldIsolate(scope, modable, unstable))
+            {
+                // SolarShared/versions 下的自装版本没有"版本夹即目录"的语义
+                //（会污染共享资源树），需要隔离时退回 Solar 原生机制。
+                instance.VersionIsolation = true;
+            }
+            // 其余情况维持现状：两者都 false，用共享目录
 
             try
             {
@@ -194,7 +229,8 @@ public sealed partial class VersionScanner(
     /// 优先看 <c>inheritsFrom</c>（加载器版本都会写它），
     /// 再看 id 里的关键字——个别第三方整合包不写 inheritsFrom。
     /// </summary>
-    public static ScannedVersion Classify(string versionId, VersionDetail detail)
+    public static ScannedVersion Classify(string versionId, VersionDetail detail,
+        string? directory = null, bool inGameDirectory = false)
     {
         var loader = DetectLoader(versionId, detail);
         var minecraftVersion = DetectMinecraftVersion(versionId, detail, loader);
@@ -202,7 +238,35 @@ public sealed partial class VersionScanner(
             ? null
             : ExtractLoaderVersion(versionId, loader, minecraftVersion);
 
-        return new ScannedVersion(versionId, loader, loaderVersion, minecraftVersion);
+        return new ScannedVersion(versionId, loader, loaderVersion, minecraftVersion,
+            detail.Type, directory, inGameDirectory);
+    }
+
+    /// <summary>版本文件夹下是否已有玩家的内容（非空 mods/ 或 saves/），对应 PCL 的自动检测。</summary>
+    private static bool HasPlayerContent(string directory)
+    {
+        foreach (var name in (ReadOnlySpan<string>)["mods", "saves"])
+        {
+            var path = Path.Combine(directory, name);
+            if (!Directory.Exists(path))
+            {
+                continue;
+            }
+
+            try
+            {
+                if (Directory.EnumerateFileSystemEntries(path).Any())
+                {
+                    return true;
+                }
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // 目录被占用或没有权限时按"没有内容"处理
+            }
+        }
+
+        return false;
     }
 
     private static ModLoader DetectLoader(string versionId, VersionDetail detail)
