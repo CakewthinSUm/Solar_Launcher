@@ -67,6 +67,13 @@
                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                             Text="{x:Bind ViewModel.SelectedInstanceSummary, Mode=OneWay}" />
 
+                        <!-- 开合动画在 code-behind 里做：从 0 高度展开，卡片不会突然跳高 -->
+                        <InfoBar
+                            x:Name="NoInstanceWarning"
+                            IsClosable="False"
+                            Message="还没有可启动的实例，请先到「管理 → 实例」创建一个"
+                            Severity="Warning" />
+
                         <InfoBar
                             IsClosable="False"
                             IsOpen="{x:Bind ViewModel.IsSignedIn, Mode=OneWay, Converter={StaticResource InvertBool}}"
