@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
+using Solar.App.Formatting;
 using Solar.Core.Minecraft;
 using Solar.Core.Models;
 
@@ -35,6 +36,9 @@ public sealed record DownloadSectionInfo(DownloadSection Section, string Key, st
         All.FirstOrDefault(s => string.Equals(s.Key, key, StringComparison.OrdinalIgnoreCase)) ?? All[0];
 }
 
+/// <summary>年份下拉的一项；<see cref="Year"/> 为 null 表示「全部年份」。</summary>
+public sealed record YearOption(int? Year, string Label);
+
 /// <summary>
 /// 下载页：六个分区共用这一个视图模型，当前分区由侧边栏子项的导航参数决定。
 /// 目前只有 Minecraft 分区接入了数据，其余分区为占位。
@@ -59,7 +63,25 @@ public sealed partial class DownloadViewModel : ViewModelBase
     private string _searchText = "";
 
     [ObservableProperty]
+    private bool _showReleases = true;
+
+    [ObservableProperty]
     private bool _showSnapshots;
+
+    [ObservableProperty]
+    private bool _showPrereleases;
+
+    [ObservableProperty]
+    private bool _showOldBeta;
+
+    [ObservableProperty]
+    private bool _showOldAlpha;
+
+    [ObservableProperty]
+    private int _yearIndex;
+
+    [ObservableProperty]
+    private string _emptyStateText = "";
 
     [ObservableProperty]
     private string _latestRelease = "—";
@@ -77,6 +99,15 @@ public sealed partial class DownloadViewModel : ViewModelBase
 
     /// <summary>Minecraft 分区的版本列表。</summary>
     public ObservableCollection<VersionSummary> Versions { get; } = new();
+
+    /// <summary>
+    /// 发布年份筛选。加载清单后只追加、不整体替换：
+    /// 替换 ItemsSource 会把 ComboBox 的 SelectedIndex 重置成 -1。
+    /// </summary>
+    public ObservableCollection<YearOption> YearOptions { get; } = new() { new(null, "全部年份") };
+
+    /// <summary>没有可显示的结果。加载中、出错、还没加载时都为 false，免得空状态闪一下。</summary>
+    public bool HasNoResults => !IsBusy && !HasErrorMessage && Versions.Count == 0 && _all.Count > 0;
 
     public bool IsMinecraftSection => CurrentSection == DownloadSection.Minecraft;
 
@@ -111,6 +142,7 @@ public sealed partial class DownloadViewModel : ViewModelBase
             LatestRelease = manifest.Latest?.Release ?? "—";
             LatestSnapshot = manifest.Latest?.Snapshot ?? "—";
 
+            RebuildYearOptions();
             ApplyFilter();
         }
         catch (Exception ex)
@@ -121,33 +153,135 @@ public sealed partial class DownloadViewModel : ViewModelBase
         finally
         {
             IsBusy = false;
+            OnPropertyChanged(nameof(HasNoResults));
         }
     }
 
     partial void OnSearchTextChanged(string value) => ApplyFilter();
 
+    partial void OnShowReleasesChanged(bool value) => ApplyFilter();
+
     partial void OnShowSnapshotsChanged(bool value) => ApplyFilter();
+
+    partial void OnShowPrereleasesChanged(bool value) => ApplyFilter();
+
+    partial void OnShowOldBetaChanged(bool value) => ApplyFilter();
+
+    partial void OnShowOldAlphaChanged(bool value) => ApplyFilter();
+
+    partial void OnYearIndexChanged(int value)
+    {
+        if (value < 0)
+        {
+            // 选项变化时 ComboBox 可能先写回 -1，拉回「全部年份」。
+            YearIndex = 0;
+            return;
+        }
+
+        ApplyFilter();
+    }
+
+    /// <summary>恢复默认筛选：只看正式版、不限年份。</summary>
+    [RelayCommand]
+    private void ResetFilters()
+    {
+        ShowReleases = true;
+        ShowSnapshots = false;
+        ShowPrereleases = false;
+        ShowOldBeta = false;
+        ShowOldAlpha = false;
+        YearIndex = 0;
+    }
+
+    private void RebuildYearOptions()
+    {
+        if (YearOptions.Count > 1)
+        {
+            return;
+        }
+
+        var years = _all
+            .Where(v => v.ReleaseTime.HasValue)
+            .Select(v => v.ReleaseTime!.Value.Year)
+            .Distinct()
+            .OrderByDescending(year => year);
+
+        foreach (var year in years)
+        {
+            YearOptions.Add(new YearOption(year, year.ToString()));
+        }
+    }
+
+    private int? SelectedYear =>
+        YearIndex > 0 && YearIndex < YearOptions.Count ? YearOptions[YearIndex].Year : null;
+
+    private List<VersionCategory> SelectedCategories()
+    {
+        var categories = new List<VersionCategory>();
+
+        if (ShowReleases)
+        {
+            categories.Add(VersionCategory.Release);
+        }
+
+        if (ShowSnapshots)
+        {
+            categories.Add(VersionCategory.Snapshot);
+        }
+
+        if (ShowPrereleases)
+        {
+            categories.Add(VersionCategory.Prerelease);
+        }
+
+        if (ShowOldBeta)
+        {
+            categories.Add(VersionCategory.OldBeta);
+        }
+
+        if (ShowOldAlpha)
+        {
+            categories.Add(VersionCategory.OldAlpha);
+        }
+
+        return categories;
+    }
 
     private void ApplyFilter()
     {
-        var query = _all.AsEnumerable();
+        var categories = SelectedCategories();
 
-        if (!ShowSnapshots)
+        IEnumerable<VersionSummary> query;
+
+        if (categories.Count == 0)
         {
-            query = query.Where(v => v.Type == "release");
+            query = Enumerable.Empty<VersionSummary>();
+            EmptyStateText = "请至少选择一种版本类型";
+        }
+        else
+        {
+            query = _all.Where(v => categories.Any(category => VersionDisplay.Matches(v, category)));
+            EmptyStateText = "没有符合条件的版本";
+        }
+
+        if (SelectedYear is { } year)
+        {
+            query = query.Where(v => v.ReleaseTime?.Year == year);
         }
 
         if (!string.IsNullOrWhiteSpace(SearchText))
         {
-            query = query.Where(v => v.Id.Contains(SearchText.Trim(), StringComparison.OrdinalIgnoreCase));
+            var keyword = SearchText.Trim();
+            query = query.Where(v => v.Id.Contains(keyword, StringComparison.OrdinalIgnoreCase));
         }
 
         Versions.Clear();
-        foreach (var version in query.Take(300))
+        foreach (var version in query)
         {
             Versions.Add(version);
         }
 
         StatusMessage = $"共 {Versions.Count} 个版本";
+        OnPropertyChanged(nameof(HasNoResults));
     }
 }

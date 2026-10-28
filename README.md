@@ -42,7 +42,7 @@
 ![实例设置](docs/images/instance-settings.png)
 
 ### ⬇️ 下载
-版本列表来自 Mojang 官方清单，支持按版本号搜索、切换是否显示快照版本，选中即可创建实例。
+版本列表来自 Mojang 官方清单，支持按版本号搜索，按版本类型（正式版 / 快照 / 预发布版 / 远古 Beta / Alpha）与发布年份筛选，选中即可创建实例。
 
 ![下载](docs/images/download.png)
 
