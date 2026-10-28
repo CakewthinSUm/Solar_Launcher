@@ -4,7 +4,13 @@
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
   </PropertyGroup>
   <ItemGroup>
-    <PackageVersion Include="Microsoft.WindowsAppSDK" Version="1.8.260921001" />
+    <!--
+      WinAppSDK 按组件引用：只用 WinUI 与 DWrite，避免把 AI / ML / Widgets
+      一起打进发布包（onnxruntime + DirectML 就占 38 MB）。
+      版本与 Microsoft.WindowsAppSDK 1.8.260921001 的依赖一致，升级时一起改。
+    -->
+    <PackageVersion Include="Microsoft.WindowsAppSDK.WinUI" Version="1.8.260803003" />
+    <PackageVersion Include="Microsoft.WindowsAppSDK.DWrite" Version="1.8.25122902" />
     <PackageVersion Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.28000.2705" />
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="8.0.1" />
     <PackageVersion Include="Microsoft.Extensions.Http" Version="8.0.1" />
