@@ -348,6 +348,9 @@ Add `SOLAR_PROBE_VERBOSE=1` when debugging network issues to see why each source
 - [x] Download page version filters (release type + release year)
 - [x] After-launch window behavior (keep / minimize / close), Settings unsaved-changes prompt and reset
 - [ ] Installed content management and update checks (reverse-lookup by SHA1, enable/disable, update)
+- [ ] Launcher self-update (check GitHub Releases, download and apply)
+- [ ] Network diagnostics (download source speed test)
+- [ ] Export an instance as a modpack
 
 ### Content download design
 
