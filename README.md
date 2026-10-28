@@ -46,8 +46,22 @@
 
 ![下载](docs/images/download.png)
 
-「下载 → Mod」从 Modrinth 与 CurseForge 搜索，顶部选定的实例决定版本与加载器筛选，
-点进详情能看到正文、截图与全部历史版本，安装时会把必选前置一起装好。
+「下载」下另外五个分区都从 Modrinth 与 CurseForge 搜索，共用同一套详情页与安装对话框：
+
+| 分区 | 搜索过滤 | 安装落点 |
+| --- | --- | --- |
+| **Mod** | 实例的游戏版本 + 加载器 | 实例的 `mods/`，安装时把必选前置一起装好 |
+| **光影** | 实例的游戏版本 | 实例的 `shaderpacks/` |
+| **整合包** | 用户选的游戏版本 | **新建一个隔离实例**，把整包文件全部下好 |
+| **资源包** | 实例的游戏版本 | 实例的 `resourcepacks/` |
+| **数据包** | 实例的游戏版本 | 选定存档的 `saves/<存档>/datapacks/` |
+
+顶部选定的实例同时决定版本与加载器筛选，搜出来的每一条都能直接装。
+没选实例也能浏览，只是安装按钮会提示先创建实例。整合包是例外——它自带
+Minecraft 版本与加载器，安装时创建一个独立实例，游戏本体与加载器在首次启动时补装。
+
+点进详情能看到正文、截图与全部历史版本。数据包在安装对话框里还要选一个存档；
+没有存档时会明确提示先在游戏里创建世界。
 
 | Mod 列表 | Mod 详情 |
 | :---: | :---: |
@@ -136,9 +150,11 @@ Forge / NeoForge 的 installer 不是简单解压：它要跑若干 processor（
 | 架构 | MVVM（CommunityToolkit.Mvvm）+ 构造函数依赖注入 |
 | 核心 | .NET 8 类库 `Solar.Core`，与 UI 完全解耦 |
 | 下载 | CmlLib.Core `ParallelGameInstaller`（只用下载部分） |
-| Mod 下载 | Modrinth / CurseForge（经 MCIM 镜像），Markdown 正文只用到极简解析器 |
+| 内容下载 | Modrinth / CurseForge（经 MCIM 镜像）；Mod / 光影 / 整合包 / 资源包 / 数据包 |
+| 整合包 | 解析 `.mrpack` / CurseForge manifest，创建隔离实例并下载整包 |
+| Markdown | 详情正文只用到极简解析器（标题 / 粗体 / 列表 / 链接） |
 | 登录 | CmlLib.Core.Auth.Microsoft（OAuth 设备码 + MSAL.NET） |
-| 测试 | xUnit（`tests/Solar.Core.Tests`），328 个测试 |
+| 测试 | xUnit（`tests/Solar.Core.Tests`），374 个测试 |
 
 ```
 src/
@@ -149,7 +165,8 @@ src/
     Minecraft/           版本清单下载与缓存、版本 JSON 解析与 inheritsFrom 合并
     Instances/           游戏实例模型、持久化、版本扫描、创建流程
     Content/             实例游戏目录里的 Mods / 资源包 / 光影 读写
-    Mods/                模组在线目录（Modrinth / CurseForge）、依赖解析、下载安装
+    Mods/                在线内容目录（Modrinth / CurseForge）、依赖解析、文件下载与安装
+    Modpacks/            整合包解析（mrpack / CurseForge manifest）与整包安装
     Loaders/             Fabric / Quilt / Forge / NeoForge 安装
     Addons/              OptiFine / LiteLoader / Fabric API / OptiFabric
     Download/            依赖下载与镜像重写
@@ -260,11 +277,17 @@ dotnet run --project tools/Solar.LoaderProbe -- forge 1.21.4 54.1.22
 dotnet run --project tools/Solar.LaunchProbe -- fabric-loader-0.20.1-1.21.4
 dotnet run --project tools/Solar.LaunchProbe -- 1.21.4-forge-54.1.22
 
-# 验证模组数据层（搜索 / 详情 / 依赖清单 / 真实下载安装）
+# 验证在线内容数据层（搜索 / 详情 / 依赖清单 / 真实下载安装）
 dotnet run --project tools/Solar.ModProbe -- search sodium fabric 1.21.4
+dotnet run --project tools/Solar.ModProbe -- search complementary 1.21.4 --type=shader
 dotnet run --project tools/Solar.ModProbe -- detail modrinth AANobbMI fabric 1.21.4
+dotnet run --project tools/Solar.ModProbe -- detail modrinth OhduvhIc 1.21.4 --type=datapack
 dotnet run --project tools/Solar.ModProbe -- plan modrinth PtjYWJkn fabric 1.21.4
 dotnet run --project tools/Solar.ModProbe -- install curseforge 394468 fabric 1.21.4
+
+# 下载并解析一个整合包，打印它的 MC 版本、加载器与文件清单（不安装）
+dotnet run --project tools/Solar.ModProbe -- modpack modrinth 1KVo5zza 1.21.4
+dotnet run --project tools/Solar.ModProbe -- modpack curseforge 396246 1.21.4
 ```
 
 排查网络问题时加 `SOLAR_PROBE_VERBOSE=1` 可以看到每次换源的详细原因。
@@ -289,29 +312,63 @@ dotnet run --project tools/Solar.ModProbe -- install curseforge 394468 fabric 1.
 - [x] 内存分配：自动按物理内存 / 可用内存 / 模组数量计算，或手动用滑条指定
 - [x] 游戏目录版本扫描与一键导入
 - [x] 下载页选版本 → 一次装完加载器与附加组件
-- [x] 模组数据层（Modrinth + CurseForge 双源、跨源去重、依赖解析、SHA1 校验安装）
-- [x] 模组下载界面（搜索 / 详情 / 安装对话框，按实例的版本与加载器过滤）
-- [ ] 光影 / 整合包 / 资源包 / 数据包 的在线下载
+- [x] 在线内容数据层（Modrinth + CurseForge 双源、跨源去重、依赖解析、SHA1 校验安装）
+- [x] 内容下载界面（Mod / 光影 / 整合包 / 资源包 / 数据包 共用搜索、详情与安装对话框）
+- [x] 光影与资源包在线下载（按实例的游戏版本过滤，装进对应目录）
+- [x] 数据包在线下载（按存档安装到 `saves/<存档>/datapacks/`）
+- [x] 整合包在线下载与安装（解析 `.mrpack` / CurseForge manifest，新建隔离实例，下载全部文件并解压 overrides）
+- [ ] 已装内容的管理与更新检查（按 SHA1 反查项目、启用/禁用、更新）
 
-### 模组下载设计
+### 内容下载设计
 
-数据层在 `Solar.Core/Mods/`，两个源统一成同一套模型，UI 层不需要分支。
+数据层在 `Solar.Core/Mods/`，两个源统一成同一套模型，UI 层不需要为不同内容类型分支。
+`ModProjectType` 负责把类型翻译成两个源各自的标识和安装落点：
+
+| 类型 | Modrinth `project_type` | CurseForge `classId` | 安装落点 |
+| --- | --- | --- | --- |
+| Mod | `mod` | 6 | `mods/` |
+| 整合包 | `modpack` | 4471 | 新建隔离实例 |
+| 资源包 | `resourcepack` | 12 | `resourcepacks/` |
+| 光影 | `shader` | 6552 | `shaderpacks/` |
+| 数据包 | `datapack` | 6945 | `saves/<存档>/datapacks/` |
 
 | 能力 | 说明 |
 | --- | --- |
 | 数据源 | Modrinth 与 CurseForge，默认走 MCIM 镜像 |
 | 降级 | 两源并行，任一不可用仍返回另一边的结果，并在结果里标出失败的源 |
-| 去重 | 同名 + 加载器有交集 + 更新时差 ≤7 天 视为同一项目，保留 CurseForge 那条 |
-| 依赖 | 安装时递归展开必选前置（深度上限 5，带环检测），可选前置只展示 |
-| 安装 | 写入实例实际使用的 `mods/`，保留上游文件名，SHA1 校验后原子落盘 |
+| 去重 | 同类型 + 同名 + 加载器有交集 + 更新时差 ≤7 天 视为同一项目，保留 CurseForge 那条 |
+| 依赖 | 只有 Mod 递归展开必选前置（深度上限 5，带环检测），可选前置只展示 |
+| 安装 | 写入实例实际使用的目录，保留上游文件名，SHA1 校验后原子落盘 |
 
-与 PCL 的三处取舍：**不做**中文词表搜索（v1 只支持英文/原名）；版本列表用服务端的
-`gameVersion` + `modLoaderType` 过滤而不是一次拉全量；安装时会把必选前置一并装好。
-详见 [docs/mod-download-design.md](docs/mod-download-design.md)。
+两个类型特有的坑：
 
-界面在「下载 → Mod」：顶部选目标实例（它的游戏版本与加载器就是筛选条件），
-搜索后点一行进详情，选版本点安装，对话框里会列出必选前置、标出已存在的文件。
-Mod 源（官方 / 镜像 / CurseForge Key）在「设置 → 下载源」里改，换源会自动清掉旧缓存。
+- **数据包**在 Modrinth 上没有独立的项目类型，同一个项目常常既有 Mod jar 版本、
+  又有 `.zip` 数据包版本。版本请求会额外带上 `loaders=["datapack"]`，否则列表里会混进 jar。
+- **光影 / 资源包 / 整合包**不参与加载器筛选。把 `categories:fabric` 或
+  `modLoaderType` 带上去会直接搜空。
+
+整合包在 `Solar.Core/Modpacks/`。安装时先下载整包、解析 manifest，再新建一个隔离实例：
+
+| 格式 | 解析方式 |
+| --- | --- |
+| Modrinth `.mrpack` | 读 `modrinth.index.json`，跳过 `env.client = "unsupported"` 的条目 |
+| CurseForge | 读 `manifest.json`，逐条用 `projectID/fileID` 查下载地址（镜像免 Key） |
+
+文件按 manifest 里的相对路径下载并做 SHA1 校验；`overrides/` 与 `client-overrides/`
+解压进实例目录（两者都有时客户端专用版本覆盖前者）。路径会做 zip-slip 校验，
+拒绝 `../`、绝对路径与盘符。游戏本体与加载器**不在安装时下载**——实例首次启动
+会走 `GameLaunchService` 的补装流程，避免一次操作里同时跑两套下载器。
+
+与 PCL 的取舍：**不做**中文词表搜索（只支持英文/原名）；版本列表用服务端的
+`gameVersion` + `modLoaderType` 过滤而不是一次拉全量；Mod 安装时会把必选前置一并装好；
+CurseForge 整合包的文件统一放进 `mods/`（manifest 不带目标目录，社区约定如此）。
+详见 [docs/mod-download-design.md](docs/mod-download-design.md) 与
+[docs/addon-download-design.md](docs/addon-download-design.md)。
+
+界面在「下载 → Mod / 光影 / 整合包 / 资源包 / 数据包」：顶部选目标实例
+（整合包改为选游戏版本），搜索后点一行进详情，选版本点安装。数据包在对话框里
+选择存档；整合包在对话框里给实例起名并显示将下载的文件数/体积。
+内容源（官方 / 镜像 / CurseForge Key）在「设置 → 下载源」里改，换源会自动清掉旧缓存。
 
 ---
 

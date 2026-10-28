@@ -27,6 +27,90 @@ public enum ModReleaseType
 }
 
 /// <summary>
+/// 在线项目类型。Modrinth 与 CurseForge 都按类型分目录，
+/// 搜索、分类与安装落点都要跟着变。
+/// </summary>
+public enum ModProjectType
+{
+    Mod = 0,
+    Modpack,
+    ResourcePack,
+    Shader,
+    DataPack,
+}
+
+/// <summary>类型在两个源上的标识，以及安装落点。</summary>
+public static class ModProjectTypes
+{
+    /// <summary>Modrinth 的 <c>project_type</c> facet 值。</summary>
+    public static string ToModrinth(this ModProjectType type) => type switch
+    {
+        ModProjectType.Modpack => "modpack",
+        ModProjectType.ResourcePack => "resourcepack",
+        ModProjectType.Shader => "shader",
+        ModProjectType.DataPack => "datapack",
+        _ => "mod",
+    };
+
+    /// <summary>CurseForge 的 Minecraft <c>classId</c>。</summary>
+    public static int ToCurseForgeClassId(this ModProjectType type) => type switch
+    {
+        ModProjectType.Modpack => 4471,
+        ModProjectType.ResourcePack => 12,
+        ModProjectType.Shader => 6552,
+        ModProjectType.DataPack => 6945,
+        _ => 6,
+    };
+
+    public static string DisplayName(this ModProjectType type) => type switch
+    {
+        ModProjectType.Modpack => "整合包",
+        ModProjectType.ResourcePack => "资源包",
+        ModProjectType.Shader => "光影",
+        ModProjectType.DataPack => "数据包",
+        _ => "Mod",
+    };
+
+    /// <summary>
+    /// 内容目录名。整合包没有固定目录——它自己就是一个实例，返回 null。
+    /// </summary>
+    public static string? ContentFolder(this ModProjectType type) => type switch
+    {
+        ModProjectType.Mod => "mods",
+        ModProjectType.ResourcePack => "resourcepacks",
+        ModProjectType.Shader => "shaderpacks",
+        ModProjectType.DataPack => "datapacks",
+        _ => null,
+    };
+
+    /// <summary>只有 Mod 需要按加载器筛选；其余类型传了加载器反而会搜不到东西。</summary>
+    public static bool UsesLoader(this ModProjectType type) => type == ModProjectType.Mod;
+
+    /// <summary>整合包需要新建实例，其余类型装进已有实例。</summary>
+    public static bool CreatesInstance(this ModProjectType type) => type == ModProjectType.Modpack;
+
+    /// <summary>从 Modrinth 的 <c>project_type</c> 还原；未知值当作 Mod。</summary>
+    public static ModProjectType FromModrinth(string? value) => value?.ToLowerInvariant() switch
+    {
+        "modpack" => ModProjectType.Modpack,
+        "resourcepack" => ModProjectType.ResourcePack,
+        "shader" => ModProjectType.Shader,
+        "datapack" => ModProjectType.DataPack,
+        _ => ModProjectType.Mod,
+    };
+
+    /// <summary>从 CurseForge 的 <c>classId</c> 还原；未知值当作 Mod。</summary>
+    public static ModProjectType FromCurseForgeClassId(long? classId) => classId switch
+    {
+        4471 => ModProjectType.Modpack,
+        12 => ModProjectType.ResourcePack,
+        6552 => ModProjectType.Shader,
+        6945 => ModProjectType.DataPack,
+        _ => ModProjectType.Mod,
+    };
+}
+
+/// <summary>
 /// 依赖关系。只保留四种语义，CurseForge 的 EmbeddedLibrary / Tool / Include
 /// 归到 <see cref="Other"/>，因为它们不影响“要不要一起装”。
 /// </summary>
@@ -46,6 +130,9 @@ public sealed record ModProjectRef(ModSource Source, string Id);
 public sealed record ModProject
 {
     public required ModSource Source { get; init; }
+
+    /// <summary>项目类型。旧缓存与测试数据没有这个字段时按 Mod 处理。</summary>
+    public ModProjectType ProjectType { get; init; } = ModProjectType.Mod;
 
     /// <summary>Modrinth 是 base62 字符串，CurseForge 是数字字符串。</summary>
     public required string Id { get; init; }
@@ -109,6 +196,9 @@ public sealed record ModSearchQuery
 {
     public string Text { get; init; } = "";
 
+    /// <summary>要搜索的项目类型；默认 Mod。</summary>
+    public ModProjectType Type { get; init; } = ModProjectType.Mod;
+
     /// <summary>游戏版本，如 <c>1.21.4</c>；为空表示不限。</summary>
     public string? GameVersion { get; init; }
 
@@ -144,6 +234,9 @@ public sealed record ModSearchPage
 /// <summary>版本列表的过滤条件。</summary>
 public sealed record ModVersionQuery
 {
+    /// <summary>项目类型。只有 Mod 会把加载器带进请求。</summary>
+    public ModProjectType Type { get; init; } = ModProjectType.Mod;
+
     public string? GameVersion { get; init; }
     public ModLoader? Loader { get; init; }
 

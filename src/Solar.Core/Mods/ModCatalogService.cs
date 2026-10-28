@@ -75,8 +75,11 @@ public sealed class ModCatalogService(
         CancellationToken ct = default) =>
         Catalog(source).GetVersionsAsync(projectId, query, ct);
 
-    public Task<IReadOnlyList<ModCategory>> GetCategoriesAsync(ModSource source, CancellationToken ct = default) =>
-        Catalog(source).GetCategoriesAsync(ct);
+    public Task<IReadOnlyList<ModCategory>> GetCategoriesAsync(
+        ModSource source,
+        ModProjectType type = ModProjectType.Mod,
+        CancellationToken ct = default) =>
+        Catalog(source).GetCategoriesAsync(type, ct);
 
     /// <summary>
     /// 展开安装清单。
@@ -96,6 +99,13 @@ public sealed class ModCatalogService(
         {
             new(project, version, ModDependencyKind.Required, AlreadyInstalled: false, IsAvailable: true),
         };
+
+        // 只有 Mod 有“前置”这个概念。光影/资源包/数据包的依赖字段即使有内容
+        // 也不是可安装的 Mod（例如数据包可能依赖另一个数据包），v1 不展开。
+        if (!project.ProjectType.UsesLoader())
+        {
+            return new ModInstallPlan(items);
+        }
 
         var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { $"{project.Source}:{project.Id}" };
         var queue = new Queue<(ModDependency Dependency, int Depth)>(
@@ -251,6 +261,12 @@ public sealed class ModCatalogService(
         // 空 Id 说明这个条目本身就没解析出来（字段名对不上、响应结构变了）。
         // 不能让它们互相“相等”，否则一整页结果会被合并成一条。
         if (string.IsNullOrEmpty(a.Id) || string.IsNullOrEmpty(b.Id))
+        {
+            return false;
+        }
+
+        // 不同类型永远不是同一个项目：Modrinth 上同名同 slug 的 Mod 与整合包是两回事
+        if (a.ProjectType != b.ProjectType)
         {
             return false;
         }

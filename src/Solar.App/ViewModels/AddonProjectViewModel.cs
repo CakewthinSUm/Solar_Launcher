@@ -10,17 +10,18 @@ using Solar.Core.Text;
 namespace Solar.App.ViewModels;
 
 /// <summary>
-/// 模组详情页：头部信息、正文、截图、兼容版本列表。
+/// 内容详情页：头部信息、正文、截图、兼容版本列表。
 /// <para>
 /// 进入页面时先用列表页传来的 <see cref="ModProject"/> 把头部填满（标题、作者、图标立刻可见），
 /// 再并行去拉完整详情与版本列表。Modrinth 的详情接口不带作者字段，
 /// 完全依赖详情接口的话作者会闪一下再消失。
 /// </para>
 /// </summary>
-public sealed partial class ModProjectViewModel : ViewModelBase
+public sealed partial class AddonProjectViewModel : ViewModelBase
 {
     private readonly IModCatalogService _catalog;
-    private readonly ILogger<ModProjectViewModel> _logger;
+    private readonly IModInstaller _installer;
+    private readonly ILogger<AddonProjectViewModel> _logger;
 
     private GameInstance? _instance;
     private ModProject? _project;
@@ -50,7 +51,13 @@ public sealed partial class ModProjectViewModel : ViewModelBase
     private string _loadersText = "";
 
     [ObservableProperty]
+    private bool _hasLoaders;
+
+    [ObservableProperty]
     private string _sourceText = "";
+
+    [ObservableProperty]
+    private string _typeLabel = "";
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(WebsiteUri))]
@@ -88,34 +95,70 @@ public sealed partial class ModProjectViewModel : ViewModelBase
 
     public bool HasVersions => Versions.Count > 0;
 
+    public ModProjectType Type => _project?.ProjectType ?? ModProjectType.Mod;
+
+    public bool IsModpack => Type.CreatesInstance();
+
+    /// <summary>整合包会新建实例，不需要先选目标实例。</summary>
+    public bool NeedsInstance => !IsModpack;
+
+    public string InstallText => IsModpack ? "安装整合包" : "安装";
+
     /// <summary>没有选中实例时不能安装，页面要说明原因。</summary>
-    public bool CanInstall => _instance is not null && SelectedVersion is not null;
+    public bool CanInstall => SelectedVersion is not null
+                              && (IsModpack || (_instance is not null && CanInstallToInstance));
+
+    /// <summary>数据包必须有存档；其余类型只要有实例即可。</summary>
+    private bool CanInstallToInstance =>
+        _instance is not null
+        && (Type != ModProjectType.DataPack || _installer.GetWorlds(_instance).Count > 0);
 
     /// <summary>没选实例时没有「兼容」这个概念，切换开关没有意义，直接禁用。</summary>
-    public bool CanFilterVersions => _instance is not null;
+    public bool CanFilterVersions => _instance is not null && !IsModpack;
 
     /// <summary>实例与原版 / 共享目录相关的提示。为空表示没有需要注意的地方。</summary>
     public string? CompatibilityWarning { get; private set; }
 
     public bool HasCompatibilityWarning => !string.IsNullOrWhiteSpace(CompatibilityWarning);
 
-    public string InstallHint => _instance is null
-        ? "先回到列表页选一个目标实例，才能安装。"
-        : SelectedVersion is null
-            ? "先选一个版本。"
-            : "";
+    public string InstallHint
+    {
+        get
+        {
+            if (NeedsInstance && _instance is null)
+            {
+                return "先回到列表页选一个目标实例，才能安装。";
+            }
 
-    public ModProjectViewModel(IModCatalogService catalog, ILogger<ModProjectViewModel> logger)
+            if (SelectedVersion is null)
+            {
+                return "先选一个版本。";
+            }
+
+            if (Type == ModProjectType.DataPack && _instance is not null && !CanInstallToInstance)
+            {
+                return "这个实例还没有存档。先在游戏里创建一个世界，数据包只能装进具体存档。";
+            }
+
+            return "";
+        }
+    }
+
+    public AddonProjectViewModel(
+        IModCatalogService catalog,
+        IModInstaller installer,
+        ILogger<AddonProjectViewModel> logger)
     {
         _catalog = catalog;
+        _installer = installer;
         _logger = logger;
     }
 
     public override Task OnNavigatedToAsync(object? parameter)
     {
-        if (parameter is not ModProjectRequest request)
+        if (parameter is not AddonProjectRequest request)
         {
-            ErrorMessage = "没有要显示的 Mod。";
+            ErrorMessage = "没有要显示的内容。";
             return Task.CompletedTask;
         }
 
@@ -141,6 +184,12 @@ public sealed partial class ModProjectViewModel : ViewModelBase
             ? (_project, SelectedVersion.Version, _instance)
             : null;
 
+    /// <summary>整合包安装需要创建一个新实例，不依赖目标实例。</summary>
+    public (ModProject Project, ModVersion Version)? GetModpackRequest() =>
+        _project is { } project && project.ProjectType.CreatesInstance() && SelectedVersion is not null
+            ? (project, SelectedVersion.Version)
+            : null;
+
     [RelayCommand]
     private async Task RefreshAsync()
     {
@@ -158,7 +207,7 @@ public sealed partial class ModProjectViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "加载 Mod 详情失败");
+            _logger.LogError(ex, "加载内容详情失败");
             ErrorMessage = ex.Message;
         }
         finally
@@ -176,6 +225,7 @@ public sealed partial class ModProjectViewModel : ViewModelBase
             // 详情接口的字段更全（正文、截图），但它可能缺作者，所以保留列表页那份作为兜底
             ApplyProject(project with
             {
+                ProjectType = detail.ProjectType == ModProjectType.Mod ? project.ProjectType : detail.ProjectType,
                 Body = detail.Body ?? project.Body,
                 Gallery = detail.Gallery.Count > 0 ? detail.Gallery : project.Gallery,
                 Author = detail.Author ?? project.Author,
@@ -201,6 +251,7 @@ public sealed partial class ModProjectViewModel : ViewModelBase
         }
 
         var request = ++_versionRequest;
+        var type = project.ProjectType;
 
         try
         {
@@ -212,8 +263,9 @@ public sealed partial class ModProjectViewModel : ViewModelBase
                 project.Id,
                 new ModVersionQuery
                 {
-                    GameVersion = _instance?.MinecraftVersion,
-                    Loader = _instance?.Loader,
+                    Type = type,
+                    GameVersion = type.CreatesInstance() ? null : _instance?.MinecraftVersion,
+                    Loader = type.UsesLoader() ? _instance?.Loader : null,
 
                     // 没选实例时没有筛选条件，服务端不传 loaders/game_versions 就等于全量；
                     // 这是「浏览」状态，不是「只看兼容」，所以不要再额外套一层
@@ -228,13 +280,15 @@ public sealed partial class ModProjectViewModel : ViewModelBase
             }
 
             var previousId = SelectedVersion?.Version.Id;
+            var gameVersion = type.CreatesInstance() ? null : _instance?.MinecraftVersion;
+            var loader = type.UsesLoader() ? _instance?.Loader : null;
 
             Versions.Clear();
             foreach (var version in versions)
             {
                 Versions.Add(new ModVersionItemViewModel(
                     version,
-                    ModLoaderMapping.Matches(version, _instance?.MinecraftVersion, _instance?.Loader)));
+                    ModLoaderMapping.Matches(version, gameVersion, loader)));
             }
 
             OnPropertyChanged(nameof(HasVersions));
@@ -246,9 +300,7 @@ public sealed partial class ModProjectViewModel : ViewModelBase
 
             VersionHint = Versions.Count == 0
                 ? "这个项目没有可下载的文件。"
-                : _instance is null
-                    ? $"共 {Versions.Count} 个版本（未选实例，全部列出）"
-                    : $"共 {Versions.Count} 个版本";
+                : $"共 {Versions.Count} 个版本";
         }
         catch (Exception ex)
         {
@@ -277,6 +329,8 @@ public sealed partial class ModProjectViewModel : ViewModelBase
         HasIcon = !string.IsNullOrWhiteSpace(project.IconUrl);
         Initial = ModDisplay.Initial(project.Title);
         LoadersText = ModDisplay.Loaders(project.Loaders);
+        HasLoaders = project.ProjectType.UsesLoader() && project.Loaders.Count > 0;
+        TypeLabel = project.ProjectType.DisplayName();
         SourceText = SourceName(project.Source) + (project.AlsoOn.Count > 0 ? "（另一源也有收录）" : "");
         WebsiteUrl = project.WebsiteUrl;
 
@@ -304,6 +358,11 @@ public sealed partial class ModProjectViewModel : ViewModelBase
         }
 
         OnPropertyChanged(nameof(HasGallery));
+        OnPropertyChanged(nameof(Type));
+        OnPropertyChanged(nameof(IsModpack));
+        OnPropertyChanged(nameof(NeedsInstance));
+        OnPropertyChanged(nameof(InstallText));
+        OnPropertyChanged(nameof(CanFilterVersions));
         UpdateCompatibilityWarning(project);
     }
 
@@ -311,20 +370,32 @@ public sealed partial class ModProjectViewModel : ViewModelBase
     {
         string? warning = null;
 
-        if (_instance is null)
+        if (project.ProjectType.CreatesInstance())
+        {
+            // 整合包会创建一个独立实例，不存在“装错实例”的问题
+            warning = null;
+        }
+        else if (_instance is null)
         {
             warning = "还没有选目标实例。回到列表页选一个实例，才能安装。";
         }
-        else if (_instance.Loader == ModLoader.Vanilla)
+        else if (project.ProjectType == ModProjectType.Mod && _instance.Loader == ModLoader.Vanilla)
         {
             warning = "这个实例是原版，没有装加载器。Mod 放进去也不会生效，除非之后加上 Fabric / Forge。";
         }
-        else if (project.Loaders.Count > 0 && !project.Loaders.Contains(_instance.Loader))
+        else if (project.ProjectType == ModProjectType.Mod
+                 && project.Loaders.Count > 0
+                 && !project.Loaders.Contains(_instance.Loader))
         {
             warning = $"这个 Mod 标注的加载器是 {ModDisplay.Loaders(project.Loaders)}，"
                       + $"与实例的 {ModDisplay.LoaderName(_instance.Loader)} 不一致。";
         }
-        else if (!_instance.VersionIsolation)
+        else if (project.ProjectType == ModProjectType.DataPack && _installer.GetWorlds(_instance).Count == 0)
+        {
+            warning = "这个实例还没有存档。数据包只能装进某个世界的 datapacks 目录，"
+                      + "请先在游戏里创建一个世界。";
+        }
+        else if (project.ProjectType == ModProjectType.Mod && !_instance.VersionIsolation)
         {
             warning = "实例没有开启版本隔离，Mod 会装进共享的游戏目录，影响所有未隔离的实例。";
         }
@@ -334,10 +405,6 @@ public sealed partial class ModProjectViewModel : ViewModelBase
         OnPropertyChanged(nameof(CanInstall));
         OnPropertyChanged(nameof(InstallHint));
     }
-
-    private string InstanceLabel => _instance is null
-        ? "这个实例"
-        : $"{_instance.MinecraftVersion} {ModDisplay.LoaderName(_instance.Loader)}".Trim();
 
     private static string SourceName(ModSource source) =>
         source == ModSource.Modrinth ? "Modrinth" : "CurseForge";

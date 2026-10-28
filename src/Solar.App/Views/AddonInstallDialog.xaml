@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ContentDialog
-    x:Class="Solar.App.Views.ModInstallDialog"
+    x:Class="Solar.App.Views.AddonInstallDialog"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -9,10 +9,20 @@
     Title="{x:Bind ViewModel.Header, Mode=OneWay}"
     CloseButtonText="取消"
     DefaultButton="Primary"
+    IsPrimaryButtonEnabled="{x:Bind ViewModel.CanInstall, Mode=OneWay}"
     PrimaryButtonText="{x:Bind ViewModel.InstallText, Mode=OneWay}"
     mc:Ignorable="d">
 
     <StackPanel Width="480" Spacing="12">
+        <!-- 数据包只对存档生效，必须先选一个 -->
+        <ComboBox
+            Header="存档"
+            HorizontalAlignment="Stretch"
+            ItemsSource="{x:Bind ViewModel.Worlds, Mode=OneWay}"
+            PlaceholderText="先选择一个存档"
+            SelectedItem="{x:Bind ViewModel.SelectedWorld, Mode=TwoWay}"
+            Visibility="{x:Bind ViewModel.IsDataPack, Mode=OneWay, Converter={StaticResource VisibleWhenTrue}}" />
+
         <!-- 目标目录：等宽显示，用户能一眼看出装到哪个实例 -->
         <StackPanel Spacing="2">
             <TextBlock Style="{StaticResource CaptionTextBlockStyle}" Text="目标目录" />
@@ -38,12 +48,12 @@
             Message="{x:Bind ViewModel.ErrorMessage, Mode=OneWay}"
             Severity="Error" />
 
-        <!-- 清单：主模组 + 递归展开的必选前置 -->
+        <!-- 清单：Mod 是主文件 + 递归展开的必选前置；其余类型只有文件本身 -->
         <StackPanel Spacing="4">
             <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="将安装" />
             <ItemsControl ItemsSource="{x:Bind ViewModel.Items, Mode=OneWay}">
                 <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="vm:ModInstallItemViewModel">
+                    <DataTemplate x:DataType="vm:AddonInstallItemViewModel">
                         <CheckBox
                             IsChecked="{x:Bind IsChecked, Mode=TwoWay}"
                             IsEnabled="{x:Bind IsSelectable}"

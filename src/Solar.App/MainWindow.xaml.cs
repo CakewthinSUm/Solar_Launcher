@@ -192,20 +192,20 @@ public sealed partial class MainWindow : Window
     }
 
     /// <summary>
-    /// 「下载」的子项：「Mod」是独立页面（有自己的搜索与详情），其余五项仍是下载页的不同分区。
-    /// 不把 Mod 塞进 DownloadPage 是因为它需要一整套自己的视图模型与二级页面，
-    /// 混在一个页面里会变成两套 DataContext。
+    /// 「下载」的子项：「Minecraft」是版本列表页；其余五项（Mod / 光影 / 整合包 /
+    /// 资源包 / 数据包）共用 <see cref="AddonDownloadPage"/>，只靠导航参数切换分区。
+    /// 它们需要自己的搜索、详情页与安装对话框，所以不塞进 <see cref="DownloadPage"/>。
     /// </summary>
     private void NavigateToDownloadSection(NavigationViewItem item)
     {
         var key = SectionKey(item, "download-");
-        if (key == "mod")
+        if (key is null or "minecraft")
         {
-            NavigateTo(typeof(ModDownloadPage), null);
+            NavigateTo(typeof(DownloadPage), "minecraft");
             return;
         }
 
-        NavigateTo(typeof(DownloadPage), key ?? "minecraft");
+        NavigateTo(typeof(AddonDownloadPage), key);
     }
 
     /// <summary>

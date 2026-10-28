@@ -2,15 +2,22 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Solar.Core;
 using Solar.Core.Instances;
+using Solar.Core.Modpacks;
 using Solar.Core.Mods;
 
-// 端到端验证模组数据层（不打真网的部分由单元测试覆盖，这里验证真实接口）：
+// 端到端验证内容数据层（不打真网的部分由单元测试覆盖，这里验证真实接口）：
 //   dotnet run --project tools/Solar.ModProbe -- search sodium fabric 1.21.4
+//   dotnet run --project tools/Solar.ModProbe -- search complementary 1.21.4 --type=shader
 //   dotnet run --project tools/Solar.ModProbe -- detail modrinth AANobbMI fabric 1.21.4
 //   dotnet run --project tools/Solar.ModProbe -- plan modrinth AANobbMI fabric 1.21.4
 //   dotnet run --project tools/Solar.ModProbe -- install modrinth AANobbMI fabric 1.21.4
+//   dotnet run --project tools/Solar.ModProbe -- modpack modrinth 1KVo5zza 1.21.4
 
-var command = args.Length > 0 ? args[0] : "search";
+// --type=<mod|shader|resourcepack|datapack|modpack> 可以出现在任意位置
+var type = ParseType(args.FirstOrDefault(a => a.StartsWith("--type=", StringComparison.Ordinal))?[7..]);
+var rest = args.Where(a => !a.StartsWith("--type=", StringComparison.Ordinal)).ToArray();
+
+var command = rest.Length > 0 ? rest[0] : "search";
 var root = Path.Combine(Path.GetTempPath(), "solar-modprobe");
 
 var services = new ServiceCollection();
@@ -25,48 +32,65 @@ switch (command)
 {
     case "search":
         return await SearchAsync(
-            args.ElementAtOrDefault(1) ?? "sodium",
-            args.ElementAtOrDefault(2),
-            args.ElementAtOrDefault(3));
+            rest.ElementAtOrDefault(1) ?? "sodium",
+            rest.ElementAtOrDefault(2),
+            rest.ElementAtOrDefault(3));
 
     case "detail":
         return await DetailAsync(
-            ParseSource(args.ElementAtOrDefault(1)),
-            Require(args, 2, "项目 Id"),
-            args.ElementAtOrDefault(3),
-            args.ElementAtOrDefault(4));
+            ParseSource(rest.ElementAtOrDefault(1)),
+            Require(rest, 2, "项目 Id"),
+            rest.ElementAtOrDefault(3),
+            rest.ElementAtOrDefault(4));
 
     case "plan":
         return await PlanAsync(
-            ParseSource(args.ElementAtOrDefault(1)),
-            Require(args, 2, "项目 Id"),
-            args.ElementAtOrDefault(3),
-            args.ElementAtOrDefault(4));
+            ParseSource(rest.ElementAtOrDefault(1)),
+            Require(rest, 2, "项目 Id"),
+            rest.ElementAtOrDefault(3),
+            rest.ElementAtOrDefault(4));
 
     case "install":
         return await InstallAsync(
-            ParseSource(args.ElementAtOrDefault(1)),
-            Require(args, 2, "项目 Id"),
-            args.ElementAtOrDefault(3),
-            args.ElementAtOrDefault(4));
+            ParseSource(rest.ElementAtOrDefault(1)),
+            Require(rest, 2, "项目 Id"),
+            rest.ElementAtOrDefault(3),
+            rest.ElementAtOrDefault(4));
+
+    case "modpack":
+        return await ModpackPlanAsync(
+            ParseSource(rest.ElementAtOrDefault(1)),
+            Require(rest, 2, "项目 Id"),
+            rest.ElementAtOrDefault(3));
 
     default:
-        Console.Error.WriteLine("未知命令。可用：search / detail / plan / install");
+        Console.Error.WriteLine("未知命令。可用：search / detail / plan / install / modpack");
         return 1;
 }
+
+ModProjectType ParseType(string? value) => value?.ToLowerInvariant() switch
+{
+    "shader" or "shaders" => ModProjectType.Shader,
+    "resourcepack" or "resourcepacks" => ModProjectType.ResourcePack,
+    "datapack" or "datapacks" => ModProjectType.DataPack,
+    "modpack" or "modpacks" => ModProjectType.Modpack,
+    _ => ModProjectType.Mod,
+};
 
 async Task<int> SearchAsync(string text, string? loaderName, string? gameVersion)
 {
     var loader = ParseLoader(loaderName);
     var query = new ModSearchQuery
     {
+        Type = type,
         Text = text,
         Loader = loader,
         GameVersion = gameVersion,
         Limit = 10,
     };
 
-    Console.WriteLine($"搜索 “{text}” 加载器={loader?.ToString() ?? "不限"} 版本={gameVersion ?? "不限"}");
+    Console.WriteLine(
+        $"搜索 “{text}” 类型={type.DisplayName()} 加载器={loader?.ToString() ?? "不限"} 版本={gameVersion ?? "不限"}");
 
     var page = await catalogs.SearchAsync(query);
 
@@ -102,13 +126,17 @@ async Task<int> DetailAsync(ModSource source, string projectId, string? loaderNa
     Console.WriteLine($"  正文: {(project.Body is null ? "无" : project.Body.Length + " 字符")}");
     Console.WriteLine($"  图集: {project.Gallery.Count} 张");
 
+    // Modrinth 没有独立的 datapack 项目类型；允许用 --type 覆盖，按 datapack 版本过滤
+    var effectiveType = type != ModProjectType.Mod ? type : project.ProjectType;
+
     var versions = await catalogs.GetVersionsAsync(source, projectId, new ModVersionQuery
     {
+        Type = effectiveType,
         GameVersion = gameVersion,
         Loader = loader,
     });
 
-    Console.WriteLine($"  版本（{gameVersion ?? "不限"} / {loader?.ToString() ?? "不限"}）: {versions.Count} 个");
+    Console.WriteLine($"  版本（{effectiveType.DisplayName()} / {gameVersion ?? "不限"} / {loader?.ToString() ?? "不限"}）: {versions.Count} 个");
     foreach (var version in versions.Take(5))
     {
         var deps = version.Dependencies.Count(d => d.Kind == ModDependencyKind.Required);
@@ -156,13 +184,18 @@ async Task<int> InstallAsync(ModSource source, string projectId, string? loaderN
         Loader = loader ?? ModLoader.Vanilla,
     };
 
-    Console.WriteLine($"目标目录: {installer.GetModsDirectory(instance)}");
+    Console.WriteLine($"目标目录: {installer.GetContentDirectory(instance, project.ProjectType)}");
 
     var progress = new Progress<Solar.Core.Download.DownloadProgress>(p =>
         Console.WriteLine($"  [{p.CompletedFiles}/{p.TotalFiles}] {p.CurrentFile}"));
 
     // 默认不覆盖：已存在的同名文件应当被跳过而不是重下
-    var result = await installer.InstallAsync(instance, plan, overwrite: false, progress);
+    var result = await installer.InstallAsync(
+        instance,
+        project.ProjectType,
+        plan,
+        overwrite: false,
+        progress: progress);
 
     Console.WriteLine($"完成：安装 {result.Installed} 个，跳过 {result.Skipped} 个");
     foreach (var file in result.Files)
@@ -173,12 +206,62 @@ async Task<int> InstallAsync(ModSource source, string projectId, string? loaderN
     return 0;
 }
 
+async Task<int> ModpackPlanAsync(ModSource source, string projectId, string? gameVersion)
+{
+    var project = await catalogs.GetProjectAsync(source, projectId);
+
+    var versions = await catalogs.GetVersionsAsync(source, projectId, new ModVersionQuery
+    {
+        Type = ModProjectType.Modpack,
+        GameVersion = gameVersion,
+        IncludeIncompatible = string.IsNullOrWhiteSpace(gameVersion),
+    });
+
+    if (versions.Count == 0)
+    {
+        Console.Error.WriteLine($"没有找到适配 {gameVersion ?? "任意版本"} 的整合包版本。");
+        return 2;
+    }
+
+    var version = versions
+        .OrderBy(v => v.ReleaseType)
+        .ThenByDescending(v => v.PublishedAt)
+        .First();
+
+    Console.WriteLine($"选用 {version.Name}（{version.File.FileName}, {version.File.Size / 1024} KB）");
+
+    var service = provider.GetRequiredService<IModpackService>();
+    var progress = new Progress<ModpackInstallProgress>(p => Console.WriteLine($"  [{p.Stage}] {p.Message}"));
+
+    var plan = await service.CreatePlanAsync(version, progress);
+
+    Console.WriteLine($"整合包: {plan.Name} {plan.Version} [{plan.Format}]");
+    Console.WriteLine($"  MC {plan.MinecraftVersion} · {plan.Loader} {plan.LoaderVersion}");
+    Console.WriteLine($"  文件 {plan.Files.Count} 个，共 {plan.TotalBytes / (1024.0 * 1024):0.#} MB，失败 {plan.FailedFiles.Count} 个");
+
+    foreach (var file in plan.Files.Take(5))
+    {
+        Console.WriteLine($"    {file.RelativePath} ← {file.Url}");
+    }
+
+    foreach (var failed in plan.FailedFiles.Take(5))
+    {
+        Console.WriteLine($"    ✗ {failed}");
+    }
+
+    service.Cleanup(plan);
+    return plan.FailedFiles.Count > 0 ? 2 : 0;
+}
+
 async Task<(ModProject Project, ModVersion Version)> PickAsync(
     ModSource source, string projectId, ModLoader? loader, string? gameVersion)
 {
     var project = await catalogs.GetProjectAsync(source, projectId);
+    var effectiveType = type != ModProjectType.Mod ? type : project.ProjectType;
+
     var versions = await catalogs.GetVersionsAsync(source, projectId, new ModVersionQuery
     {
+        Type = effectiveType,
         GameVersion = gameVersion,
         Loader = loader,
     });

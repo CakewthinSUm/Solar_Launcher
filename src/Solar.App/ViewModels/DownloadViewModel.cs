@@ -36,8 +36,9 @@ public sealed record DownloadSectionInfo(DownloadSection Section, string Key, st
 }
 
 /// <summary>
-/// 下载页：六个分区共用这一个视图模型，当前分区由侧边栏子项的导航参数决定。
-/// 目前只有 Minecraft 分区接入了数据，其余分区为占位。
+/// Minecraft 下载页：版本清单与按版本号搜索。
+/// 其余五个分区（Mod / 光影 / 整合包 / 资源包 / 数据包）走
+/// <see cref="AddonDownloadViewModel"/>，它们共用另一套搜索与安装流程。
 /// </summary>
 public sealed partial class DownloadViewModel : ViewModelBase
 {
@@ -46,7 +47,6 @@ public sealed partial class DownloadViewModel : ViewModelBase
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsMinecraftSection))]
-    [NotifyPropertyChangedFor(nameof(IsPlaceholderSection))]
     private DownloadSection _currentSection;
 
     [ObservableProperty]
@@ -79,9 +79,6 @@ public sealed partial class DownloadViewModel : ViewModelBase
     public ObservableCollection<VersionSummary> Versions { get; } = new();
 
     public bool IsMinecraftSection => CurrentSection == DownloadSection.Minecraft;
-
-    /// <summary>尚未接入数据的五个分区共用一个占位视图。</summary>
-    public bool IsPlaceholderSection => !IsMinecraftSection;
 
     public override async Task OnNavigatedToAsync(object? parameter)
     {

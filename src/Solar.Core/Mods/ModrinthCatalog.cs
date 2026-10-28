@@ -37,6 +37,9 @@ internal static class ModrinthDtos
         public string Title { get; set; } = "";
         public string Description { get; set; } = "";
 
+        /// <summary>mod / modpack / resourcepack / shader / datapack。</summary>
+        public string? ProjectType { get; set; }
+
         /// <summary>Markdown 正文。列表接口没有这个字段。</summary>
         public string? Body { get; set; }
 
@@ -155,7 +158,7 @@ public sealed class ModrinthCatalog(ModHttp http, ModCache cache) : IModCatalog
 
         return new ModSearchPage
         {
-            Items = response.Hits.Select(ToProject).ToList(),
+            Items = response.Hits.Select(hit => ToProject(hit, query.Type)).ToList(),
             TotalHits = response.TotalHits,
             Offset = response.Offset,
             Limit = response.Limit,
@@ -185,6 +188,9 @@ public sealed class ModrinthCatalog(ModHttp http, ModCache cache) : IModCatalog
     {
         var cacheKey = BuildVersionCacheKey(projectId, query);
 
+        // 只有 Mod 才有加载器这个概念；把 loaders 参数带到光影/资源包上会直接搜空
+        var usesLoader = query.Type.UsesLoader();
+
         // 缓存里存的是过滤后的完整列表，Limit 只在返回时截断。
         // 否则先来一次 Limit=10 的调用会把缓存写成十条，之后要 100 条也只能拿到十条。
         var cached = await cache.ReadVersionsAsync(Source, cacheKey, ct).ConfigureAwait(false);
@@ -195,10 +201,18 @@ public sealed class ModrinthCatalog(ModHttp http, ModCache cache) : IModCatalog
 
         var builder = new System.Text.StringBuilder($"project/{Uri.EscapeDataString(projectId)}/version?include_changelog=false");
 
+        // 数据包必须限定 datapack loader：Modrinth 上没有独立的 datapack 项目类型，
+        // 同一个项目往往既有 Mod jar 版本、又有 datapack zip 版本。
+        // 这个过滤不能放进下面的兼容性开关里，否则“显示全部版本”会把 jar 也列出来。
+        if (query.Type == ModProjectType.DataPack)
+        {
+            builder.Append($"&loaders={Uri.EscapeDataString("[\"datapack\"]")}");
+        }
+
         // 不加过滤就返回全部历史版本；加了过滤能让服务端直接筛掉不兼容的
         if (!query.IncludeIncompatible)
         {
-            if (ModLoaderMapping.ToModrinth(query.Loader) is { } loader)
+            if (usesLoader && ModLoaderMapping.ToModrinth(query.Loader) is { } loader)
             {
                 builder.Append($"&loaders={Uri.EscapeDataString($"[\"{loader}\"]")}");
             }
@@ -222,9 +236,12 @@ public sealed class ModrinthCatalog(ModHttp http, ModCache cache) : IModCatalog
         return versions.Take(Math.Max(1, query.Limit)).ToList();
     }
 
-    public async Task<IReadOnlyList<ModCategory>> GetCategoriesAsync(CancellationToken ct = default)
+    public async Task<IReadOnlyList<ModCategory>> GetCategoriesAsync(
+        ModProjectType type = ModProjectType.Mod,
+        CancellationToken ct = default)
     {
-        var cached = await cache.ReadCategoriesAsync(Source, ct).ConfigureAwait(false);
+        var cacheKey = $"{Source}_{type.ToModrinth()}";
+        var cached = await cache.ReadCategoriesAsync(Source, ct, cacheKey).ConfigureAwait(false);
         if (cached is not null)
         {
             return cached;
@@ -233,14 +250,15 @@ public sealed class ModrinthCatalog(ModHttp http, ModCache cache) : IModCatalog
         var url = new Uri(Base, "tag/category");
         var dtos = await http.GetJsonAsync<List<ModrinthDtos.CategoryDto>>(url, Json, ct).ConfigureAwait(false);
 
+        var slug = type.ToModrinth();
         var categories = dtos
-            .Where(c => string.Equals(c.ProjectType, "mod", StringComparison.OrdinalIgnoreCase))
+            .Where(c => string.Equals(c.ProjectType, slug, StringComparison.OrdinalIgnoreCase))
             .Where(c => !string.IsNullOrWhiteSpace(c.Name))
             .Select(c => new ModCategory(c.Name!, DisplayCategory(c.Name!), Source))
             .OrderBy(c => c.Name, StringComparer.Ordinal)
             .ToList();
 
-        await cache.WriteCategoriesAsync(Source, categories, ct).ConfigureAwait(false);
+        await cache.WriteCategoriesAsync(Source, categories, ct, cacheKey).ConfigureAwait(false);
         return categories;
     }
 
@@ -250,9 +268,10 @@ public sealed class ModrinthCatalog(ModHttp http, ModCache cache) : IModCatalog
     /// </summary>
     internal static string BuildFacets(ModSearchQuery query)
     {
-        var groups = new List<string> { "[\"project_type:mod\"]" };
+        var groups = new List<string> { $"[\"project_type:{query.Type.ToModrinth()}\"]" };
 
-        if (ModLoaderMapping.ToModrinth(query.Loader) is { } loader)
+        // 加载器只对 Mod 有意义：光影/资源包/整合包都没有 fabric 之类的 category
+        if (query.Type.UsesLoader() && ModLoaderMapping.ToModrinth(query.Loader) is { } loader)
         {
             groups.Add($"[\"categories:{loader}\"]");
         }
@@ -280,26 +299,35 @@ public sealed class ModrinthCatalog(ModHttp http, ModCache cache) : IModCatalog
 
     private static string BuildVersionCacheKey(string projectId, ModVersionQuery query)
     {
+        var type = query.Type.ToModrinth();
+
         if (query.IncludeIncompatible)
         {
-            return projectId + "_all";
+            return $"{type}_{projectId}_all";
         }
 
-        var loader = ModLoaderMapping.ToModrinth(query.Loader) ?? "any";
+        var loader = query.Type switch
+        {
+            ModProjectType.DataPack => "datapack",
+            _ when query.Type.UsesLoader() => ModLoaderMapping.ToModrinth(query.Loader) ?? "any",
+            _ => "any",
+        };
+
         var version = string.IsNullOrWhiteSpace(query.GameVersion) ? "any" : query.GameVersion.Trim();
-        return $"{projectId}_{version}_{loader}";
+        return $"{type}_{projectId}_{version}_{loader}";
     }
 
-    private static ModProject ToProject(ModrinthDtos.SearchHit hit) => new()
+    private static ModProject ToProject(ModrinthDtos.SearchHit hit, ModProjectType type) => new()
     {
         Source = ModSource.Modrinth,
+        ProjectType = type,
         Id = hit.ProjectId,
         Slug = hit.Slug,
         Title = hit.Title,
         Summary = hit.Description,
         Author = hit.Author,
         IconUrl = PreferPng(hit.IconUrl, null),
-        WebsiteUrl = hit.Slug is null ? null : $"https://modrinth.com/mod/{hit.Slug}",
+        WebsiteUrl = WebsiteUrl(type, hit.Slug),
         Downloads = hit.Downloads,
         UpdatedAt = hit.DateModified,
         Loaders = MapLoaders(hit.Categories, hit.Loaders),
@@ -307,31 +335,41 @@ public sealed class ModrinthCatalog(ModHttp http, ModCache cache) : IModCatalog
         Categories = hit.Categories.Where(c => ModLoaderMapping.FromModrinth(c) is null).ToList(),
     };
 
-    private static ModProject ToProject(ModrinthDtos.ProjectDto dto) => new()
+    private static ModProject ToProject(ModrinthDtos.ProjectDto dto)
     {
-        Source = ModSource.Modrinth,
-        Id = dto.Id,
-        Slug = dto.Slug,
-        Title = dto.Title,
-        Summary = dto.Description,
-        Body = dto.Body,
-        IconUrl = PreferPng(dto.IconUrl, dto.RawIconUrl),
-        WebsiteUrl = dto.Slug is null ? null : $"https://modrinth.com/mod/{dto.Slug}",
-        Downloads = dto.Downloads,
-        UpdatedAt = dto.Updated,
-        Loaders = MapLoaders(dto.Categories, dto.Loaders),
-        GameVersions = dto.GameVersions,
-        Categories = dto.Categories
-            .Concat(dto.AdditionalCategories)
-            .Where(c => ModLoaderMapping.FromModrinth(c) is null)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList(),
-        Gallery = dto.Gallery
-            .Select(g => g.RawUrl ?? g.Url)
-            .Where(u => !string.IsNullOrWhiteSpace(u))
-            .Select(u => u!)
-            .ToList(),
-    };
+        var type = ModProjectTypes.FromModrinth(dto.ProjectType);
+
+        return new ModProject
+        {
+            Source = ModSource.Modrinth,
+            ProjectType = type,
+            Id = dto.Id,
+            Slug = dto.Slug,
+            Title = dto.Title,
+            Summary = dto.Description,
+            Body = dto.Body,
+            IconUrl = PreferPng(dto.IconUrl, dto.RawIconUrl),
+            WebsiteUrl = WebsiteUrl(type, dto.Slug),
+            Downloads = dto.Downloads,
+            UpdatedAt = dto.Updated,
+            Loaders = MapLoaders(dto.Categories, dto.Loaders),
+            GameVersions = dto.GameVersions,
+            Categories = dto.Categories
+                .Concat(dto.AdditionalCategories)
+                .Where(c => ModLoaderMapping.FromModrinth(c) is null)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList(),
+            Gallery = dto.Gallery
+                .Select(g => g.RawUrl ?? g.Url)
+                .Where(u => !string.IsNullOrWhiteSpace(u))
+                .Select(u => u!)
+                .ToList(),
+        };
+    }
+
+    /// <summary>不同项目类型在 Modrinth 上是不同的路径段（/mod/、/shader/…）。</summary>
+    private static string? WebsiteUrl(ModProjectType type, string? slug) =>
+        slug is null ? null : $"https://modrinth.com/{type.ToModrinth()}/{slug}";
 
     /// <summary>
     /// 优先 PNG。Modrinth 的 icon_url 是 WebP，而 WinUI 的 Image 依赖系统 WIC 解码器，

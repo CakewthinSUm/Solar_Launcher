@@ -46,17 +46,23 @@ public sealed class ModCache(AppPaths paths, ILogger<ModCache> logger)
         CancellationToken ct = default) =>
         WriteAsync(VersionsFile(source, cacheKey), versions.ToList(), ct);
 
+    /// <summary>
+    /// 分类。不同项目类型（Mod / 光影 / 资源包…）的分类集合不同，
+    /// 用 <paramref name="cacheKey"/> 区分；不传时与旧缓存兼容。
+    /// </summary>
     public async Task<IReadOnlyList<ModCategory>?> ReadCategoriesAsync(
         ModSource source,
-        CancellationToken ct = default) =>
-        await ReadAsync<List<ModCategory>>(CategoriesFile(source), CategoriesLifetime, ct)
+        CancellationToken ct = default,
+        string? cacheKey = null) =>
+        await ReadAsync<List<ModCategory>>(CategoriesFile(source, cacheKey), CategoriesLifetime, ct)
             .ConfigureAwait(false);
 
     public Task WriteCategoriesAsync(
         ModSource source,
         IReadOnlyList<ModCategory> categories,
-        CancellationToken ct = default) =>
-        WriteAsync(CategoriesFile(source), categories.ToList(), ct);
+        CancellationToken ct = default,
+        string? cacheKey = null) =>
+        WriteAsync(CategoriesFile(source, cacheKey), categories.ToList(), ct);
 
     /// <summary>清空缓存。设置页换镜像后调一次，避免拿到旧源的内容。</summary>
     public void Clear()
@@ -123,8 +129,10 @@ public sealed class ModCache(AppPaths paths, ILogger<ModCache> logger)
     private string VersionsFile(ModSource source, string cacheKey) =>
         Path.Combine(Root, "versions", $"{Prefix(source)}_{Sanitize(cacheKey)}.json");
 
-    private string CategoriesFile(ModSource source) =>
-        Path.Combine(Root, "categories", $"{Prefix(source)}.json");
+    private string CategoriesFile(ModSource source, string? cacheKey = null) =>
+        Path.Combine(Root, "categories", cacheKey is null
+            ? $"{Prefix(source)}.json"
+            : $"{Prefix(source)}_{Sanitize(cacheKey)}.json");
 
     private static string Prefix(ModSource source) => source == ModSource.Modrinth ? "mr" : "cf";
 
