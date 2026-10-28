@@ -5,7 +5,12 @@
     <TargetFramework>net8.0-windows10.0.26100.0</TargetFramework>
     <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
     <RootNamespace>Solar.App</RootNamespace>
-    <AssemblyName>SolarLauncher</AssemblyName>
+    <!--
+      单文件发布时用资产名作为程序集名：WinUI 会按 exe 文件名查找同名 .pri，
+      改名后的单文件 exe 只有程序集名与文件名一致才能启动。
+    -->
+    <AssemblyName Condition="'$(SingleFileAssemblyName)' == ''">SolarLauncher</AssemblyName>
+    <AssemblyName Condition="'$(SingleFileAssemblyName)' != ''">$(SingleFileAssemblyName)</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon Condition="Exists('Assets\AppIcon.ico')">Assets\AppIcon.ico</ApplicationIcon>
     <Platforms>x86;x64;ARM64</Platforms>
@@ -30,7 +35,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.WindowsAppSDK" />
+    <PackageReference Include="Microsoft.WindowsAppSDK.WinUI" />
+    <PackageReference Include="Microsoft.WindowsAppSDK.DWrite" />
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" />
     <PackageReference Include="CommunityToolkit.Mvvm" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />

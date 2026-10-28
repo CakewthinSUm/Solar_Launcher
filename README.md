@@ -2,220 +2,205 @@
 
 # ☀️ Solar Launcher
 
-**一个用 WinUI 3 写的现代 Minecraft 启动器**
+**A modern Minecraft launcher built with WinUI 3**
 
-原生 Windows 11 界面 · 便携免安装 · 实例隔离 · 微软正版登录
+Native Windows 11 UI · Portable, no install · Instance isolation · Microsoft account login
+
+**English** · [简体中文](README_zh-cn.md)
 
 [![.NET 8](https://img.shields.io/badge/.NET-8.0-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
 [![WinUI 3](https://img.shields.io/badge/WinUI-3%20%2F%20Windows%20App%20SDK%201.8-0067C0?logo=windows&logoColor=white)](https://learn.microsoft.com/windows/apps/winui/winui3/)
 [![Version](https://img.shields.io/badge/version-0.1.1--beta-2ea44f)](../../releases)
-[![Platform](https://img.shields.io/badge/platform-Windows%2010%201809%2B-0078D4?logo=windows&logoColor=white)](#-快速开始)
+[![Platform](https://img.shields.io/badge/platform-Windows%2010%201809%2B-0078D4?logo=windows&logoColor=white)](#-getting-started)
 
-[下载](../../releases) · [功能](#-功能) · [截图](#-截图) · [开发](#-开发) · [当前进度](#-当前进度)
+[Download](../../releases) · [Features](#-features) · [Screenshots](#-screenshots) · [Development](#-development) · [Roadmap](#-roadmap)
 
 </div>
 
-![主页](docs/images/home.png)
+![Home](docs/images/home.png)
 
 ---
 
-## ✨ 功能
+## ✨ Features
 
-### 🎮 实例管理
-每个实例可以选不同版本、不同加载器，互不干扰。游戏目录里已有的版本可以**一键扫描导入**，不必重新下载。
+### 🎮 Instance management
+Each instance can use a different Minecraft version and mod loader, independently. Existing versions in your game directory can be **imported with a single scan** — no re-download required.
 
-从下载页点一个版本就能直接进入创建流程，把加载器、OptiFine、Fabric API 这些组件一次装好。
+Pick a version on the Download page to jump straight into creation and install the loader, OptiFine, Fabric API, and other components in one go.
 
-| 实例列表 | 创建实例 |
+| Instance list | Create instance |
 | :---: | :---: |
-| ![实例](docs/images/instances.png) | ![创建实例](docs/images/instance-create.png) |
+| ![Instances](docs/images/instances.png) | ![Create instance](docs/images/instance-create.png) |
 
-### 📦 版本隔离
-给单个实例开启隔离后，它使用自己独立的 `.minecraft` 目录 —— 存档、模组、配置全部独立，
-可以同时放一个 Fabric 实例和一个 Forge 实例而互不冲突。
+### 📦 Version isolation
+Enable isolation for an instance and it gets its own `.minecraft` directory — saves, mods, and configs are fully separate, so a Fabric instance and a Forge instance can coexist without conflicts.
 
-开启时可以选择把共享目录的 `mods` / `config` / `saves` / `resourcepacks` 复制一份过来，
-目标已存在的文件不会覆盖。关闭隔离只切回共享目录，实例目录原样保留。
+When enabling it, you can copy `mods` / `config` / `saves` / `resourcepacks` from the shared directory; existing files are never overwritten. Disabling isolation just switches back to the shared directory; the instance directory is left untouched.
 
-`assets` 与 `libraries` 始终共享，不受隔离影响。
+`assets` and `libraries` are always shared and unaffected by isolation.
 
-![实例设置](docs/images/instance-settings.png)
+![Instance settings](docs/images/instance-settings.png)
 
-### 🚀 启动与进度
-点启动后，启动按钮展开为底部的进度卡片：步骤条按「解析版本 → 补装依赖 → 安装加载器 → 启动游戏」
-逐项推进，下载阶段显示当前文件、已完成数量与总体进度。失败原因直接写在卡片里，
-可以重试或取消，不再弹窗挡住细节。一个实例都没有时点启动，卡片会提示先创建实例。
+### 🚀 Launch and progress
+When you hit Launch, the button expands into a progress card at the bottom: the step list advances through "Resolve version → Install missing files → Install loader → Launch game", and the download stage shows the current file, completed count, and overall progress. Failures are shown directly in the card with retry or cancel — no modal dialog hiding the details. If you have no instances, the card tells you to create one first.
 
-下载与启动进度同步显示在任务栏进度条上，进入启动阶段时闪烁任务栏提醒。
-游戏窗口真正出现后，启动器按「设置 → 游戏启动后」保持不动（默认）、最小化或关闭；
-如果游戏进程提前退出，启动器保持可见并显示错误。
+Download and launch progress are mirrored in the taskbar progress bar, and the taskbar flashes when the game starts. Once the game window actually appears, the launcher follows Settings → After game launch: do nothing (default), minimize, or close. If the game process exits early, the launcher stays visible and shows the error.
 
-### ⚙️ 设置
-设置页集中管理游戏目录、新建实例的隔离默认值、Java 路径、下载源与「游戏启动后」行为。
-有未保存的修改时离开页面会询问「保存 / 不保存 / 取消」，底部「重置」可把所有项恢复默认值，
-保存后生效。
+### ⚙️ Settings
+The Settings page manages the game directory, the default isolation for new instances, the Java path, download sources, and the after-launch behavior. If you leave with unsaved changes, it asks Save / Don't save / Cancel; Reset at the bottom restores all defaults (applied after saving).
 
-### ⬇️ 下载
-版本列表来自 Mojang 官方清单，支持按版本号搜索，按版本类型（正式版 / 快照 / 预发布版 / 远古 Beta / Alpha）与发布年份筛选，选中即可创建实例。
+### ⬇️ Downloads
+The version list comes from Mojang's official manifest. Search by version string and filter by release type (release / snapshot / pre-release / old beta / old alpha) and release year; select one to create an instance.
 
-![下载](docs/images/download.png)
+![Downloads](docs/images/download.png)
 
-「下载」下另外五个分区都从 Modrinth 与 CurseForge 搜索，共用同一套详情页与安装对话框：
+The other five tabs under Downloads search Modrinth and CurseForge and share the same detail page and install dialog:
 
-| 分区 | 搜索过滤 | 安装落点 |
+| Tab | Search filter | Install location |
 | --- | --- | --- |
-| **Mod** | 实例的游戏版本 + 加载器 | 实例的 `mods/`，安装时把必选前置一起装好 |
-| **光影** | 实例的游戏版本 | 实例的 `shaderpacks/` |
-| **整合包** | 用户选的游戏版本 | **新建一个隔离实例**，把整包文件全部下好 |
-| **资源包** | 实例的游戏版本 | 实例的 `resourcepacks/` |
-| **数据包** | 实例的游戏版本 | 选定存档的 `saves/<存档>/datapacks/` |
+| **Mod** | Instance game version + loader | Instance `mods/`, required dependencies installed too |
+| **Shaders** | Instance game version | Instance `shaderpacks/` |
+| **Modpacks** | User-selected game version | **Creates a new isolated instance** and downloads the whole pack |
+| **Resource packs** | Instance game version | Instance `resourcepacks/` |
+| **Data packs** | Instance game version | `saves/<world>/datapacks/` of the selected world |
 
-顶部选定的实例同时决定版本与加载器筛选，搜出来的每一条都能直接装。
-没选实例也能浏览，只是安装按钮会提示先创建实例。整合包是例外——它自带
-Minecraft 版本与加载器，安装时创建一个独立实例，游戏本体与加载器在首次启动时补装。
+The instance selected at the top determines both version and loader filters, so every result can be installed directly. You can browse without selecting an instance; the install button will just prompt you to create one. Modpacks are the exception — they carry their own Minecraft version and loader, create a separate instance on install, and install the game and loader on first launch.
 
-点进详情能看到正文、截图与全部历史版本。数据包在安装对话框里还要选一个存档；
-没有存档时会明确提示先在游戏里创建世界。
+The detail page shows the description, screenshots, and all historical versions. Data packs also require choosing a world in the install dialog; if there are no worlds, it tells you to create one in-game first.
 
-| Mod 列表 | Mod 详情 |
+| Mod list | Mod detail |
 | :---: | :---: |
-| ![Mod](docs/images/mod-download.png) | ![Mod 详情](docs/images/mod-detail.png) |
+| ![Mods](docs/images/mod-download.png) | ![Mod detail](docs/images/mod-detail.png) |
 
-### 🧩 模组加载器
-支持 **Fabric / Quilt / Forge / NeoForge** 四大加载器，以及 **OptiFine**、**LiteLoader**、**Fabric API**、**OptiFabric** 等附加组件。
+### 🧩 Mod loaders
+Supports **Fabric / Quilt / Forge / NeoForge**, plus add-ons such as **OptiFine**, **LiteLoader**, **Fabric API**, and **OptiFabric**.
 
-| 加载器 | 安装方式 |
+| Loader | Install method |
 | --- | --- |
-| Fabric / Quilt | 元数据接口直接返回带 `inheritsFrom` 的 profile JSON |
-| Forge / NeoForge | 下载 installer jar，取出 `version.json`，再执行客户端 processor |
-| OptiFine | 解析安装器，生成 launchwrapper profile |
-| LiteLoader | 解析安装器，注入 tweakClass |
+| Fabric / Quilt | Metadata API returns a profile JSON with `inheritsFrom` |
+| Forge / NeoForge | Download the installer jar, extract `version.json`, run client processors |
+| OptiFine | Parse the installer and generate a launchwrapper profile |
+| LiteLoader | Parse the installer and inject the tweakClass |
 
-Forge / NeoForge 的 installer 不是简单解压：它要跑若干 processor（重命名原版 jar、打二进制补丁）
-才能产出可用的 client artifact。这些 processor 用 Java 执行，参数里混有三种占位符形态 ——
-`{KEY}` 引用数据表、`[group:artifact:version@ext]` 内联 maven 坐标、`'literal'` 单引号字面量，
-全部在 `LoaderInstaller` 里处理。
+Forge / NeoForge installers are not simple archives: they run processors (renaming the vanilla jar, applying binary patches) to produce a usable client artifact. Those processors run under Java, and their arguments mix three placeholder forms — `{KEY}` data table references, `[group:artifact:version@ext]` inline Maven coordinates, and `'literal'` single-quoted strings — all handled in `LoaderInstaller`.
 
-安装时机是**首次启动该实例时**，不是创建实例时 —— installer 要下载几百 MB，建实例时同步等待体验很差。
+Installation happens **on the instance's first launch**, not at creation — the installer can download hundreds of MB, and blocking instance creation on it is a bad experience.
 
-### 🗂️ 内容管理
-「管理」下直接读写实例实际使用的游戏目录：
+### 🗂️ Content management
+Under "Manage", the launcher reads and writes the instance's actual game directory:
 
-| 子项 | 内容 |
+| Sub-item | Contents |
 | --- | --- |
-| **实例** | 创建 / 删除实例，进入单个实例的设置 |
-| **Mods** | `mods` 目录里的 jar |
-| **资源包** | `resourcepacks` 目录里的 zip 或解压后的文件夹 |
-| **光影** | `shaderpacks` 目录里的 zip 或解压后的文件夹 |
+| **Instances** | Create / delete instances, open per-instance settings |
+| **Mods** | Jars in the `mods` directory |
+| **Resource packs** | Zips or extracted folders in `resourcepacks` |
+| **Shaders** | Zips or extracted folders in `shaderpacks` |
 
-不维护额外索引 —— 手动往里放文件，刷新就能看到。页面里可以导入文件 / 文件夹、
-在资源管理器中定位、删除。
+No extra index — drop files in manually and refresh. You can import files / folders, reveal in Explorer, and delete from the page.
 
 ![Mods](docs/images/mods.png)
 
-### 🧠 内存分配
-**自动模式**根据物理内存、当前可用内存和实例的模组数量计算堆上限，每次启动重新估算，
-后台程序多时自动少给一些。也可以切到**手动模式**用滑条指定。
+### 🧠 Memory allocation
+**Automatic mode** computes the heap limit from physical memory, currently available memory, and the instance's mod count, re-evaluating on every launch and giving less when many background apps are running. You can also switch to **manual mode** and use a slider.
 
-### 🔐 微软正版登录
-只支持微软正版账户，不提供离线登录。
+### 🔐 Microsoft account login
+Microsoft accounts only; offline login is not supported.
 
-登录走 OAuth **设备码流程**：点「登录」后启动器显示一次性代码，同时复制到剪贴板、
-用默认浏览器打开 `microsoft.com/link`，粘贴确认即可，无需内嵌浏览器。支持多账户与令牌静默刷新。
+Login uses the OAuth **device code flow**: click "Sign in" and the launcher shows a one-time code, copies it to the clipboard, and opens `microsoft.com/link` in your default browser — paste and confirm, no embedded browser needed. Multiple accounts and silent token refresh are supported.
 
-令牌链（OAuth → Xbox Live → XSTS → Minecraft Services）由
-[CmlLib.Core.Auth.Microsoft](https://github.com/CmlLib/CmlLib.Core.Auth.Microsoft) 完成。
-`SolarData/accounts.json` 只存用户名、UUID、XUID 等展示信息，**不含任何令牌**；
-令牌在 `SolarData/msa-accounts.json`。
+The token chain (OAuth → Xbox Live → XSTS → Minecraft Services) is handled by
+[CmlLib.Core.Auth.Microsoft](https://github.com/CmlLib/CmlLib.Core.Auth.Microsoft).
+`SolarData/accounts.json` stores only display data such as username, UUID, and XUID, **no tokens**;
+tokens live in `SolarData/msa-accounts.json`.
 
-> **客户端 ID 已内置**：启动器随包分发自己的 Azure 应用 ID，登录无需任何配置。
-> 详见下方[账户配置](#账户配置)。
+> **Client ID is built in**: the launcher ships its own Azure application ID, so login needs no configuration.
+> See [Account configuration](#-account-configuration) below.
 
-### 🚀 下载引擎与镜像
-依赖下载使用 [CmlLib.Core](https://github.com/CmlLib/CmlLib.Core) 的 `ParallelGameInstaller`：
-它用 TPL Dataflow 把「校验」和「下载」分成两级流水线，各自独立并行度，内置 SHA1 校验与背压。
-版本解析、参数拼装、进程启动全部是 `Solar.Core` 自己的实现。
+### 🚀 Download engine and mirrors
+Dependency downloads use [CmlLib.Core](https://github.com/CmlLib/CmlLib.Core)'s `ParallelGameInstaller`:
+it splits validation and downloading into two TPL Dataflow stages with independent parallelism, built-in SHA1 verification, and backpressure.
+Version resolution, argument assembly, and process launch are all implemented in `Solar.Core`.
 
-镜像通过 `MirrorRewritingHandler` 在 HTTP 层重写 URL：只重写 `libraries.minecraft.net`（→ `/maven/`）
-与 `resources.download.minecraft.net`（→ `/assets/`），`piston-data` 等路径保持直连，
-因为镜像对它们的支持不完整。
+Mirrors rewrite URLs at the HTTP layer via `MirrorRewritingHandler`: only `libraries.minecraft.net` (→ `/maven/`)
+and `resources.download.minecraft.net` (→ `/assets/`) are rewritten; paths such as `piston-data` stay direct
+because mirrors support them incompletely.
 
-模组源默认走 **MCIM 镜像**（`mod.mcimirror.top`），它同时代理 Modrinth 与 CurseForge ——
-后者不需要 API Key，这是国内可用 CurseForge 的唯一途径。
+Mod sources default to the **MCIM mirror** (`mod.mcimirror.top`), which proxies both Modrinth and CurseForge —
+the latter needs no API key, the only practical way to use CurseForge from mainland China.
 
 ---
 
-## 🖼️ 截图
+## 🖼️ Screenshots
 
-| 设置 | 账户 |
+| Settings | Accounts |
 | :---: | :---: |
-| ![设置](docs/images/settings.png) | ![账户](docs/images/accounts.png) |
+| ![Settings](docs/images/settings.png) | ![Accounts](docs/images/accounts.png) |
 
-> 界面遵循 WinUI 3 官方规范：标题栏用 `TitleBar` 控件，导航用 `NavigationView`，
-> 颜色全部取自 `ThemeResource`（自动适配浅色 / 深色 / 高对比度），窗口材质为 `MicaBackdrop`。
-> 上面截图是深色主题。
+> The UI follows WinUI 3 conventions: `TitleBar` for the title bar, `NavigationView` for navigation,
+> all colors from `ThemeResource` (adapts to light / dark / high contrast), and `MicaBackdrop` for the window material.
+> Screenshots use the dark theme.
 
 ---
 
-## 🧱 技术栈
+## 🧱 Tech stack
 
-| 层 | 技术 |
+| Layer | Technology |
 | --- | --- |
-| UI | WinUI 3 / Windows App SDK 1.8，非打包便携版 |
-| 架构 | MVVM（CommunityToolkit.Mvvm）+ 构造函数依赖注入 |
-| 核心 | .NET 8 类库 `Solar.Core`，与 UI 完全解耦 |
-| 下载 | CmlLib.Core `ParallelGameInstaller`（只用下载部分） |
-| 内容下载 | Modrinth / CurseForge（经 MCIM 镜像）；Mod / 光影 / 整合包 / 资源包 / 数据包 |
-| 整合包 | 解析 `.mrpack` / CurseForge manifest，创建隔离实例并下载整包 |
-| Markdown | 详情正文只用到极简解析器（标题 / 粗体 / 列表 / 链接） |
-| 登录 | CmlLib.Core.Auth.Microsoft（OAuth 设备码 + MSAL.NET） |
-| 测试 | xUnit（`tests/Solar.Core.Tests`），390 个测试 |
+| UI | WinUI 3 / Windows App SDK 1.8, unpackaged portable |
+| Architecture | MVVM (CommunityToolkit.Mvvm) + constructor dependency injection |
+| Core | .NET 8 class library `Solar.Core`, fully decoupled from the UI |
+| Downloads | CmlLib.Core `ParallelGameInstaller` (download part only) |
+| Content downloads | Modrinth / CurseForge (via MCIM mirror); mods / shaders / modpacks / resource packs / data packs |
+| Modpacks | Parse `.mrpack` / CurseForge manifests, create an isolated instance and download the pack |
+| Markdown | A minimal parser for detail pages (headings / bold / lists / links) |
+| Login | CmlLib.Core.Auth.Microsoft (OAuth device code + MSAL.NET) |
+| Tests | xUnit (`tests/Solar.Core.Tests`), 390 tests |
 
 ```
 src/
-  Solar.Core/            核心层，无 UI 依赖
-    Paths/               AppPaths：所有目录集中管理，便携版根目录 = exe 所在目录
-    Json/                统一 JSON 选项、原子写入、参数数组转换器
-    Models/              Mojang 版本 JSON 模型、rules 求值
-    Minecraft/           版本清单下载与缓存、版本 JSON 解析与 inheritsFrom 合并
-    Instances/           游戏实例模型、持久化、版本扫描、创建流程
-    Content/             实例游戏目录里的 Mods / 资源包 / 光影 读写
-    Mods/                在线内容目录（Modrinth / CurseForge）、依赖解析、文件下载与安装
-    Modpacks/            整合包解析（mrpack / CurseForge manifest）与整包安装
-    Loaders/             Fabric / Quilt / Forge / NeoForge 安装
+  Solar.Core/            Core layer, no UI dependencies
+    Paths/               AppPaths: central directory management; portable root = exe directory
+    Json/                Shared JSON options, atomic writes, argument array converter
+    Models/              Mojang version JSON models, rules evaluation
+    Minecraft/           Version manifest download and cache, version JSON parsing and inheritsFrom merging
+    Instances/           Game instance model, persistence, version scanning, creation flow
+    Content/             Mods / resource packs / shaders in the instance game directory
+    Mods/                Online content catalog (Modrinth / CurseForge), dependency resolution, file download and install
+    Modpacks/            Modpack parsing (mrpack / CurseForge manifest) and full-pack install
+    Loaders/             Fabric / Quilt / Forge / NeoForge installation
     Addons/              OptiFine / LiteLoader / Fabric API / OptiFabric
-    Download/            依赖下载与镜像重写
-    Launch/              启动参数拼装与游戏进程启动
-    Memory/              内存自动分配
-    Accounts/            微软登录与账户存储
-    Java/                Java 探测与版本选择
-    Settings/            全局设置
-  Solar.App/             WinUI 3 界面层
-    Services/            导航服务、对话框服务
-    ViewModels/          各页面视图模型
-    Views/               页面（PageBase 统一处理 DataContext 与加载）
-    Converters/          XAML 值转换器
+    Download/            Dependency downloads and mirror rewriting
+    Launch/              Launch argument assembly and game process launch
+    Memory/              Automatic memory allocation
+    Accounts/            Microsoft login and account storage
+    Java/                Java detection and version selection
+    Settings/            Global settings
+  Solar.App/             WinUI 3 UI layer
+    Services/            Navigation and dialog services
+    ViewModels/          Page view models
+    Views/               Pages (PageBase handles DataContext and loading)
+    Converters/          XAML value converters
 tests/
-  Solar.Core.Tests/      核心层单元测试
-tools/                   端到端验证工具（见下）
+  Solar.Core.Tests/      Core unit tests
+tools/                   End-to-end probes (see below)
 ```
 
 ---
 
-## 🚀 快速开始
+## 🚀 Getting started
 
-### 直接使用
+### Use a release
 
-从 [Releases](../../releases) 下载最新构建，解压到任意目录，双击 `SolarLauncher.exe`。
+Download the latest build from [Releases](../../releases), extract it anywhere, and double-click `SolarLauncher.exe`.
 
-这是**便携版**：所有数据都写在 exe 所在目录，删掉文件夹即可完全卸载。
-Windows App SDK 以自包含方式随输出分发，**无需单独安装运行时**。
+This is a **portable** build: all data lives next to the exe, and deleting the folder removes everything.
+The Windows App SDK is bundled; the **.NET 8 Desktop Runtime** is still required.
 
-> 解压即用：微软登录所需的客户端 ID 已内置，无需任何前置配置。见[账户配置](#账户配置)。
+> Ready to use: the Azure client ID needed for Microsoft login is built in, so no setup is required. See [Account configuration](#-account-configuration).
 
-### 从源码构建
+### Build from source
 
-要求：**.NET 8 SDK**、Windows 10 1809 及以上。
+Requirements: **.NET 8 SDK**, Windows 10 1809 or later.
 
 ```bash
 git clone https://github.com/CakewthinSUm/Solar_Launcher.git
@@ -226,99 +211,99 @@ dotnet run --project src/Solar.App
 
 ---
 
-## 📁 目录布局（便携版）
+## 📁 Directory layout (portable)
 
-运行后在 exe 所在目录生成：
+Created next to the exe at runtime:
 
 ```
-SolarData/          设置、账户、日志、版本清单缓存
-SolarShared/        共享资源：versions / libraries / assets / runtime
-SolarInstances/     每个实例一个目录，内含 natives、instance.json
-                    以及开启版本隔离后的 .minecraft/
-.minecraft/         共享游戏目录：存档、模组、配置（默认位置，可在设置中改）
+SolarData/          Settings, accounts, logs, version manifest cache
+SolarShared/        Shared resources: versions / libraries / assets / runtime
+SolarInstances/     One directory per instance, containing natives, instance.json
+                    and the isolated .minecraft/ when version isolation is enabled
+.minecraft/         Shared game directory: saves, mods, configs (default; configurable in Settings)
 ```
 
-共享游戏目录（`.minecraft`）默认被所有实例使用，因此换实例不会丢存档。
-把它指向官方启动器的 `.minecraft` 就能直接复用已有的模组与存档。
-不同版本的 natives 始终按实例隔离在 `SolarInstances/<id>/natives`。
+The shared game directory (`.minecraft`) is used by all instances by default, so switching instances never loses saves.
+Point it at the official launcher's `.minecraft` to reuse existing mods and saves.
+Natives for different versions are always isolated per instance under `SolarInstances/<id>/natives`.
 
 ---
 
-## ⚙️ 账户配置
+## ⚙️ Account configuration
 
-客户端 ID 是**应用**的属性，不是用户的：Solar Launcher 已经把自己在 Azure 注册的
-应用 ID 内置在 `AuthOptions.DefaultClientId` 里，随程序分发。它有两点值得说明：
+The client ID belongs to the **application**, not the user: Solar Launcher ships its own Azure
+application ID in `AuthOptions.DefaultClientId`. Two things are worth noting:
 
-- 它是公开信息，不是密钥，放在客户端里是微软推荐的做法；
-- 它决定了 Minecraft 服务认不认这个应用，所以必须用**本启动器自己**注册的那个，
-  不能借用别的启动器 / 第三方注册的 ID（那违反微软的使用条款）。
+- It is public information, not a secret; shipping it in the client is Microsoft's recommended approach.
+- It determines whether Minecraft services accept the app, so it must be the ID registered by
+  **this launcher itself**; do not borrow another launcher's or a third party's ID (that violates Microsoft's terms).
 
-普通用户**不需要做任何配置**：打开启动器 → 「账户」→ 登录即可。
+Regular users **do not need to configure anything**: open the launcher → Accounts → Sign in.
 
-想改用自己注册的应用（例如二次开发、fork 后自建），需要：
+To use your own registered app (for a fork or secondary development):
 
-1. 在 [Azure 门户](https://portal.azure.com) 注册应用
-2. 应用类型选「移动和桌面应用」，启用「允许公共客户端流」
-3. 重定向 URI 填 `http://localhost`
-4. 在 [aka.ms/mce-reviewappid](https://aka.ms/mce-reviewappid) 提交审核
-   （否则调用 Minecraft API 会返回 403）
-5. 把客户端 ID 写进 `AuthOptions.DefaultClientId`
-   （`src/Solar.Core/Accounts/MicrosoftAuthService.cs`）
+1. Register an app in the [Azure portal](https://portal.azure.com)
+2. Choose "Mobile and desktop applications" and enable "Allow public client flows"
+3. Set the redirect URI to `http://localhost`
+4. Submit for review at [aka.ms/mce-reviewappid](https://aka.ms/mce-reviewappid)
+   (otherwise Minecraft API calls return 403)
+5. Put the client ID into `AuthOptions.DefaultClientId`
+   (`src/Solar.Core/Accounts/MicrosoftAuthService.cs`)
 
-客户端 ID 不作为设置项暴露给用户，也不需要用户填写。
+The client ID is not exposed as a setting and users never need to enter it.
 
 ---
 
-## 🆕 更新日志
+## 🆕 Changelog
 
 ### 0.1.1-beta
 
-- 启动按钮展开为底部进度卡片：分阶段步骤条、当前文件与总体进度、取消与失败重试
-- 无实例时点启动，提示移入卡片并带展开 / 收起动画
-- 下载与启动进度同步到任务栏，进入启动阶段时闪烁提醒
-- 设置新增「游戏启动后」：保持不动 / 最小化 / 关闭启动器，等游戏窗口真正出现后执行
-- 离开设置页时提示保存未保存的修改，底部新增「重置」
-- 修复微软登录点击无响应（设备码回调跨线程更新 UI），验证码自动复制并打开验证页
-- 下载页支持按版本类型与发布年份筛选
-- 补齐光影 / 整合包 / 资源包 / 数据包在线下载，并接入 Mod 下载界面
-- 内置 Azure 客户端 ID，登录不再需要手动配置
+- The launch button expands into a bottom progress card: staged steps, current file and overall progress, cancel and retry
+- With no instances, the launch hint moves into the card with an expand / collapse animation
+- Download and launch progress mirrored in the taskbar, flashing when the game starts
+- New "After game launch" setting: do nothing / minimize / close the launcher, executed once the game window actually appears
+- Leaving Settings with unsaved changes now prompts to save; Reset button added
+- Fixed Microsoft login doing nothing (device-code callback updated UI off the UI thread); the code is now copied to the clipboard and the verification page opened automatically
+- Download page filters by release type and release year
+- Added online downloads for shaders / modpacks / resource packs / data packs and the Mod download UI
+- Built-in Azure client ID; no manual login configuration
 
 ---
 
-## 🛠️ 开发
+## 🛠️ Development
 
 ```bash
-# 构建与测试
+# Build and test
 dotnet build SolarLauncher.sln
 dotnet test tests/Solar.Core.Tests/Solar.Core.Tests.csproj
 
-# 运行
+# Run
 dotnet run --project src/Solar.App
 ```
 
-### 端到端验证工具
+### End-to-end probes
 
-`tools/` 下每个探针都验证一条真实链路，不需要 UI：
+Each probe under `tools/` verifies one real path without the UI:
 
 ```bash
-# 真实下载一个版本的全部依赖（不需要登录）
+# Download all dependencies for a real version (no login needed)
 dotnet run --project tools/Solar.Smoke -- 1.21.4 %TEMP%\solar-smoke --prepare-only
 
-# 下载并启动，60 秒后若仍在运行则判定成功（需要先登录）
+# Download and launch; success if still running after 60 seconds (login required)
 dotnet run --project tools/Solar.Smoke -- 1.21.4 %TEMP%\solar-smoke
 
-# 验证微软登录全流程：设备码 → Xbox → XSTS → Minecraft → 静默刷新
-dotnet run --project tools/Solar.AuthProbe -- <你的客户端ID>
+# Verify the full Microsoft login flow: device code → Xbox → XSTS → Minecraft → silent refresh
+dotnet run --project tools/Solar.AuthProbe -- <your-client-id>
 
-# 验证加载器安装（不给版本号则列出可选项并选最新）
+# Verify loader installation (lists choices and picks the latest if no version is given)
 dotnet run --project tools/Solar.LoaderProbe -- fabric 1.21.4
 dotnet run --project tools/Solar.LoaderProbe -- forge 1.21.4 54.1.22
 
-# 验证装好的加载器版本能否真正启动（用合成账户，不需要登录）
+# Verify an installed loader version can actually launch (synthetic account, no login)
 dotnet run --project tools/Solar.LaunchProbe -- fabric-loader-0.20.1-1.21.4
 dotnet run --project tools/Solar.LaunchProbe -- 1.21.4-forge-54.1.22
 
-# 验证在线内容数据层（搜索 / 详情 / 依赖清单 / 真实下载安装）
+# Verify the online content data layer (search / details / dependency plan / real install)
 dotnet run --project tools/Solar.ModProbe -- search sodium fabric 1.21.4
 dotnet run --project tools/Solar.ModProbe -- search complementary 1.21.4 --type=shader
 dotnet run --project tools/Solar.ModProbe -- detail modrinth AANobbMI fabric 1.21.4
@@ -326,98 +311,98 @@ dotnet run --project tools/Solar.ModProbe -- detail modrinth OhduvhIc 1.21.4 --t
 dotnet run --project tools/Solar.ModProbe -- plan modrinth PtjYWJkn fabric 1.21.4
 dotnet run --project tools/Solar.ModProbe -- install curseforge 394468 fabric 1.21.4
 
-# 下载并解析一个整合包，打印它的 MC 版本、加载器与文件清单（不安装）
+# Download and parse a modpack, print its MC version, loader, and file list (no install)
 dotnet run --project tools/Solar.ModProbe -- modpack modrinth 1KVo5zza 1.21.4
 dotnet run --project tools/Solar.ModProbe -- modpack curseforge 396246 1.21.4
 ```
 
-排查网络问题时加 `SOLAR_PROBE_VERBOSE=1` 可以看到每次换源的详细原因。
+Add `SOLAR_PROBE_VERBOSE=1` when debugging network issues to see why each source switch happened.
 
 ---
 
-## 🗺️ 当前进度
+## 🗺️ Roadmap
 
-- [x] 项目骨架、DI、MVVM、导航
-- [x] 实例创建 / 删除 / 列表，持久化到磁盘
-- [x] 版本清单拉取与本地缓存（可在设置中换成国内镜像）
-- [x] 版本 JSON 下载、`inheritsFrom` 合并、rules 平台求值
-- [x] Java 自动探测与版本匹配
-- [x] 依赖（libraries / assets / natives）下载与 SHA1 校验
-- [x] 启动参数拼装与游戏进程启动
-- [x] 启动进度卡片（分阶段步骤条、下载详情、取消与失败重试）
-- [x] 任务栏下载进度与完成闪烁
-- [x] 下载镜像（BMCLAPI）与实例级 Java / 内存覆盖
-- [x] 微软正版登录（设备码流程、多账户、令牌静默刷新）
-- [x] 模组加载器安装（Fabric / Quilt / Forge / NeoForge）
-- [x] OptiFine / LiteLoader / Fabric API / OptiFabric 附加组件
-- [x] 实例级版本隔离（独立游戏目录，可把共享内容复制过来）
-- [x] 「管理」下的 Mods / 资源包 / 光影 列表、导入、删除
-- [x] 内存分配：自动按物理内存 / 可用内存 / 模组数量计算，或手动用滑条指定
-- [x] 游戏目录版本扫描与一键导入
-- [x] 下载页选版本 → 一次装完加载器与附加组件
-- [x] 在线内容数据层（Modrinth + CurseForge 双源、跨源去重、依赖解析、SHA1 校验安装）
-- [x] 内容下载界面（Mod / 光影 / 整合包 / 资源包 / 数据包 共用搜索、详情与安装对话框）
-- [x] 光影与资源包在线下载（按实例的游戏版本过滤，装进对应目录）
-- [x] 数据包在线下载（按存档安装到 `saves/<存档>/datapacks/`）
-- [x] 整合包在线下载与安装（解析 `.mrpack` / CurseForge manifest，新建隔离实例，下载全部文件并解压 overrides）
-- [x] 下载页版本筛选（版本类型 + 发布年份）
-- [x] 启动后窗口行为（保持 / 最小化 / 关闭），设置页未保存提示与重置
-- [ ] 已装内容的管理与更新检查（按 SHA1 反查项目、启用/禁用、更新）
+- [x] Project skeleton, DI, MVVM, navigation
+- [x] Instance create / delete / list, persisted to disk
+- [x] Version manifest fetch and local cache (switchable to a China mirror in Settings)
+- [x] Version JSON download, `inheritsFrom` merging, platform rules evaluation
+- [x] Automatic Java detection and version matching
+- [x] Dependency (libraries / assets / natives) download with SHA1 verification
+- [x] Launch argument assembly and game process launch
+- [x] Launch progress card (staged steps, download details, cancel and retry)
+- [x] Taskbar download progress and completion flash
+- [x] Download mirror (BMCLAPI) and per-instance Java / memory overrides
+- [x] Microsoft account login (device code flow, multiple accounts, silent token refresh)
+- [x] Mod loader installation (Fabric / Quilt / Forge / NeoForge)
+- [x] OptiFine / LiteLoader / Fabric API / OptiFabric add-ons
+- [x] Per-instance version isolation (separate game directory, optional copy of shared content)
+- [x] Mods / resource packs / shaders list, import, and delete under "Manage"
+- [x] Memory allocation: automatic from physical / available memory and mod count, or manual slider
+- [x] Game directory version scan and one-click import
+- [x] Pick a version on the Download page → install loader and add-ons in one go
+- [x] Online content data layer (Modrinth + CurseForge, cross-source dedup, dependency resolution, SHA1-verified install)
+- [x] Content download UI (mods / shaders / modpacks / resource packs / data packs share search, details, and install dialog)
+- [x] Online shader and resource pack downloads (filtered by instance game version, installed into the right directory)
+- [x] Online data pack downloads (installed into `saves/<world>/datapacks/`)
+- [x] Online modpack download and install (parse `.mrpack` / CurseForge manifest, create an isolated instance, download all files and extract overrides)
+- [x] Download page version filters (release type + release year)
+- [x] After-launch window behavior (keep / minimize / close), Settings unsaved-changes prompt and reset
+- [ ] Installed content management and update checks (reverse-lookup by SHA1, enable/disable, update)
 
-### 内容下载设计
+### Content download design
 
-数据层在 `Solar.Core/Mods/`，两个源统一成同一套模型，UI 层不需要为不同内容类型分支。
-`ModProjectType` 负责把类型翻译成两个源各自的标识和安装落点：
+The data layer lives in `Solar.Core/Mods/` and unifies both sources behind one model, so the UI does not branch per content type.
+`ModProjectType` maps a type to each source's identifier and install location:
 
-| 类型 | Modrinth `project_type` | CurseForge `classId` | 安装落点 |
+| Type | Modrinth `project_type` | CurseForge `classId` | Install location |
 | --- | --- | --- | --- |
 | Mod | `mod` | 6 | `mods/` |
-| 整合包 | `modpack` | 4471 | 新建隔离实例 |
-| 资源包 | `resourcepack` | 12 | `resourcepacks/` |
-| 光影 | `shader` | 6552 | `shaderpacks/` |
-| 数据包 | `datapack` | 6945 | `saves/<存档>/datapacks/` |
+| Modpack | `modpack` | 4471 | New isolated instance |
+| Resource pack | `resourcepack` | 12 | `resourcepacks/` |
+| Shader | `shader` | 6552 | `shaderpacks/` |
+| Data pack | `datapack` | 6945 | `saves/<world>/datapacks/` |
 
-| 能力 | 说明 |
+| Capability | Description |
 | --- | --- |
-| 数据源 | Modrinth 与 CurseForge，默认走 MCIM 镜像 |
-| 降级 | 两源并行，任一不可用仍返回另一边的结果，并在结果里标出失败的源 |
-| 去重 | 同类型 + 同名 + 加载器有交集 + 更新时差 ≤7 天 视为同一项目，保留 CurseForge 那条 |
-| 依赖 | 只有 Mod 递归展开必选前置（深度上限 5，带环检测），可选前置只展示 |
-| 安装 | 写入实例实际使用的目录，保留上游文件名，SHA1 校验后原子落盘 |
+| Sources | Modrinth and CurseForge, MCIM mirror by default |
+| Fallback | Both sources queried in parallel; if one fails, results from the other are still returned and the failed source is marked |
+| Dedup | Same type + same name + overlapping loaders + update time within 7 days = same project; keep the CurseForge entry |
+| Dependencies | Only mods recursively expand required dependencies (depth limit 5, cycle detection); optional dependencies are shown only |
+| Install | Writes to the instance's actual directory, keeps upstream file names, SHA1-verified atomic write |
 
-两个类型特有的坑：
+Two type-specific gotchas:
 
-- **数据包**在 Modrinth 上没有独立的项目类型，同一个项目常常既有 Mod jar 版本、
-  又有 `.zip` 数据包版本。版本请求会额外带上 `loaders=["datapack"]`，否则列表里会混进 jar。
-- **光影 / 资源包 / 整合包**不参与加载器筛选。把 `categories:fabric` 或
-  `modLoaderType` 带上去会直接搜空。
+- **Data packs** have no separate project type on Modrinth; the same project often has both mod jar versions
+  and `.zip` data pack versions. Version requests add `loaders=["datapack"]`, otherwise jars leak into the list.
+- **Shaders / resource packs / modpacks** do not participate in loader filtering. Passing `categories:fabric` or
+  `modLoaderType` returns nothing.
 
-整合包在 `Solar.Core/Modpacks/`。安装时先下载整包、解析 manifest，再新建一个隔离实例：
+Modpacks live in `Solar.Core/Modpacks/`. Installation downloads the pack, parses the manifest, then creates a new isolated instance:
 
-| 格式 | 解析方式 |
+| Format | Parsing |
 | --- | --- |
-| Modrinth `.mrpack` | 读 `modrinth.index.json`，跳过 `env.client = "unsupported"` 的条目 |
-| CurseForge | 读 `manifest.json`，逐条用 `projectID/fileID` 查下载地址（镜像免 Key） |
+| Modrinth `.mrpack` | Read `modrinth.index.json`, skip entries with `env.client = "unsupported"` |
+| CurseForge | Read `manifest.json`, look up each `projectID/fileID` download URL (the mirror needs no key) |
 
-文件按 manifest 里的相对路径下载并做 SHA1 校验；`overrides/` 与 `client-overrides/`
-解压进实例目录（两者都有时客户端专用版本覆盖前者）。路径会做 zip-slip 校验，
-拒绝 `../`、绝对路径与盘符。游戏本体与加载器**不在安装时下载**——实例首次启动
-会走 `GameLaunchService` 的补装流程，避免一次操作里同时跑两套下载器。
+Files are downloaded by the relative paths in the manifest with SHA1 verification; `overrides/` and `client-overrides/`
+are extracted into the instance directory (client overrides win when both exist). Paths are zip-slip checked,
+rejecting `../`, absolute paths, and drive letters. The game itself and the loader are **not downloaded during install** —
+the instance's first launch runs the `GameLaunchService` catch-up flow, avoiding two downloaders in one operation.
 
-与 PCL 的取舍：**不做**中文词表搜索（只支持英文/原名）；版本列表用服务端的
-`gameVersion` + `modLoaderType` 过滤而不是一次拉全量；Mod 安装时会把必选前置一并装好；
-CurseForge 整合包的文件统一放进 `mods/`（manifest 不带目标目录，社区约定如此）。
-详见 [docs/mod-download-design.md](docs/mod-download-design.md) 与
-[docs/addon-download-design.md](docs/addon-download-design.md)。
+Trade-offs versus PCL: **no** Chinese keyword search (English/original names only); version lists filter server-side by
+`gameVersion` + `modLoaderType` instead of fetching everything; required mod dependencies are installed together;
+CurseForge modpack files all go into `mods/` (the manifest has no target directory; this is the community convention).
+See [docs/mod-download-design.md](docs/mod-download-design.md) and
+[docs/addon-download-design.md](docs/addon-download-design.md).
 
-界面在「下载 → Mod / 光影 / 整合包 / 资源包 / 数据包」：顶部选目标实例
-（整合包改为选游戏版本），搜索后点一行进详情，选版本点安装。数据包在对话框里
-选择存档；整合包在对话框里给实例起名并显示将下载的文件数/体积。
-内容源（官方 / 镜像 / CurseForge Key）在「设置 → 下载源」里改，换源会自动清掉旧缓存。
+The UI lives under Downloads → Mods / Shaders / Modpacks / Resource packs / Data packs: pick a target instance
+at the top (modpacks pick a game version instead), search, click a row for details, choose a version and install.
+Data packs choose a world in the dialog; modpacks ask for an instance name and show the file count / size to download.
+Content sources (official / mirror / CurseForge key) are configured in Settings → Download sources; changing them clears the old cache.
 
 ---
 
-## 📄 说明
+## 📄 Notice
 
-本项目与 Mojang Studios / Microsoft 无关联。Minecraft 是 Mojang Studios 的商标。
-使用正版账户登录，请遵守 [Minecraft 最终用户许可协议](https://www.minecraft.net/eula)。
+This project is not affiliated with Mojang Studios or Microsoft. Minecraft is a trademark of Mojang Studios.
+Use a legitimate account and follow the [Minecraft End User License Agreement](https://www.minecraft.net/eula).
