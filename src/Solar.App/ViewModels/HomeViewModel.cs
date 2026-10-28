@@ -111,6 +111,10 @@ public sealed partial class HomeViewModel : ViewModelBase
     /// <summary>没有登录账户时启动必定失败，提前在界面上标出来。</summary>
     public bool IsSignedIn => !string.IsNullOrEmpty(_accounts.ActiveAccountId);
 
+    /// <summary>点了启动但一个实例都没有时，在卡片里给出警告。</summary>
+    [ObservableProperty]
+    private bool _isNoInstanceWarningOpen;
+
     public ObservableCollection<GameInstance> Instances { get; } = new();
 
     /// <summary>步骤条数据源；每次启动重建一次，进度事件只改条目的状态。</summary>
@@ -167,6 +171,9 @@ public sealed partial class HomeViewModel : ViewModelBase
                 Instances.Add(instance);
             }
 
+            // 实例列表重载后，之前那次「没有实例」的警告不再适用
+            IsNoInstanceWarningOpen = false;
+
             // 卡片打开期间（启动中、失败待重试）按 Id 重新绑定选中项，
             // 既不改变用户选中的实例，也不会因为列表重建让 ComboBox 丢选中。
             if (!IsLaunchCardOpen)
@@ -210,7 +217,7 @@ public sealed partial class HomeViewModel : ViewModelBase
     {
         if (SelectedInstance is not { } instance)
         {
-            StatusMessage = "还没有可启动的实例，请先到“管理 → 实例”创建一个。";
+            IsNoInstanceWarningOpen = true;
             return;
         }
 
