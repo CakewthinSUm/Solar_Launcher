@@ -1,0 +1,244 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="Solar.App.Views.Controls.LaunchDock"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:vm="using:Solar.App.ViewModels"
+    HorizontalAlignment="Stretch"
+    VerticalAlignment="Bottom"
+    mc:Ignorable="d">
+
+    <!--
+        启动按钮与进度卡片共用同一个贴底容器：
+        空闲时只有按钮；启动时按钮淡出，卡片表面从按钮尺寸展开成通栏。
+        形变动画在 code-behind 里完成，这里只负责结构。
+    -->
+    <Grid
+        x:Name="DockRoot"
+        Margin="24,0,24,24"
+        SizeChanged="DockRoot_SizeChanged">
+
+        <!-- 卡片表面。空闲时透明且尺寸为 0，展开时才是可见的卡片。 -->
+        <Border
+            x:Name="Surface"
+            HorizontalAlignment="Right"
+            VerticalAlignment="Bottom"
+            Background="{ThemeResource AcrylicInAppFillColorDefaultBrush}"
+            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+            BorderThickness="1"
+            CornerRadius="{StaticResource OverlayCornerRadius}"
+            Opacity="0">
+
+            <!--
+                Border 的 CornerRadius 只裁剪背景，不裁剪子元素；
+                用这个 Grid 的矩形 Clip 把固定尺寸的卡片内容按当前表面大小「揭开」。
+            -->
+            <Grid x:Name="ClipHost" SizeChanged="ClipHost_SizeChanged">
+                <Grid
+                    x:Name="CardContent"
+                    Padding="20,16"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Bottom"
+                    Opacity="0"
+                    RowSpacing="10"
+                    Visibility="Collapsed">
+
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <!-- 标题：状态 + 启动时的实例快照，右侧是取消/收起 -->
+                    <Grid ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Spacing="2">
+                            <TextBlock
+                                Style="{StaticResource BodyStrongTextBlockStyle}"
+                                Text="{x:Bind ViewModel.LaunchHeadline, Mode=OneWay}" />
+                            <TextBlock
+                                Style="{StaticResource CaptionTextBlockStyle}"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Text="{x:Bind ViewModel.LaunchingInstanceName, Mode=OneWay}"
+                                TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+
+                        <StackPanel
+                            Grid.Column="1"
+                            VerticalAlignment="Center"
+                            Orientation="Horizontal"
+                            Spacing="8">
+                            <Button
+                                Command="{x:Bind ViewModel.CancelLaunchCommand, Mode=OneWay}"
+                                Content="取消"
+                                Visibility="{x:Bind ViewModel.IsLaunching, Mode=OneWay, Converter={StaticResource VisibleWhenTrue}}" />
+                            <Button
+                                AutomationProperties.Name="收起启动进度"
+                                Command="{x:Bind ViewModel.DismissLaunchCardCommand, Mode=OneWay}"
+                                ToolTipService.ToolTip="收起"
+                                Visibility="{x:Bind ViewModel.IsLaunching, Mode=OneWay, Converter={StaticResource CollapsedWhenTrue}}">
+                                <FontIcon FontSize="12" Glyph="&#xE711;" />
+                            </Button>
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- 总体进度 -->
+                    <Grid Grid.Row="1" ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <ProgressBar
+                            VerticalAlignment="Center"
+                            Maximum="1"
+                            Value="{x:Bind ViewModel.LaunchProgress, Mode=OneWay}" />
+                        <TextBlock
+                            Grid.Column="1"
+                            VerticalAlignment="Center"
+                            Style="{StaticResource CaptionTextBlockStyle}"
+                            Text="{x:Bind ViewModel.LaunchPercentText, Mode=OneWay}" />
+                    </Grid>
+
+                    <!-- 当前阶段消息、下载统计与文件名 -->
+                    <StackPanel Grid.Row="2" Spacing="2">
+                        <TextBlock
+                            AutomationProperties.LiveSetting="Polite"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            Style="{StaticResource CaptionTextBlockStyle}"
+                            Text="{x:Bind ViewModel.LaunchStageMessage, Mode=OneWay}"
+                            TextTrimming="CharacterEllipsis" />
+                        <TextBlock
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            Style="{StaticResource CaptionTextBlockStyle}"
+                            Text="{x:Bind ViewModel.LaunchStats, Mode=OneWay}"
+                            TextTrimming="CharacterEllipsis"
+                            Visibility="{x:Bind ViewModel.HasLaunchStats, Mode=OneWay, Converter={StaticResource VisibleWhenTrue}}" />
+                        <TextBlock
+                            FontFamily="Consolas"
+                            Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                            Style="{StaticResource CaptionTextBlockStyle}"
+                            Text="{x:Bind ViewModel.LaunchDetail, Mode=OneWay}"
+                            TextTrimming="CharacterEllipsis"
+                            Visibility="{x:Bind ViewModel.LaunchDetail, Mode=OneWay, Converter={StaticResource VisibleWhenText}}" />
+                    </StackPanel>
+
+                    <!-- 失败：错误直接留在卡片里，提供重试；右上角的 × 用来收起 -->
+                    <StackPanel
+                        Grid.Row="3"
+                        Spacing="8"
+                        Visibility="{x:Bind ViewModel.IsLaunchFailed, Mode=OneWay, Converter={StaticResource VisibleWhenTrue}}">
+                        <InfoBar
+                            IsClosable="False"
+                            IsOpen="{x:Bind ViewModel.HasLaunchError, Mode=OneWay}"
+                            Message="{x:Bind ViewModel.LaunchErrorMessage, Mode=OneWay}"
+                            Severity="Error" />
+                        <Button
+                            HorizontalAlignment="Right"
+                            Command="{x:Bind ViewModel.LaunchCommand, Mode=OneWay}"
+                            Content="重试" />
+                    </StackPanel>
+
+                    <!-- 横向步骤条 -->
+                    <ItemsControl
+                        Grid.Row="4"
+                        HorizontalAlignment="Center"
+                        ItemsSource="{x:Bind ViewModel.LaunchStages, Mode=OneWay}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal" Spacing="6" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:LaunchStageItem">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <StackPanel MinWidth="60" Spacing="4">
+                                        <Grid
+                                            Width="20"
+                                            Height="20"
+                                            HorizontalAlignment="Center">
+                                            <Ellipse
+                                                Width="8"
+                                                Height="8"
+                                                Stroke="{ThemeResource TextFillColorTertiaryBrush}"
+                                                StrokeThickness="1.5"
+                                                Visibility="{x:Bind IsPending, Mode=OneWay, Converter={StaticResource VisibleWhenTrue}}" />
+                                            <ProgressRing
+                                                Width="16"
+                                                Height="16"
+                                                IsActive="{x:Bind IsActive, Mode=OneWay}"
+                                                Visibility="{x:Bind IsActive, Mode=OneWay, Converter={StaticResource VisibleWhenTrue}}" />
+                                            <FontIcon
+                                                FontSize="14"
+                                                Foreground="{ThemeResource SystemFillColorSuccessBrush}"
+                                                Glyph="&#xE73E;"
+                                                Visibility="{x:Bind IsDone, Mode=OneWay, Converter={StaticResource VisibleWhenTrue}}" />
+                                            <FontIcon
+                                                FontSize="14"
+                                                Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+                                                Glyph="&#xE783;"
+                                                Visibility="{x:Bind IsFailed, Mode=OneWay, Converter={StaticResource VisibleWhenTrue}}" />
+                                            <FontIcon
+                                                FontSize="14"
+                                                Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                                Glyph="&#xE711;"
+                                                Visibility="{x:Bind IsCanceled, Mode=OneWay, Converter={StaticResource VisibleWhenTrue}}" />
+                                        </Grid>
+
+                                        <Grid>
+                                            <TextBlock
+                                                HorizontalAlignment="Center"
+                                                Style="{StaticResource CaptionTextBlockStyle}"
+                                                Text="{x:Bind Title}"
+                                                TextTrimming="CharacterEllipsis"
+                                                Visibility="{x:Bind IsActive, Mode=OneWay, Converter={StaticResource CollapsedWhenTrue}}" />
+                                            <TextBlock
+                                                HorizontalAlignment="Center"
+                                                FontWeight="SemiBold"
+                                                Style="{StaticResource CaptionTextBlockStyle}"
+                                                Text="{x:Bind Title}"
+                                                TextTrimming="CharacterEllipsis"
+                                                Visibility="{x:Bind IsActive, Mode=OneWay, Converter={StaticResource VisibleWhenTrue}}" />
+                                        </Grid>
+                                    </StackPanel>
+
+                                    <!-- 步骤之间的连接线；最后一项不画 -->
+                                    <Border
+                                        Width="12"
+                                        Height="1"
+                                        Margin="0,10,0,0"
+                                        VerticalAlignment="Top"
+                                        AutomationProperties.AccessibilityView="Raw"
+                                        Background="{ThemeResource CardStrokeColorDefaultBrush}"
+                                        Visibility="{x:Bind HasConnector, Converter={StaticResource VisibleWhenTrue}}" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </Grid>
+            </Grid>
+        </Border>
+
+        <!-- 空闲态的启动按钮；展开后隐藏 -->
+        <Button
+            x:Name="LaunchButton"
+            MinWidth="180"
+            HorizontalAlignment="Right"
+            VerticalAlignment="Bottom"
+            Command="{x:Bind ViewModel.LaunchCommand, Mode=OneWay}"
+            IsEnabled="{x:Bind ViewModel.IsLaunching, Mode=OneWay, Converter={StaticResource InvertBool}}"
+            Style="{StaticResource SolarLaunchButtonStyle}">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <FontIcon FontSize="16" Glyph="&#xE768;" />
+                <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="启动游戏" />
+            </StackPanel>
+        </Button>
+    </Grid>
+</UserControl>
