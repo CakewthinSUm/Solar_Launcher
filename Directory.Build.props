@@ -7,9 +7,9 @@
     <Company>Solar Launcher</Company>
     <Product>Solar Launcher</Product>
     <!-- 预发布版：AssemblyVersion 取前三段，预发布标签只进 InformationalVersion -->
-    <Version>0.1.1-beta</Version>
-    <AssemblyVersion>0.1.1.0</AssemblyVersion>
-    <FileVersion>0.1.1.0</FileVersion>
+    <Version>0.1.2-beta</Version>
+    <AssemblyVersion>0.1.2.0</AssemblyVersion>
+    <FileVersion>0.1.2.0</FileVersion>
     <NeutralLanguage>zh-CN</NeutralLanguage>
   </PropertyGroup>
 </Project>
