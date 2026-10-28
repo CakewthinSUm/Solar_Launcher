@@ -100,7 +100,8 @@ Forge / NeoForge 的 installer 不是简单解压：它要跑若干 processor（
 `SolarData/accounts.json` 只存用户名、UUID、XUID 等展示信息，**不含任何令牌**；
 令牌在 `SolarData/msa-accounts.json`。
 
-> **必须自行注册 Azure 应用**：启动器不内置客户端 ID。详见下方[账户配置](#账户配置)。
+> **客户端 ID 已内置**：启动器随包分发自己的 Azure 应用 ID，登录无需任何配置。
+> 详见下方[账户配置](#账户配置)。
 
 ### 🚀 下载引擎与镜像
 依赖下载使用 [CmlLib.Core](https://github.com/CmlLib/CmlLib.Core) 的 `ParallelGameInstaller`：
@@ -179,7 +180,7 @@ tools/                   端到端验证工具（见下）
 这是**便携版**：所有数据都写在 exe 所在目录，删掉文件夹即可完全卸载。
 Windows App SDK 以自包含方式随输出分发，**无需单独安装运行时**。
 
-> ⚠️ 首次启动前请先在「设置 → 账户」填入自己的 Azure 客户端 ID，否则无法登录。见[账户配置](#账户配置)。
+> 解压即用：微软登录所需的客户端 ID 已内置，无需任何前置配置。见[账户配置](#账户配置)。
 
 ### 从源码构建
 
@@ -214,16 +215,26 @@ SolarInstances/     每个实例一个目录，内含 natives、instance.json
 
 ## ⚙️ 账户配置
 
-启动器**不内置**客户端 ID。使用前需要：
+客户端 ID 是**应用**的属性，不是用户的：Solar Launcher 已经把自己在 Azure 注册的
+应用 ID 内置在 `AuthOptions.DefaultClientId` 里，随程序分发。它有两点值得说明：
+
+- 它是公开信息，不是密钥，放在客户端里是微软推荐的做法；
+- 它决定了 Minecraft 服务认不认这个应用，所以必须用**本启动器自己**注册的那个，
+  不能借用别的启动器 / 第三方注册的 ID（那违反微软的使用条款）。
+
+普通用户**不需要做任何配置**：打开启动器 → 「账户」→ 登录即可。
+
+想改用自己注册的应用（例如二次开发、fork 后自建），需要：
 
 1. 在 [Azure 门户](https://portal.azure.com) 注册应用
 2. 应用类型选「移动和桌面应用」，启用「允许公共客户端流」
 3. 重定向 URI 填 `http://localhost`
 4. 在 [aka.ms/mce-reviewappid](https://aka.ms/mce-reviewappid) 提交审核
    （否则调用 Minecraft API 会返回 403）
-5. 把客户端 ID 填进「设置 → 账户」
+5. 把客户端 ID 写进 `AuthOptions.DefaultClientId`
+   （`src/Solar.Core/Accounts/MicrosoftAuthService.cs`）
 
-用别人注册的客户端 ID 违反微软的使用条款。
+客户端 ID 不作为设置项暴露给用户，也不需要用户填写。
 
 ---
 

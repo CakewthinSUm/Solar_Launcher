@@ -38,7 +38,7 @@ public static class SolarServiceCollectionExtensions
 
         services.AddSingleton<IAccountStore, AccountStore>();
 
-        // 默认配置为空；实际取值每次从 ISettingsService 读取，用户改了立即生效
+        // 默认就是启动器内置的应用 ID；实际取值每次从 ISettingsService 读取，用户改了立即生效
         services.AddSingleton(new AuthOptions());
         services.AddSingleton<IMicrosoftAuthService, MicrosoftAuthService>();
 

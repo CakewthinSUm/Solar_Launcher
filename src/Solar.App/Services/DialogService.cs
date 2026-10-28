@@ -3,10 +3,26 @@ using Microsoft.UI.Xaml.Controls;
 
 namespace Solar.App.Services;
 
+/// <summary>「保存 / 不保存 / 取消」对话框的结果。</summary>
+public enum SaveChangesChoice
+{
+    /// <summary>保存后再继续。</summary>
+    Save,
+
+    /// <summary>放弃修改继续。</summary>
+    Discard,
+
+    /// <summary>取消，留在原处。</summary>
+    Cancel,
+}
+
 public interface IDialogService
 {
     Task ShowMessageAsync(string title, string message);
     Task<bool> ShowConfirmAsync(string title, string message, string primaryText = "确定", string closeText = "取消");
+
+    /// <summary>询问未保存的修改怎么处理。</summary>
+    Task<SaveChangesChoice> ShowSaveChangesAsync(string title, string message);
 
     /// <summary>
     /// 带一个勾选框的确认框。返回 (是否确认, 是否勾选)；
@@ -33,6 +49,19 @@ public sealed class DialogService : IDialogService
     {
         var dialog = CreateDialog(title, message, primaryText, closeText);
         return await ShowAsync(dialog) == ContentDialogResult.Primary;
+    }
+
+    public async Task<SaveChangesChoice> ShowSaveChangesAsync(string title, string message)
+    {
+        var dialog = CreateDialog(title, message, "保存", "取消");
+        dialog.SecondaryButtonText = "不保存";
+
+        return await ShowAsync(dialog) switch
+        {
+            ContentDialogResult.Primary => SaveChangesChoice.Save,
+            ContentDialogResult.Secondary => SaveChangesChoice.Discard,
+            _ => SaveChangesChoice.Cancel,
+        };
     }
 
     public async Task<(bool Confirmed, bool Checked)> ShowConfirmWithCheckBoxAsync(

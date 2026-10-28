@@ -122,6 +122,31 @@
                     </StackPanel>
                 </Border>
 
+                <!-- 游戏启动成功后的启动器窗口行为 -->
+                <Border Style="{StaticResource SolarCardStyle}">
+                    <StackPanel Spacing="12">
+                        <StackPanel Spacing="2">
+                            <TextBlock Text="游戏启动后" />
+                            <TextBlock
+                                Style="{StaticResource CaptionTextBlockStyle}"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Text="游戏窗口出现后，启动器要做什么。默认保持不动；关闭启动器不会影响已经启动的游戏。"
+                                TextWrapping="Wrap" />
+                        </StackPanel>
+
+                        <!--
+                            三项直接平铺，比下拉框少一次点击，选项也一眼看全。
+                            各列宽度按最长的一项统一，给每项一个最小宽度，
+                            否则最短的几项会紧贴左边的文字。
+                        -->
+                        <RadioButtons MaxColumns="3" SelectedIndex="{x:Bind ViewModel.AfterLaunchActionIndex, Mode=TwoWay}">
+                            <RadioButton MinWidth="200" Content="不执行任何操作" />
+                            <RadioButton MinWidth="200" Content="最小化启动器" />
+                            <RadioButton MinWidth="200" Content="关闭启动器" />
+                        </RadioButtons>
+                    </StackPanel>
+                </Border>
+
                 <!-- 新建实例的版本隔离默认值 -->
                 <Border Style="{StaticResource SolarCardStyle}">
                     <StackPanel Spacing="8">
@@ -185,25 +210,6 @@
                             <Run Text="实际使用：" />
                             <Run Text="{x:Bind ViewModel.EffectiveMinecraftDirectory, Mode=OneWay}" />
                         </TextBlock>
-                    </StackPanel>
-                </Border>
-            </StackPanel>
-
-            <!-- 账户 -->
-            <StackPanel Spacing="8">
-                <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="账户" />
-                <Border Style="{StaticResource SolarCardStyle}">
-                    <StackPanel Spacing="8">
-                        <TextBlock Text="微软应用客户端 ID" />
-                        <TextBlock
-                            Style="{StaticResource CaptionTextBlockStyle}"
-                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                            Text="在 Azure 门户注册应用后获得。应用类型选「移动和桌面应用」，启用公共客户端流，重定向 URI 填 http://localhost，并在 aka.ms/mce-reviewappid 提交审核。"
-                            TextWrapping="Wrap" />
-                        <TextBox
-                            FontFamily="Consolas"
-                            PlaceholderText="00000000-0000-0000-0000-000000000000"
-                            Text="{x:Bind ViewModel.MicrosoftClientId, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                     </StackPanel>
                 </Border>
             </StackPanel>
@@ -349,6 +355,14 @@
                     Command="{x:Bind ViewModel.SaveCommand}"
                     Content="保存"
                     Style="{StaticResource AccentButtonStyle}" />
+                <!--
+                    重置只改界面上的值，不落盘：用户可以再检查一遍，也可以直接离开放弃。
+                    所以放在保存旁边——它是「准备好之后再保存」的一部分。
+                -->
+                <Button
+                    Command="{x:Bind ViewModel.ResetToDefaultsCommand}"
+                    Content="重置"
+                    ToolTipService.ToolTip="把所有设置恢复为默认值，点保存后生效" />
                 <ProgressRing
                     Width="20"
                     Height="20"
