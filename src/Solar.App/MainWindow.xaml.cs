@@ -31,6 +31,12 @@ public sealed partial class MainWindow : Window
     /// <summary>上次停留的管理子分区；点父项「管理」时回到这里。</summary>
     private NavigationViewItem _lastManageItem;
 
+    /// <summary>用户已决定离开设置页，本次重新发起的导航不再询问一次。</summary>
+    private bool _leavingSettingsConfirmed;
+
+    /// <summary>正在询问是否保存设置；期间忽略新的导航请求，避免叠出多个对话框。</summary>
+    private bool _askingToSaveSettings;
+
     private readonly TaskbarProgressService _taskbarProgress = App.GetService<TaskbarProgressService>();
 
     public MainWindow()
@@ -100,10 +106,18 @@ public sealed partial class MainWindow : Window
     /// <summary>标题栏的返回键：没有可回退的页面时禁用，避免点了没反应。</summary>
     private void AppTitleBar_BackRequested(TitleBar sender, object args)
     {
-        if (ContentFrame.CanGoBack)
+        if (!ContentFrame.CanGoBack)
         {
-            ContentFrame.GoBack();
+            return;
         }
+
+        // 返回同样算离开设置页
+        if (TryDeferLeavingSettings(null, ContentFrame.GoBack))
+        {
+            return;
+        }
+
+        ContentFrame.GoBack();
     }
 
     private void ContentFrame_Navigated(object sender, NavigationEventArgs e) =>
@@ -234,7 +248,78 @@ public sealed partial class MainWindow : Window
             return;
         }
 
+        if (TryDeferLeavingSettings(pageType, () => NavigateTo(pageType, parameter)))
+        {
+            return;
+        }
+
         _currentParameter = parameter;
         ContentFrame.Navigate(pageType, parameter, new EntranceNavigationTransitionInfo());
+    }
+
+    /// <summary>
+    /// 离开设置页时若有未保存的修改，先把导航停下来问用户。
+    /// 返回 true 表示已经推迟，调用方不要再继续导航。
+    /// <para>
+    /// <paramref name="targetPageType"/> 是设置页本身时直接放行——
+    /// 那不是离开，例如用户取消后把侧栏选中项拨回设置。
+    /// </para>
+    /// </summary>
+    private bool TryDeferLeavingSettings(Type? targetPageType, Action proceed)
+    {
+        if (_leavingSettingsConfirmed || targetPageType == typeof(SettingsPage))
+        {
+            return false;
+        }
+
+        if (ContentFrame.Content is not SettingsPage page || !page.ViewModel.HasUnsavedChanges)
+        {
+            return false;
+        }
+
+        // 对话框还开着时又来了导航请求（展开父项后补选子项就会这样）：
+        // 一起拦下，等用户选完再统一处理，不能悄悄放行
+        if (_askingToSaveSettings)
+        {
+            return true;
+        }
+
+        _ = ConfirmLeavingSettingsAsync(page, proceed);
+        return true;
+    }
+
+    private async Task ConfirmLeavingSettingsAsync(SettingsPage page, Action proceed)
+    {
+        _askingToSaveSettings = true;
+        bool canLeave;
+        try
+        {
+            canLeave = await page.ConfirmLeaveAsync();
+        }
+        finally
+        {
+            _askingToSaveSettings = false;
+        }
+
+        if (!canLeave)
+        {
+            // 侧栏已经跳到用户点的那一项，页面却停在设置：把选中项拨回去，
+            // 否则高亮的菜单项和实际显示的内容对不上。
+            // 选中设置项又会触发一次导航请求，由 TryDeferLeavingSettings 的
+            // targetPageType 判断放行，最终因页面没变而直接返回。
+            NavView.SelectedItem = NavView.SettingsItem;
+            return;
+        }
+
+        // 用户已经决定，重新执行刚才被拦下的导航
+        _leavingSettingsConfirmed = true;
+        try
+        {
+            proceed();
+        }
+        finally
+        {
+            _leavingSettingsConfirmed = false;
+        }
     }
 }

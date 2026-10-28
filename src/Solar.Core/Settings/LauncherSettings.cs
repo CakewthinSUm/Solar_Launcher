@@ -57,20 +57,27 @@ public sealed class LauncherSettings
     /// </summary>
     public string? CurseForgeApiKey { get; set; }
 
-    /// <summary>启动后是否自动关闭启动器。</summary>
-    public bool CloseLauncherAfterLaunch { get; set; }
-
-    /// <summary>
-    /// 微软应用的客户端 ID，正版登录必需。
-    /// 在 Azure 门户注册应用后填写，详见 <c>AuthOptions</c> 的说明。
-    /// </summary>
-    public string? MicrosoftClientId { get; set; }
+    /// <summary>游戏窗口出现后对启动器窗口的处理方式。默认保持不动。</summary>
+    public AfterLaunchAction AfterLaunchAction { get; set; } = AfterLaunchAction.Nothing;
 
     /// <summary>
     /// 新建实例时版本隔离的默认值。默认「每次询问」：
     /// 带模组加载器时建议隔离，纯原版则沿用共享目录。
     /// </summary>
     public VersionIsolationDefault NewInstanceIsolation { get; set; } = VersionIsolationDefault.Ask;
+}
+
+/// <summary>游戏启动成功后启动器窗口的处理方式。</summary>
+public enum AfterLaunchAction
+{
+    /// <summary>什么都不做，启动器留在原地。</summary>
+    Nothing = 0,
+
+    /// <summary>把启动器最小化到任务栏。</summary>
+    Minimize = 1,
+
+    /// <summary>关闭启动器。游戏是独立进程，不受影响。</summary>
+    Close = 2,
 }
 
 /// <summary>新建实例时版本隔离的处理方式。</summary>
