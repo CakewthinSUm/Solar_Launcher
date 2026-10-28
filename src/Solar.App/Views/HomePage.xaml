@@ -6,85 +6,8 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:views="using:Solar.App.Views"
-    xmlns:conv="using:Solar.App.Converters"
+    xmlns:controls="using:Solar.App.Views.Controls"
     mc:Ignorable="d">
-
-    <Page.Resources>
-        <conv:VisibleWhenTrueConverter x:Key="VisibleWhenTrue" />
-        <conv:InvertBoolConverter x:Key="InvertBool" />
-
-        <!--
-            「启动游戏」是主页唯一的主动作，单独一套视觉状态。
-            模板与 AccentButtonStyle 相同，只把背景换成 SolarLaunchButtonBackground*
-            （App.xaml 里基于系统语义色定义），悬停/按下沿用 WinUI 强调色按钮的做法降低不透明度。
-            前景色用 TextOnAccentFillColorPrimaryBrush：深色主题下是黑字、浅色主题下是白字，
-            正好对应系统语义绿在两种主题里的明度，对比度始终够。
-        -->
-        <Style x:Key="SolarLaunchButtonStyle" TargetType="Button">
-            <Setter Property="Foreground" Value="{ThemeResource TextOnAccentFillColorPrimaryBrush}" />
-            <Setter Property="Background" Value="{StaticResource SolarLaunchButtonBackgroundBrush}" />
-            <Setter Property="BackgroundSizing" Value="OuterBorderEdge" />
-            <Setter Property="BorderBrush" Value="Transparent" />
-            <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="CornerRadius" Value="{StaticResource ControlCornerRadius}" />
-            <Setter Property="Padding" Value="24,10" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <ContentPresenter
-                            x:Name="ContentPresenter"
-                            Padding="{TemplateBinding Padding}"
-                            HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
-                            VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
-                            AutomationProperties.AccessibilityView="Raw"
-                            Background="{TemplateBinding Background}"
-                            BackgroundSizing="{TemplateBinding BackgroundSizing}"
-                            BorderBrush="{TemplateBinding BorderBrush}"
-                            BorderThickness="{TemplateBinding BorderThickness}"
-                            Content="{TemplateBinding Content}"
-                            ContentTemplate="{TemplateBinding ContentTemplate}"
-                            ContentTransitions="{TemplateBinding ContentTransitions}"
-                            CornerRadius="{TemplateBinding CornerRadius}"
-                            Foreground="{TemplateBinding Foreground}">
-                            <ContentPresenter.BackgroundTransition>
-                                <BrushTransition Duration="0:0:0.083" />
-                            </ContentPresenter.BackgroundTransition>
-
-                            <VisualStateManager.VisualStateGroups>
-                                <VisualStateGroup x:Name="CommonStates">
-                                    <VisualState x:Name="Normal" />
-                                    <VisualState x:Name="PointerOver">
-                                        <Storyboard>
-                                            <ObjectAnimationUsingKeyFrames Storyboard.TargetName="ContentPresenter" Storyboard.TargetProperty="Background">
-                                                <DiscreteObjectKeyFrame KeyTime="0" Value="{StaticResource SolarLaunchButtonBackgroundPointerOverBrush}" />
-                                            </ObjectAnimationUsingKeyFrames>
-                                        </Storyboard>
-                                    </VisualState>
-                                    <VisualState x:Name="Pressed">
-                                        <Storyboard>
-                                            <ObjectAnimationUsingKeyFrames Storyboard.TargetName="ContentPresenter" Storyboard.TargetProperty="Background">
-                                                <DiscreteObjectKeyFrame KeyTime="0" Value="{StaticResource SolarLaunchButtonBackgroundPressedBrush}" />
-                                            </ObjectAnimationUsingKeyFrames>
-                                        </Storyboard>
-                                    </VisualState>
-                                    <VisualState x:Name="Disabled">
-                                        <Storyboard>
-                                            <ObjectAnimationUsingKeyFrames Storyboard.TargetName="ContentPresenter" Storyboard.TargetProperty="Background">
-                                                <DiscreteObjectKeyFrame KeyTime="0" Value="{StaticResource SolarLaunchButtonBackgroundDisabledBrush}" />
-                                            </ObjectAnimationUsingKeyFrames>
-                                            <ObjectAnimationUsingKeyFrames Storyboard.TargetName="ContentPresenter" Storyboard.TargetProperty="Foreground">
-                                                <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource TextOnAccentFillColorDisabledBrush}" />
-                                            </ObjectAnimationUsingKeyFrames>
-                                        </Storyboard>
-                                    </VisualState>
-                                </VisualStateGroup>
-                            </VisualStateManager.VisualStateGroups>
-                        </ContentPresenter>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-    </Page.Resources>
 
     <Grid>
         <ScrollViewer>
@@ -101,15 +24,40 @@
                         Text="选择实例并开始游戏" />
                 </StackPanel>
 
-                <!-- 启动卡片：只负责选择实例，启动按钮固定在右下角 -->
+                <!-- 准备启动：选择要运行的实例 -->
                 <Border Style="{StaticResource SolarCardStyle}" Padding="24">
                     <StackPanel Spacing="12">
-                        <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="准备启动" />
+                        <!-- 标题行：刷新按钮放在卡片右上角，用图标而不是文字 -->
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock
+                                VerticalAlignment="Center"
+                                Style="{StaticResource SubtitleTextBlockStyle}"
+                                Text="准备启动" />
+
+                            <Button
+                                Grid.Column="1"
+                                Width="32"
+                                Height="32"
+                                Padding="0"
+                                VerticalAlignment="Center"
+                                AutomationProperties.Name="刷新"
+                                Command="{x:Bind ViewModel.RefreshCommand}"
+                                Style="{StaticResource SubtleButtonStyle}"
+                                ToolTipService.ToolTip="刷新">
+                                <FontIcon FontSize="14" Glyph="&#xE72C;" />
+                            </Button>
+                        </Grid>
 
                         <ComboBox
                             Header="游戏实例"
                             HorizontalAlignment="Stretch"
                             DisplayMemberPath="Name"
+                            IsEnabled="{x:Bind ViewModel.IsLaunchCardOpen, Mode=OneWay, Converter={StaticResource InvertBool}}"
                             ItemsSource="{x:Bind ViewModel.Instances, Mode=OneWay}"
                             PlaceholderText="还没有实例"
                             SelectedItem="{x:Bind ViewModel.SelectedInstance, Mode=TwoWay}" />
@@ -124,23 +72,6 @@
                             IsOpen="{x:Bind ViewModel.IsSignedIn, Mode=OneWay, Converter={StaticResource InvertBool}}"
                             Message="尚未登录微软账户，请先到「账户」页登录"
                             Severity="Warning" />
-                    </StackPanel>
-                </Border>
-
-                <!-- 下载/启动进度：只在启动过程中出现 -->
-                <Border
-                    Style="{StaticResource SolarCardStyle}"
-                    Visibility="{x:Bind ViewModel.HasLaunchProgress, Mode=OneWay, Converter={StaticResource VisibleWhenTrue}}">
-                    <StackPanel Spacing="8">
-                        <ProgressBar
-                            Maximum="1"
-                            Value="{x:Bind ViewModel.LaunchProgress, Mode=OneWay}"
-                            Visibility="{x:Bind ViewModel.IsLaunching, Mode=OneWay, Converter={StaticResource VisibleWhenTrue}}" />
-                        <TextBlock
-                            Style="{StaticResource CaptionTextBlockStyle}"
-                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                            Text="{x:Bind ViewModel.LaunchStatus, Mode=OneWay}"
-                            TextTrimming="CharacterEllipsis" />
                     </StackPanel>
                 </Border>
 
@@ -196,38 +127,12 @@
                     Message="{x:Bind ViewModel.StatusMessage, Mode=OneWay}"
                     Severity="Success" />
 
-                <Button Command="{x:Bind ViewModel.RefreshCommand}" Content="刷新" />
-
-                <!-- 底部留白：高度 = 按钮高度 + 下边距，滚到底时内容不会被悬浮按钮挡住 -->
+                <!-- 底部留白：高度 = 按钮高度 + 下边距，滚到底时内容不会被底部 Dock 遮挡 -->
                 <Border Height="72" />
             </StackPanel>
         </ScrollViewer>
 
-        <!--
-            启动按钮固定在页面右下角（悬浮），滚动内容时始终可见。
-            ScrollViewer 与它同处一个 Grid，所以按钮的位置相对整个页面而不是滚动内容。
-            右侧 24 与页面内边距一致，与内容右边缘对齐；窄窗口下仍贴右下角。
-        -->
-        <StackPanel
-            Margin="0,0,24,24"
-            HorizontalAlignment="Right"
-            VerticalAlignment="Bottom"
-            Orientation="Horizontal"
-            Spacing="8">
-            <Button
-                Command="{x:Bind ViewModel.CancelLaunchCommand}"
-                Content="取消"
-                Visibility="{x:Bind ViewModel.IsLaunching, Mode=OneWay, Converter={StaticResource VisibleWhenTrue}}" />
-            <Button
-                MinWidth="180"
-                Command="{x:Bind ViewModel.LaunchCommand}"
-                IsEnabled="{x:Bind ViewModel.IsLaunching, Mode=OneWay, Converter={StaticResource InvertBool}}"
-                Style="{StaticResource SolarLaunchButtonStyle}">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                    <FontIcon FontSize="16" Glyph="&#xE768;" />
-                    <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="启动游戏" />
-                </StackPanel>
-            </Button>
-        </StackPanel>
+        <!-- 底部 Dock：包含启动按钮和展开的进度卡片；盖在 ScrollViewer 之上 -->
+        <controls:LaunchDock ViewModel="{x:Bind ViewModel, Mode=OneWay}" />
     </Grid>
 </views:PageBase>
