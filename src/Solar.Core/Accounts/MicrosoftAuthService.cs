@@ -51,7 +51,6 @@ public sealed class MicrosoftAuthService(
     AppPaths paths,
     IAccountStore store,
     AuthOptions options,
-    Solar.Core.Settings.ISettingsService settings,
     ILogger<MicrosoftAuthService> logger) : IMicrosoftAuthService
 {
     private const string AccountFileName = "msa-accounts.json";
@@ -218,14 +217,10 @@ public sealed class MicrosoftAuthService(
     }
 
     /// <summary>
-    /// 客户端 ID 以设置为准，回退到注入的默认值。
-    /// 这样用户在设置页填写后无需重启启动器。
+    /// 客户端 ID 固定用启动器内置的那个（<see cref="AuthOptions.ClientId"/>）。
+    /// 它属于应用而不是用户，所以不开放给设置覆盖。
     /// </summary>
-    private string ResolveClientId()
-    {
-        var configured = settings.Current.MicrosoftClientId;
-        return string.IsNullOrWhiteSpace(configured) ? options.ClientId : configured.Trim();
-    }
+    private string ResolveClientId() => options.ClientId;
 
     /// <summary>
     /// 客户端 ID 变了要重建 MSAL 应用，否则缓存的令牌属于旧应用，静默刷新会失败。
@@ -359,15 +354,23 @@ public sealed class MicrosoftAuthService(
 /// <summary>
 /// 微软登录所需的配置。
 /// <para>
-/// <c>ClientId</c> 必须在 Azure 门户注册应用后获得：
-/// 应用类型选「移动和桌面应用」，启用「允许公共客户端流」，
+/// <see cref="DefaultClientId"/> 是 Solar Launcher 自己在 Azure 注册的应用 ID。
+/// 它是公开信息（不是密钥），随程序一起分发，所以用户开箱即可登录，
+/// 不需要自己注册应用。它属于应用而不是用户，因此不暴露成设置项；
+/// fork 后想用自己注册的应用，直接改这个常量。
+/// </para>
+/// <para>
+/// 注册应用时：应用类型选「移动和桌面应用」，启用「允许公共客户端流」，
 /// 重定向 URI 填 <c>http://localhost</c>，
 /// 并在 aka.ms/mce-reviewappid 提交审核，否则调用 Minecraft API 会返回 403。
 /// </para>
 /// </summary>
 public sealed class AuthOptions
 {
-    public string ClientId { get; set; } = "";
+    /// <summary>Solar Launcher 的 Azure 应用 ID。公开信息，随程序分发。</summary>
+    public const string DefaultClientId = "562e44b1-f41a-4edc-a2c4-81b80c52dd39";
+
+    public string ClientId { get; set; } = DefaultClientId;
 
     public bool IsConfigured => !string.IsNullOrWhiteSpace(ClientId);
 }

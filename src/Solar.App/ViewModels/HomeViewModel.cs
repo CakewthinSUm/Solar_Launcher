@@ -3,6 +3,7 @@ using System.Diagnostics;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
+using Microsoft.UI.Windowing;
 using Solar.App.Formatting;
 using Solar.App.Services;
 using Solar.Core.Accounts;
@@ -10,6 +11,7 @@ using Solar.Core.Download;
 using Solar.Core.Instances;
 using Solar.Core.Java;
 using Solar.Core.Launch;
+using Solar.Core.Settings;
 
 namespace Solar.App.ViewModels;
 
@@ -23,6 +25,8 @@ public sealed partial class HomeViewModel : ViewModelBase
     private readonly IJavaDetector _javaDetector;
     private readonly IGameLaunchService _launchService;
     private readonly IAccountStore _accounts;
+    private readonly ISettingsService _settings;
+    private readonly IDialogService _dialogs;
     private readonly TaskbarProgressService _taskbar;
     private readonly ILogger<HomeViewModel> _logger;
 
@@ -88,6 +92,8 @@ public sealed partial class HomeViewModel : ViewModelBase
         IJavaDetector javaDetector,
         IGameLaunchService launchService,
         IAccountStore accounts,
+        ISettingsService settings,
+        IDialogService dialogs,
         TaskbarProgressService taskbar,
         ILogger<HomeViewModel> logger)
     {
@@ -96,6 +102,8 @@ public sealed partial class HomeViewModel : ViewModelBase
         _javaDetector = javaDetector;
         _launchService = launchService;
         _accounts = accounts;
+        _settings = settings;
+        _dialogs = dialogs;
         _taskbar = taskbar;
         _logger = logger;
     }
@@ -300,6 +308,14 @@ public sealed partial class HomeViewModel : ViewModelBase
             // 成功态停留一会儿再缩回按钮
             ScheduleAutoCollapse(tracker, TimeSpan.FromSeconds(2.5));
 
+            // 进程起来不等于窗口已经出现，设置里的“最小化/关闭启动器”等窗口出来再执行。
+            // 不 await：启动流程到此结束，按钮要立刻恢复可用。
+            var afterLaunch = _settings.Current.AfterLaunchAction;
+            if (afterLaunch != AfterLaunchAction.Nothing)
+            {
+                _ = ApplyAfterLaunchActionAsync(process, afterLaunch);
+            }
+
             // 进程观察者要活过启动 CTS 的释放，所以这里用 None；目前只记录退出日志
             _ = process.WaitForExitAsync(CancellationToken.None).ContinueWith(
                 _ => _logger.LogInformation("游戏进程已退出: {Name}", instance.Name),
@@ -325,6 +341,84 @@ public sealed partial class HomeViewModel : ViewModelBase
             _launchCts?.Dispose();
             _launchCts = null;
         }
+    }
+
+    /// <summary>
+    /// 等游戏窗口真的出现，再按设置最小化或关闭启动器。
+    /// <para>
+    /// 只看进程是否启动成功是不够的：Java 初始化、加载模组都发生在窗口出来之前，
+    /// 这时就把启动器收起来，用户既看不到启动进度，也看不到启动失败的报错。
+    /// </para>
+    /// </summary>
+    private async Task ApplyAfterLaunchActionAsync(Process process, AfterLaunchAction action)
+    {
+        try
+        {
+            if (!await WaitForGameWindowAsync(process).ConfigureAwait(false))
+            {
+                // 窗口出现前进程就退出了，多半是启动失败：保持启动器可见，方便排查
+                _logger.LogWarning("游戏窗口未出现，跳过启动器窗口处理");
+                return;
+            }
+
+            if (App.MainWindow is not { } window)
+            {
+                return;
+            }
+
+            // 窗口操作必须在 UI 线程上做
+            window.DispatcherQueue.TryEnqueue(() =>
+            {
+                switch (action)
+                {
+                    case AfterLaunchAction.Minimize:
+                        if (window.AppWindow.Presenter is OverlappedPresenter presenter)
+                        {
+                            presenter.Minimize();
+                        }
+
+                        break;
+
+                    case AfterLaunchAction.Close:
+                        window.Close();
+                        break;
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            // 收起窗口失败不该影响已经启动的游戏
+            _logger.LogWarning(ex, "游戏启动后处理启动器窗口失败");
+        }
+    }
+
+    /// <summary>
+    /// 轮询到游戏进程建出主窗口为止；进程退出则返回 false。
+    /// 不设超时：大型整合包几十秒才出窗口很常见，提前放弃等于设置失效。
+    /// 循环随进程结束自然退出，且每次启动只跑一次。
+    /// </summary>
+    private static async Task<bool> WaitForGameWindowAsync(Process process)
+    {
+        while (!process.HasExited)
+        {
+            try
+            {
+                process.Refresh();
+                if (process.MainWindowHandle != IntPtr.Zero)
+                {
+                    return true;
+                }
+            }
+            catch (InvalidOperationException)
+            {
+                // 刚好在这一刻退出，与上面的 HasExited 同理
+                return false;
+            }
+
+            await Task.Delay(250).ConfigureAwait(false);
+        }
+
+        return false;
     }
 
     [RelayCommand]

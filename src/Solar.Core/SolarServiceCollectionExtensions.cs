@@ -11,6 +11,7 @@ using Solar.Core.Launch;
 using Solar.Core.Loaders;
 using Solar.Core.Memory;
 using Solar.Core.Minecraft;
+using Solar.Core.Modpacks;
 using Solar.Core.Mods;
 using Solar.Core.Paths;
 using Solar.Core.Settings;
@@ -38,7 +39,7 @@ public static class SolarServiceCollectionExtensions
 
         services.AddSingleton<IAccountStore, AccountStore>();
 
-        // 默认配置为空；实际取值每次从 ISettingsService 读取，用户改了立即生效
+        // 默认就是启动器内置的应用 ID；实际取值每次从 ISettingsService 读取，用户改了立即生效
         services.AddSingleton(new AuthOptions());
         services.AddSingleton<IMicrosoftAuthService, MicrosoftAuthService>();
 
@@ -91,7 +92,11 @@ public static class SolarServiceCollectionExtensions
         services.AddSingleton<IModCatalog, ModrinthCatalog>();
         services.AddSingleton<IModCatalog, CurseForgeCatalog>();
         services.AddSingleton<IModCatalogService, ModCatalogService>();
+        services.AddSingleton<IModFileDownloader, ModFileDownloader>();
         services.AddSingleton<IModInstaller, ModInstaller>();
+
+        // 整合包：解析 manifest、创建实例、下载全部文件
+        services.AddSingleton<IModpackService, ModpackService>();
     }
 
     /// <summary>

@@ -3,9 +3,10 @@ using Microsoft.Extensions.Logging;
 using Solar.Core;
 using Solar.Core.Accounts;
 
-// 验证微软登录链路。需要先填好客户端 ID：
+// 验证微软登录链路。默认使用启动器内置的客户端 ID：
+//   dotnet run --project tools/Solar.AuthProbe
+// 也可以传一个 ID 覆盖它（用于验证自己注册的应用）：
 //   dotnet run --project tools/Solar.AuthProbe -- <clientId>
-// 留空则只检查配置与端点可达性。
 
 var clientId = args.Length > 0 ? args[0] : "";
 
@@ -14,29 +15,24 @@ var services = new ServiceCollection();
 services.AddLogging(b => b.AddSimpleConsole(o => o.SingleLine = true).SetMinimumLevel(LogLevel.Information));
 services.AddSolarCore(root);
 
-using var provider = services.BuildServiceProvider();
-
-var settings = provider.GetRequiredService<Solar.Core.Settings.ISettingsService>();
-await settings.LoadAsync();
-
-if (!string.IsNullOrWhiteSpace(clientId))
+// 命令行传入的 ID 只覆盖本次运行用的 AuthOptions，不落盘
+var isOverride = !string.IsNullOrWhiteSpace(clientId);
+if (isOverride)
 {
-    settings.Current.MicrosoftClientId = clientId.Trim();
-    await settings.SaveAsync();
-    Console.WriteLine($"已写入客户端 ID: {clientId[..Math.Min(8, clientId.Length)]}…");
+    services.AddSingleton(new AuthOptions { ClientId = clientId.Trim() });
 }
 
-// 服务实际读取的是设置里的值（AuthOptions 只是默认值兜底），
-// 所以这里也要按设置判断，否则刚写入的 ID 会被误判为未配置。
-var configured = !string.IsNullOrWhiteSpace(settings.Current.MicrosoftClientId);
-Console.WriteLine($"当前客户端 ID 配置: {(configured ? "已配置" : "未配置")}");
+using var provider = services.BuildServiceProvider();
+
+var options = provider.GetRequiredService<AuthOptions>();
+var configured = !string.IsNullOrWhiteSpace(options.ClientId);
+Console.WriteLine($"当前客户端 ID: {(configured ? "已配置" : "未配置")}（{(isOverride ? "命令行参数" : "内置默认值")}）");
 
 if (!configured)
 {
     Console.WriteLine();
     Console.WriteLine("未配置客户端 ID，无法走完登录流程。");
-    Console.WriteLine("请在 Azure 门户注册应用后，把 ID 作为参数传入本工具，");
-    Console.WriteLine("或在启动器「设置 → 账户」中填写。");
+    Console.WriteLine("请把 ID 作为参数传入本工具。");
     return 2;
 }
 

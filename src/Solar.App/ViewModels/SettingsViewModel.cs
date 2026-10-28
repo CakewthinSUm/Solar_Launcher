@@ -53,9 +53,6 @@ public sealed partial class SettingsViewModel : ViewModelBase
     private string _javaPath = "";
 
     [ObservableProperty]
-    private string _microsoftClientId = "";
-
-    [ObservableProperty]
     private string _versionManifestUrl = "";
 
     [ObservableProperty]
@@ -70,6 +67,10 @@ public sealed partial class SettingsViewModel : ViewModelBase
     /// <summary>0 = 每次询问，1 = 总是开启，2 = 总是关闭。ComboBox 只认索引。</summary>
     [ObservableProperty]
     private int _newInstanceIsolationIndex;
+
+    /// <summary>0 = 不执行任何操作，1 = 最小化，2 = 关闭。ComboBox 只认索引。</summary>
+    [ObservableProperty]
+    private int _afterLaunchActionIndex;
 
     /// <summary>0 = 官方优先，1 = 镜像优先，2 = 仅镜像。</summary>
     [ObservableProperty]
@@ -108,7 +109,6 @@ public sealed partial class SettingsViewModel : ViewModelBase
     public bool IsAutomaticMemory => MemoryModeIndex == 0;
 
     public bool IsManualMemory => MemoryModeIndex == 1;
-
     /// <summary>滑条旁的数值，按 GB/MB 显示更直观。</summary>
     public string MemoryLimitText => MaxMemoryMb >= 1024
         ? $"{MaxMemoryMb} MB（约 {MaxMemoryMb / 1024.0:0.#} GB）"
@@ -152,18 +152,73 @@ public sealed partial class SettingsViewModel : ViewModelBase
         }
     }
 
-    private void LoadFromSettings()
+    /// <summary>版本清单的官方地址；输入框留空时保存的就是它。</summary>
+    private const string DefaultVersionManifestUrl = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json";
+
+    /// <summary>界面上的值与已保存的设置是否有出入。</summary>
+    public bool HasUnsavedChanges
     {
-        var s = _settings.Current;
+        get
+        {
+            var saved = _settings.Current;
+
+            // 判定规则与 TrySaveAsync 写入时的规范化保持一致：
+            // 只差空白、大小写，或改回了原值，都不算未保存。
+            return (IsManualMemory ? MemoryAllocationMode.Manual : MemoryAllocationMode.Automatic) != saved.MemoryAllocationMode
+                   || MemoryAllocator.Clamp(MaxMemoryMb) != saved.MaxMemoryMb
+                   || MinecraftDirectoryChanged
+                   || NullIfBlank(JavaPath) != saved.JavaPath
+                   || NormalizedVersionManifestUrl != saved.VersionManifestUrl
+                   || Math.Clamp(DownloadThreads, 1, 32) != saved.DownloadThreads
+                   || NullIfBlank(DownloadMirrorUrl) != saved.DownloadMirrorUrl
+                   || (VersionIsolationDefault)Math.Clamp(NewInstanceIsolationIndex, 0, 2) != saved.NewInstanceIsolation
+                   || (AfterLaunchAction)Math.Clamp(AfterLaunchActionIndex, 0, 2) != saved.AfterLaunchAction
+                   || (ModSourcePreference)Math.Clamp(ModSourcePreferenceIndex, 0, 2) != saved.ModSourcePreference
+                   || NullIfBlank(ModMirrorUrl) != saved.ModMirrorUrl
+                   || NullIfBlank(CurseForgeApiKey) != saved.CurseForgeApiKey;
+        }
+    }
+
+    /// <summary>
+    /// 游戏目录按「实际会用的路径」比：留空和显式填默认目录是一回事，
+    /// 大小写与末尾分隔符也不算修改。
+    /// </summary>
+    private bool MinecraftDirectoryChanged
+    {
+        get
+        {
+            try
+            {
+                return !string.Equals(
+                    _paths.ResolveMinecraftDirectory(MinecraftDirectory).TrimEnd('\\', '/'),
+                    _paths.ResolveMinecraftDirectory(_settings.Current.MinecraftDirectory).TrimEnd('\\', '/'),
+                    StringComparison.OrdinalIgnoreCase);
+            }
+            catch
+            {
+                // 路径不合法时退回文本比较；保存时还会再校验一次
+                return NullIfBlank(MinecraftDirectory) != _settings.Current.MinecraftDirectory;
+            }
+        }
+    }
+
+    private string NormalizedVersionManifestUrl => string.IsNullOrWhiteSpace(VersionManifestUrl)
+        ? DefaultVersionManifestUrl
+        : VersionManifestUrl.Trim();
+
+    private void LoadFromSettings() => LoadFromSettings(_settings.Current);
+
+    private void LoadFromSettings(LauncherSettings s)
+    {
         MemoryModeIndex = s.MemoryAllocationMode == MemoryAllocationMode.Manual ? 1 : 0;
         MaxMemoryMb = MemoryAllocator.Clamp(s.MaxMemoryMb);
         JavaPath = s.JavaPath ?? "";
         MinecraftDirectory = s.MinecraftDirectory ?? "";
-        MicrosoftClientId = s.MicrosoftClientId ?? "";
         VersionManifestUrl = s.VersionManifestUrl;
         DownloadThreads = s.DownloadThreads;
         DownloadMirrorUrl = s.DownloadMirrorUrl ?? "";
         NewInstanceIsolationIndex = (int)s.NewInstanceIsolation;
+        AfterLaunchActionIndex = (int)s.AfterLaunchAction;
         ModSourcePreferenceIndex = (int)s.ModSourcePreference;
         ModMirrorUrl = s.ModMirrorUrl ?? "";
         CurseForgeApiKey = s.CurseForgeApiKey ?? "";
@@ -328,27 +383,51 @@ public sealed partial class SettingsViewModel : ViewModelBase
         }
     }
 
+    /// <summary>
+    /// 恢复默认值：只改界面上的值，点保存才写盘。
+    /// 这样用户可以先把各项看一遍再决定，也可以直接离开放弃。
+    /// </summary>
+    [RelayCommand]
+    private void ResetToDefaults() => LoadFromSettings(new LauncherSettings());
+
     [RelayCommand]
     private async Task SaveAsync()
+    {
+        if (!await TrySaveAsync())
+        {
+            return;
+        }
+
+        StatusMessage = "设置已保存";
+        await _dialogs.ShowMessageAsync("已保存", "设置已保存。");
+    }
+
+    /// <summary>离开页面时询问是否保存未提交的修改。</summary>
+    public Task<SaveChangesChoice> AskSaveBeforeLeavingAsync() =>
+        _dialogs.ShowSaveChangesAsync("设置尚未保存", "设置的修改还没有保存，离开前要保存吗？");
+
+    /// <summary>
+    /// 校验并写入设置。失败时已经提示过用户，返回 false。
+    /// 与 <see cref="SaveAsync"/> 分开，是因为离开页面时的保存不该再弹一次「已保存」。
+    /// </summary>
+    public async Task<bool> TrySaveAsync()
     {
         if (!TryNormalizeMinecraftDirectory(out var minecraftDirectory, out var pathError))
         {
             await _dialogs.ShowMessageAsync("路径无效", pathError);
-            return;
+            return false;
         }
 
         var s = _settings.Current;
         s.MemoryAllocationMode = IsManualMemory ? MemoryAllocationMode.Manual : MemoryAllocationMode.Automatic;
         s.MaxMemoryMb = MemoryAllocator.Clamp(MaxMemoryMb);
         s.MinecraftDirectory = minecraftDirectory;
-        s.JavaPath = string.IsNullOrWhiteSpace(JavaPath) ? null : JavaPath.Trim();
-        s.MicrosoftClientId = string.IsNullOrWhiteSpace(MicrosoftClientId) ? null : MicrosoftClientId.Trim();
-        s.VersionManifestUrl = string.IsNullOrWhiteSpace(VersionManifestUrl)
-            ? "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json"
-            : VersionManifestUrl.Trim();
+        s.JavaPath = NullIfBlank(JavaPath);
+        s.VersionManifestUrl = NormalizedVersionManifestUrl;
         s.DownloadThreads = Math.Clamp(DownloadThreads, 1, 32);
-        s.DownloadMirrorUrl = string.IsNullOrWhiteSpace(DownloadMirrorUrl) ? null : DownloadMirrorUrl.Trim();
+        s.DownloadMirrorUrl = NullIfBlank(DownloadMirrorUrl);
         s.NewInstanceIsolation = (VersionIsolationDefault)Math.Clamp(NewInstanceIsolationIndex, 0, 2);
+        s.AfterLaunchAction = (AfterLaunchAction)Math.Clamp(AfterLaunchActionIndex, 0, 2);
 
         // Mod 源三项：换了任何一个，缓存里的项目与版本都属于旧源，必须清掉
         var modSourceChanged = s.ModSourcePreference != (ModSourcePreference)Math.Clamp(ModSourcePreferenceIndex, 0, 2)
@@ -368,13 +447,13 @@ public sealed partial class SettingsViewModel : ViewModelBase
                 _modCache.Clear();
             }
 
-            StatusMessage = "设置已保存";
-            await _dialogs.ShowMessageAsync("已保存", "设置已保存。");
+            return true;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "保存设置失败");
             await _dialogs.ShowMessageAsync("保存失败", ex.Message);
+            return false;
         }
     }
 

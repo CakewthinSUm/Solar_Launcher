@@ -232,7 +232,7 @@ public sealed class InstanceCreationService(
         IProgress<InstanceCreateProgress>? progress,
         CancellationToken ct)
     {
-        // 前两个走 IModInstaller：它带镜像降级与 SHA1 校验，和「管理 → Mods」是同一套逻辑。
+        // 前两个走 IModInstaller：它带镜像降级与 SHA1 校验，和「下载 → Mod」是同一套逻辑。
         var managed = new List<ModInstallItem>();
 
         if (components.FabricApi is { } fabricApi)
@@ -252,7 +252,13 @@ public sealed class InstanceCreationService(
 
             var plan = new ModInstallPlan(managed);
             var result = await modInstaller
-                .InstallAsync(instance, plan, overwrite: false, WrapDownloadProgress(progress), ct)
+                .InstallAsync(
+                    instance,
+                    ModProjectType.Mod,
+                    plan,
+                    overwrite: false,
+                    progress: WrapDownloadProgress(progress),
+                    ct: ct)
                 .ConfigureAwait(false);
 
             instance.CompanionMods.AddRange(result.Files);

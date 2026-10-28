@@ -1,5 +1,10 @@
 # Mod 下载功能设计方案
 
+> 本文是 **Mod** 的原始设计。引擎后来扩展到光影 / 整合包 / 资源包 / 数据包，
+> 类型映射、整合包安装与数据包过滤见 [addon-download-design.md](addon-download-design.md)。
+> 文中提到的 `ModDownloadPage` / `ModProjectPage` 已改名为 `AddonDownloadPage` /
+> `AddonProjectPage`，安装对话框为 `AddonInstallDialog` 与 `ModpackInstallDialog`。
+
 本文先梳理 PCL2 的实现，再给出 Solar Launcher 的落地方案。
 文末「已验证事实」一节记录的是本次实际请求过的接口，可直接作为实现依据。
 

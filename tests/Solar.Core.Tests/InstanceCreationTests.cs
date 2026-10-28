@@ -5,6 +5,7 @@ using Solar.Core.Instances;
 using Solar.Core.Java;
 using Solar.Core.Loaders;
 using Solar.Core.Minecraft;
+using Solar.Core.Mods;
 using Solar.Core.Paths;
 using Xunit;
 
@@ -311,20 +312,31 @@ public sealed class InstanceCreationTests : IDisposable
         private readonly InstanceGameDirectory _gameDirectories =
             new(paths, new FakeSettings());
 
-        public string GetModsDirectory(GameInstance instance) =>
-            Path.Combine(_gameDirectories.Resolve(instance), "mods");
+        public string GetContentDirectory(
+            GameInstance instance,
+            Solar.Core.Mods.ModProjectType type,
+            string? world = null) =>
+            Path.Combine(_gameDirectories.Resolve(instance), type.ContentFolder() ?? "mods");
 
-        public bool IsInstalled(GameInstance instance, Solar.Core.Mods.ModFile file) =>
-            File.Exists(Path.Combine(GetModsDirectory(instance), file.FileName));
+        public bool IsInstalled(
+            GameInstance instance,
+            Solar.Core.Mods.ModProjectType type,
+            Solar.Core.Mods.ModFile file,
+            string? world = null) =>
+            File.Exists(Path.Combine(GetContentDirectory(instance, type, world), file.FileName));
+
+        public IReadOnlyList<string> GetWorlds(GameInstance instance) => [];
 
         public Task<Solar.Core.Mods.ModInstallResult> InstallAsync(
             GameInstance instance,
+            Solar.Core.Mods.ModProjectType type,
             Solar.Core.Mods.ModInstallPlan plan,
+            string? world = null,
             bool overwrite = false,
             IProgress<Solar.Core.Download.DownloadProgress>? progress = null,
             CancellationToken ct = default)
         {
-            var directory = GetModsDirectory(instance);
+            var directory = GetContentDirectory(instance, type, world);
             Directory.CreateDirectory(directory);
 
             var files = new List<string>();

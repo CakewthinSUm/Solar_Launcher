@@ -65,9 +65,10 @@ public partial class App : Application
         services.AddTransient<InstanceSetupViewModel>();
         services.AddTransient<InstanceCreateViewModel>();
         services.AddTransient<DownloadViewModel>();
-        services.AddTransient<ModDownloadViewModel>();
-        services.AddTransient<ModProjectViewModel>();
-        services.AddTransient<ModInstallDialogViewModel>();
+        services.AddTransient<AddonDownloadViewModel>();
+        services.AddTransient<AddonProjectViewModel>();
+        services.AddTransient<AddonInstallDialogViewModel>();
+        services.AddTransient<ModpackInstallDialogViewModel>();
         services.AddTransient<ContentViewModel>();
         services.AddTransient<SettingsViewModel>();
         services.AddTransient<AccountsViewModel>();
@@ -76,8 +77,8 @@ public partial class App : Application
         services.AddTransient<InstanceSetupPage>();
         services.AddTransient<InstanceCreatePage>();
         services.AddTransient<DownloadPage>();
-        services.AddTransient<ModDownloadPage>();
-        services.AddTransient<ModProjectPage>();
+        services.AddTransient<AddonDownloadPage>();
+        services.AddTransient<AddonProjectPage>();
         services.AddTransient<ContentPage>();
         services.AddTransient<SettingsPage>();
         services.AddTransient<AccountsPage>();

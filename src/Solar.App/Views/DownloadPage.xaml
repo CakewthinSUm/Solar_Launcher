@@ -6,12 +6,12 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:views="using:Solar.App.Views"
+    xmlns:fmt="using:Solar.App.Formatting"
     xmlns:models="using:Solar.Core.Models"
     mc:Ignorable="d">
 
     <!--
-        六个分区由侧边栏「下载」下的子项切换，页面本身只负责按分区渲染内容，
-        不再放第二层 tab，避免同一份导航出现两处入口。
+        这个页面只负责 Minecraft 版本列表；其余五个分区由 AddonDownloadPage 处理。
         底部不留内边距：版本列表要铺到窗口下边缘，否则滚到底会有一条空白带，
         看起来像最后一行被截断了（内边距改由列表自己的 Padding 提供）。
     -->
@@ -54,6 +54,7 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
                 <AutoSuggestBox
@@ -63,17 +64,67 @@
                     PlaceholderText="版本号"
                     QueryIcon="Find"
                     Text="{x:Bind ViewModel.SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                <!--
-                    ToggleSwitch 的 On/OffContent 描述的是开关当前状态，不是它控制的行为。
-                    用 Header 说明开关的含义，状态文案只写“开 / 关”，避免歧义。
-                -->
-                <ToggleSwitch
+
+                <TextBlock
                     Grid.Column="1"
                     VerticalAlignment="Bottom"
-                    Header="显示快照版本"
-                    IsOn="{x:Bind ViewModel.ShowSnapshots, Mode=TwoWay}"
-                    OffContent="关"
-                    OnContent="开" />
+                    Margin="0,0,0,8"
+                    Style="{StaticResource CaptionTextBlockStyle}"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}"
+                    Visibility="{x:Bind ViewModel.HasStatusMessage, Mode=OneWay, Converter={StaticResource VisibleWhenTrue}}" />
+
+                <!--
+                    筛选面板必须内联在页面上：放进 Page.Resources 会失去 x:Bind 的命名空间。
+                    Flyout 默认向上弹出，会盖住搜索行，所以指定向下弹出。
+                -->
+                <Button
+                    x:Name="FilterButton"
+                    Grid.Column="2"
+                    VerticalAlignment="Bottom"
+                    AutomationProperties.Name="筛选">
+                    <Button.Flyout>
+                        <Flyout Placement="BottomEdgeAlignedLeft">
+                            <StackPanel Width="260" Spacing="12">
+                                <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="版本类型" />
+                                <CheckBox Content="正式版" IsChecked="{x:Bind ViewModel.ShowReleases, Mode=TwoWay}" />
+                                <CheckBox Content="快照" IsChecked="{x:Bind ViewModel.ShowSnapshots, Mode=TwoWay}" />
+                                <CheckBox Content="预发布版" IsChecked="{x:Bind ViewModel.ShowPrereleases, Mode=TwoWay}" />
+                                <CheckBox Content="远古 Beta" IsChecked="{x:Bind ViewModel.ShowOldBeta, Mode=TwoWay}" />
+                                <CheckBox Content="远古 Alpha" IsChecked="{x:Bind ViewModel.ShowOldAlpha, Mode=TwoWay}" />
+
+                                <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="发布年份" />
+                                <ComboBox
+                                    HorizontalAlignment="Stretch"
+                                    AutomationProperties.Name="发布年份"
+                                    DisplayMemberPath="Label"
+                                    ItemsSource="{x:Bind ViewModel.YearOptions}"
+                                    SelectedIndex="{x:Bind ViewModel.YearIndex, Mode=TwoWay}" />
+
+                                <Grid ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Button
+                                        Grid.Column="0"
+                                        Command="{x:Bind ViewModel.ResetFiltersCommand}"
+                                        Content="重置" />
+                                    <Button
+                                        Grid.Column="1"
+                                        HorizontalAlignment="Stretch"
+                                        Click="CloseFilter_Click"
+                                        Content="完成"
+                                        Style="{StaticResource AccentButtonStyle}" />
+                                </Grid>
+                            </StackPanel>
+                        </Flyout>
+                    </Button.Flyout>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <FontIcon FontSize="16" Glyph="&#xE71C;" />
+                        <TextBlock Text="筛选" />
+                    </StackPanel>
+                </Button>
             </Grid>
 
             <!--
@@ -110,7 +161,7 @@
                                 VerticalAlignment="Center"
                                 Style="{StaticResource CaptionTextBlockStyle}"
                                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                Text="{x:Bind Type}" />
+                                Text="{x:Bind fmt:VersionDisplay.TypeLabel(Type, Id)}" />
                             <FontIcon
                                 Grid.Column="2"
                                 VerticalAlignment="Center"
@@ -122,6 +173,17 @@
                 </ListView.ItemTemplate>
             </ListView>
 
+            <!-- 空状态：叠在列表上但不吃点击，滚动和行点击都不受影响 -->
+            <TextBlock
+                Grid.Row="2"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                IsHitTestVisible="False"
+                Style="{StaticResource BodyTextBlockStyle}"
+                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                Text="{x:Bind ViewModel.EmptyStateText, Mode=OneWay}"
+                Visibility="{x:Bind ViewModel.HasNoResults, Mode=OneWay, Converter={StaticResource VisibleWhenTrue}}" />
+
             <InfoBar
                 Grid.Row="2"
                 VerticalAlignment="Top"
@@ -131,22 +193,5 @@
                 Severity="Error" />
         </Grid>
 
-        <!-- 其余分区：暂为占位，待接入各自的来源后替换 -->
-        <StackPanel
-            Grid.Row="1"
-            HorizontalAlignment="Center"
-            VerticalAlignment="Center"
-            Spacing="4"
-            Visibility="{x:Bind ViewModel.IsPlaceholderSection, Mode=OneWay, Converter={StaticResource VisibleWhenTrue}}">
-            <TextBlock
-                HorizontalAlignment="Center"
-                Style="{StaticResource BodyStrongTextBlockStyle}"
-                Text="{x:Bind ViewModel.SectionTitle, Mode=OneWay}" />
-            <TextBlock
-                HorizontalAlignment="Center"
-                Style="{StaticResource CaptionTextBlockStyle}"
-                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                Text="尚未接入" />
-        </StackPanel>
     </Grid>
 </views:PageBase>

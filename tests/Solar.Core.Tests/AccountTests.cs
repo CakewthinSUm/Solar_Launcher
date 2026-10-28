@@ -189,6 +189,10 @@ public class AccountErrorTranslationTests
 
 public class AuthOptionsTests
 {
+    /// <summary>内置的客户端 ID 不能丢：丢了普通用户就登不上了。</summary>
+    [Fact]
+    public void DefaultClientIdIsBundled() => Assert.True(new AuthOptions().IsConfigured);
+
     [Theory]
     [InlineData(null, false)]
     [InlineData("", false)]
