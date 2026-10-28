@@ -120,7 +120,8 @@
                 <ProgressRing
                     Width="16"
                     Height="16"
-                    IsActive="{x:Bind ViewModel.IsSearching, Mode=OneWay}" />
+                    IsActive="{x:Bind ViewModel.ShowInlineBusy, Mode=OneWay}"
+                    Visibility="{x:Bind ViewModel.ShowInlineBusy, Mode=OneWay, Converter={StaticResource VisibleWhenTrue}}" />
                 <Button
                     VerticalAlignment="Center"
                     Command="{x:Bind ViewModel.LoadMoreCommand}"
@@ -261,13 +262,23 @@
                 </ListView.ItemTemplate>
             </ListView>
 
+            <!-- 搜索中且列表为空：内容区正中的大进度环，取代「没有结果」出现 -->
+            <ProgressRing
+                Grid.Row="1"
+                Width="48"
+                Height="48"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                IsActive="{x:Bind ViewModel.ShowCenterBusy, Mode=OneWay}"
+                Visibility="{x:Bind ViewModel.ShowCenterBusy, Mode=OneWay, Converter={StaticResource VisibleWhenTrue}}" />
+
             <!-- 空状态 -->
             <StackPanel
                 Grid.Row="1"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Center"
                 Spacing="4"
-                Visibility="{x:Bind ViewModel.HasResults, Mode=OneWay, Converter={StaticResource CollapsedWhenTrue}}">
+                Visibility="{x:Bind ViewModel.ShowEmptyState, Mode=OneWay, Converter={StaticResource VisibleWhenTrue}}">
                 <TextBlock
                     HorizontalAlignment="Center"
                     Style="{StaticResource BodyStrongTextBlockStyle}"
