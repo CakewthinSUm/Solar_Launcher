@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="docs/images/icon.png" width="96" alt="Solar Launcher 图标" />
+
 # ☀️ Solar Launcher
 
 **一个用 WinUI 3 写的现代 Minecraft 启动器**
