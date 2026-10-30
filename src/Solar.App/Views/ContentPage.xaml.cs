@@ -1,5 +1,7 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media.Animation;
+using Microsoft.UI.Xaml.Navigation;
 using Solar.App.ViewModels;
 using Solar.Core.Content;
 
@@ -16,9 +18,35 @@ public sealed partial class ContentPage : PageBase
         ViewModel = viewModel;
         DataContext = viewModel;
         InitializeComponent();
+
+        // 这一页要在 Mods / 资源包 / 光影 之间切换。缓存复用旧页面时，
+        // 分区栏不会跟着新参数重建，容易停在上一段分区上；每次重建最省心。
+        NavigationCacheMode = Microsoft.UI.Xaml.Navigation.NavigationCacheMode.Disabled;
     }
 
     public new ContentViewModel ViewModel { get; }
+
+    /// <summary>分区栏跟着导航参数走：从实例页或栏上切过来时，把选中项拨到当前分区。</summary>
+    protected override void OnNavigatedTo(NavigationEventArgs e)
+    {
+        base.OnNavigatedTo(e);
+        SectionBar.SelectedKey = e.Parameter as string ?? ViewModel.Section.Key;
+    }
+
+    /// <summary>
+    /// 分区栏切到实例：回到实例列表；其余分区仍是这一页，换个参数即可。
+    /// 分区切换不播页面动画——它更像页内 tab，用入场动画整页飞进来会显得很跳。
+    /// </summary>
+    private void SectionBar_SectionSelected(object? sender, string key)
+    {
+        if (key == "instances")
+        {
+            Frame.Navigate(typeof(InstancesPage), null, new SuppressNavigationTransitionInfo());
+            return;
+        }
+
+        Frame.Navigate(typeof(ContentPage), key, new SuppressNavigationTransitionInfo());
+    }
 
     /// <summary>
     /// 导入文件。具体认哪些后缀由 ContentManager 在列列表时决定，

@@ -11,7 +11,7 @@ public enum AccountType
 /// <para>
 /// 这里只保存"展示用的身份信息"和"下次静默刷新所需的句柄"。
 /// 真正的 OAuth / XSTS / Minecraft 令牌由 CmlLib 的账户管理器保管，
-/// 存放在 <c>SolarData/msa-accounts.json</c>，不经过本类。
+/// 存放在 <c>%APPDATA%\SolarLauncher\msa-accounts.json</c>，不经过本类。
 /// </para>
 /// </summary>
 public sealed class GameAccount

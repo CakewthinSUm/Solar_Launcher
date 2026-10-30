@@ -131,8 +131,8 @@ Forge / NeoForge 的 installer 不是简单解压：它要跑若干 processor（
 
 令牌链（OAuth → Xbox Live → XSTS → Minecraft Services）由
 [CmlLib.Core.Auth.Microsoft](https://github.com/CmlLib/CmlLib.Core.Auth.Microsoft) 完成。
-`SolarData/accounts.json` 只存用户名、UUID、XUID 等展示信息，**不含任何令牌**；
-令牌在 `SolarData/msa-accounts.json`。
+`%APPDATA%\SolarLauncher\accounts.json` 只存用户名、UUID、XUID 等展示信息，**不含任何令牌**；
+令牌在 `%APPDATA%\SolarLauncher\msa-accounts.json`。
 
 > **客户端 ID 已内置**：启动器随包分发自己的 Azure 应用 ID，登录无需任何配置。
 > 详见下方[账户配置](#账户配置)。
@@ -180,7 +180,8 @@ Forge / NeoForge 的 installer 不是简单解压：它要跑若干 processor（
 ```
 src/
   Solar.Core/            核心层，无 UI 依赖
-    Paths/               AppPaths：所有目录集中管理，便携版根目录 = exe 所在目录
+    Paths/               AppPaths：所有目录集中管理；游戏资源在 exe 所在目录，
+                         配置与账户在 %APPDATA%\SolarLauncher
     Json/                统一 JSON 选项、原子写入、参数数组转换器
     Models/              Mojang 版本 JSON 模型、rules 求值
     Minecraft/           版本清单下载与缓存、版本 JSON 解析与 inheritsFrom 合并
@@ -214,7 +215,9 @@ tools/                   端到端验证工具（见下）
 
 从 [Releases](../../releases) 下载最新构建，解压到任意目录，双击 `SolarLauncher.exe`。
 
-这是**便携版**：所有数据都写在 exe 所在目录，删掉文件夹即可完全卸载。
+程序免安装：游戏资源写在 exe 所在目录，**配置、账户与日志在 `%APPDATA%\SolarLauncher`**，
+所以换一个程序副本仍是同一份登录状态；删掉 exe 所在的文件夹即可卸载，
+再手动删掉 `%APPDATA%\SolarLauncher` 就什么都不剩了。
 Windows App SDK 以自包含方式随输出分发；仍需安装 **.NET 8 Desktop Runtime**。
 
 > 解压即用：微软登录所需的客户端 ID 已内置，无需任何前置配置。见[账户配置](#账户配置)。
@@ -232,19 +235,24 @@ dotnet run --project src/Solar.App
 
 ---
 
-## 📁 目录布局（便携版）
+## 📁 目录布局
 
-运行后在 exe 所在目录生成：
+数据分两处存放：
 
 ```
-SolarData/          设置、账户、日志、版本清单缓存
-SolarShared/        共享资源：versions / libraries / assets / runtime
-                    versions/<id>/ 同时是隔离实例的游戏目录（存档、模组、配置写在里面）
-SolarInstances/     每个实例一个目录：natives、instance.json
-                    （整合包实例的游戏目录 .minecraft/ 也在这里，因为它的加载器
-                      要到首次启动才安装）
-.minecraft/         共享游戏目录：存档、模组、配置（默认位置，可在设置中改）
+%APPDATA%\SolarLauncher\   配置、账户、日志，以及版本清单与 Mod 缓存
+                           （settings.json / accounts.json / msa-accounts.json / instances.json / logs）
+<exe 所在目录>\
+SolarShared/               共享资源：versions / libraries / assets / runtime
+                           versions/<id>/ 同时是隔离实例的游戏目录（存档、模组、配置写在里面）
+SolarInstances/            每个实例一个目录：natives、instance.json
+                           （整合包实例的游戏目录 .minecraft/ 也在这里，因为它的加载器
+                             要到首次启动才安装）
+.minecraft/                共享游戏目录：存档、模组、配置（默认位置，可在设置中改）
 ```
+
+旧版本写在 exe 旁边的 `SolarData/` 会在首次启动时自动搬到 `%APPDATA%\SolarLauncher`，
+登录状态不会丢；目标目录已有数据时不会覆盖。
 
 共享游戏目录（`.minecraft`）供未开启隔离的实例使用，因此换实例不会丢存档。
 把它指向官方启动器的 `.minecraft` 就能直接复用已有的模组与存档。

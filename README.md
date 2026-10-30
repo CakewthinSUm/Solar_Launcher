@@ -112,8 +112,8 @@ Login uses the OAuth **device code flow**: click "Sign in" and the launcher show
 
 The token chain (OAuth → Xbox Live → XSTS → Minecraft Services) is handled by
 [CmlLib.Core.Auth.Microsoft](https://github.com/CmlLib/CmlLib.Core.Auth.Microsoft).
-`SolarData/accounts.json` stores only display data such as username, UUID, and XUID, **no tokens**;
-tokens live in `SolarData/msa-accounts.json`.
+`%APPDATA%\SolarLauncher\accounts.json` stores only display data such as username, UUID, and XUID, **no tokens**;
+tokens live in `%APPDATA%\SolarLauncher\msa-accounts.json`.
 
 > **Client ID is built in**: the launcher ships its own Azure application ID, so login needs no configuration.
 > See [Account configuration](#-account-configuration) below.
@@ -161,7 +161,8 @@ the latter needs no API key, the only practical way to use CurseForge from mainl
 ```
 src/
   Solar.Core/            Core layer, no UI dependencies
-    Paths/               AppPaths: central directory management; portable root = exe directory
+    Paths/               AppPaths: central directory management; game files in the exe directory,
+                         settings/accounts in %APPDATA%\SolarLauncher
     Json/                Shared JSON options, atomic writes, argument array converter
     Models/              Mojang version JSON models, rules evaluation
     Minecraft/           Version manifest download and cache, version JSON parsing and inheritsFrom merging
@@ -195,7 +196,9 @@ tools/                   End-to-end probes (see below)
 
 Download the latest build from [Releases](../../releases), extract it anywhere, and double-click `SolarLauncher.exe`.
 
-This is a **portable** build: all data lives next to the exe, and deleting the folder removes everything.
+No installer: game files live next to the exe, while **settings, accounts and logs live in `%APPDATA%\SolarLauncher`**,
+so a second copy of the launcher still finds the same login. Delete the exe folder to uninstall,
+and `%APPDATA%\SolarLauncher` to leave nothing behind.
 The Windows App SDK is bundled; the **.NET 8 Desktop Runtime** is still required.
 
 > Ready to use: the Azure client ID needed for Microsoft login is built in, so no setup is required. See [Account configuration](#-account-configuration).
@@ -213,20 +216,25 @@ dotnet run --project src/Solar.App
 
 ---
 
-## 📁 Directory layout (portable)
+## 📁 Directory layout
 
-Created next to the exe at runtime:
+Data lives in two places:
 
 ```
-SolarData/          Settings, accounts, logs, version manifest cache
-SolarShared/        Shared resources: versions / libraries / assets / runtime
-                    versions/<id>/ also becomes the game directory of isolated instances
-                    (saves, mods and configs land there)
-SolarInstances/     One directory per instance: natives, instance.json
-                    (modpack instances also keep their game directory, .minecraft/,
-                     here because their loader is installed on first launch)
-.minecraft/         Shared game directory: saves, mods, configs (default; configurable in Settings)
+%APPDATA%\SolarLauncher\   Settings, accounts, logs, version manifest and mod caches
+                           (settings.json / accounts.json / msa-accounts.json / instances.json / logs)
+<exe directory>\
+SolarShared/               Shared resources: versions / libraries / assets / runtime
+                           versions/<id>/ is also the game directory of isolated instances
+                           (saves, mods and configs land there)
+SolarInstances/            One directory per instance: natives, instance.json
+                           (modpack instances also keep their game directory, .minecraft/,
+                            here because their loader is installed on first launch)
+.minecraft/                Shared game directory: saves, mods, configs (default; configurable in Settings)
 ```
+
+A legacy `SolarData/` next to the exe is moved to `%APPDATA%\SolarLauncher` on first launch,
+so the login survives the upgrade; existing data at the destination is never overwritten.
 
 The shared game directory (`.minecraft`) is used by instances without isolation, so switching instances never loses saves.
 Point it at the official launcher's `.minecraft` to reuse existing mods and saves.

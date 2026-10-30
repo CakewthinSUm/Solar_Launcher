@@ -23,7 +23,7 @@ public sealed record ContentSectionInfo(ContentKind Kind, string Key, string Tit
 }
 
 /// <summary>
-/// 内容管理页：Mods、资源包、光影共用这一个视图模型，当前分区由侧边栏子项的导航参数决定。
+/// 内容管理页：Mods、资源包、光影共用这一个视图模型，当前分区由页面顶部分区栏的导航参数决定。
 /// 列表直接读实例游戏目录下的对应文件夹，文件系统就是唯一事实来源。
 /// </summary>
 public sealed partial class ContentViewModel : ViewModelBase
@@ -87,7 +87,7 @@ public sealed partial class ContentViewModel : ViewModelBase
     public bool IsEmpty => !HasItems;
 
     public string EmptyHint => HasNoInstances
-        ? "还没有实例。先在「管理 → 实例」创建一个，再回来管理内容。"
+        ? "还没有实例。先在「管理」创建一个，再回来管理内容。"
         : $"这个实例的 {ContentFolders.GetFolderName(Section.Kind)} 文件夹是空的，点「导入」把文件放进来。";
 
     public override Task OnNavigatedToAsync(object? parameter) => LoadAsync(parameter as string);
