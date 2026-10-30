@@ -67,6 +67,34 @@
                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                             Text="{x:Bind ViewModel.SelectedInstanceSummary, Mode=OneWay}" />
 
+                        <!-- 版本隔离：与实例设置里的同名开关是同一个值，切换即保存 -->
+                        <Grid ColumnSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel VerticalAlignment="Center" Spacing="2">
+                                <TextBlock
+                                    Style="{StaticResource BodyTextBlockStyle}"
+                                    Text="版本隔离" />
+                                <TextBlock
+                                    Style="{StaticResource CaptionTextBlockStyle}"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="{x:Bind ViewModel.IsolationHint, Mode=OneWay}"
+                                    TextWrapping="Wrap" />
+                            </StackPanel>
+
+                            <ToggleSwitch
+                                Grid.Column="1"
+                                VerticalAlignment="Center"
+                                AutomationProperties.Name="版本隔离"
+                                IsEnabled="{x:Bind ViewModel.CanChangeIsolation, Mode=OneWay}"
+                                IsOn="{x:Bind ViewModel.VersionIsolation, Mode=TwoWay}"
+                                OffContent="关"
+                                OnContent="开" />
+                        </Grid>
+
                         <!-- 开合动画在 code-behind 里做：从 0 高度展开，卡片不会突然跳高 -->
                         <InfoBar
                             x:Name="NoInstanceWarning"

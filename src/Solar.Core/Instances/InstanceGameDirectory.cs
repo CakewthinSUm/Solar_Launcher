@@ -7,10 +7,12 @@ namespace Solar.Core.Instances;
 public sealed record CopySummary(int CopiedFiles, int SkippedFiles);
 
 /// <summary>
-/// 决定一个实例该用哪个游戏目录（.minecraft）。
+/// 决定一个实例该用哪个游戏目录（.minecraft），对齐 PCL 的版本隔离：
+/// 隔离开启时游戏目录就是该版本的版本文件夹，关闭时用全局设置里的共享目录。
 /// <para>
-/// 未开启版本隔离时用全局设置里的共享目录；开启后用实例自己的
-/// <c>SolarInstances/&lt;id&gt;/.minecraft</c>，存档、模组、配置都与其它实例分开。
+/// 游戏目录优先看实例的 <see cref="GameInstance.GameDirectoryOverride"/>
+/// （整合包实例的私有目录），否则在该版本的版本文件夹里找：
+/// <c>SolarShared/versions</c> 与共享游戏目录的 <c>versions</c>。
 /// assets 与 libraries 始终在 <c>SolarShared/</c> 下，不受隔离影响。
 /// </para>
 /// </summary>
@@ -19,32 +21,51 @@ public sealed class InstanceGameDirectory(AppPaths paths, ISettingsService setti
     /// <summary>共享游戏目录，即未开启隔离的实例所用的那份 .minecraft。</summary>
     public string Shared => paths.ResolveMinecraftDirectory(settings.Current.MinecraftDirectory);
 
-    public string GetIsolatedPath(string instanceId) => paths.GetInstanceMinecraftDirectory(instanceId);
+    /// <summary>
+    /// 实例目录下的 .minecraft。整合包实例在加载器装好前用它
+    /// （版本 id 会变，不能按 id 推版本文件夹）。
+    /// </summary>
+    public string GetOwnGameDirectory(string instanceId) => paths.GetInstanceMinecraftDirectory(instanceId);
 
-    /// <summary>解析实例实际使用的游戏目录：覆盖 &gt; 常规隔离 &gt; 共享目录。</summary>
-    public string Resolve(GameInstance instance)
+    /// <summary>
+    /// 隔离实例的游戏目录：覆盖路径优先，否则是该版本的版本文件夹。
+    /// 版本还没下载时返回它的落点 <c>SolarShared/versions/&lt;id&gt;</c>。
+    /// </summary>
+    public string GetIsolatedPath(GameInstance instance)
     {
         var overridePath = instance.GameDirectoryOverride;
         if (!string.IsNullOrWhiteSpace(overridePath))
         {
             // 相对路径按程序根目录解析，与 MinecraftDirectory 的解析规则一致（便携性）；
-            // 绝对路径（扫描导入时记录的版本夹，可能在 Root 外）原样使用。
+            // 绝对路径（整合包实例目录，可能在 Root 外）原样使用。
             var expanded = Environment.ExpandEnvironmentVariables(overridePath.Trim());
             return Path.GetFullPath(expanded, paths.Root);
         }
 
-        return instance.VersionIsolation ? GetIsolatedPath(instance.Id) : Shared;
+        var versionId = instance.EffectiveVersionId;
+        if (string.IsNullOrWhiteSpace(versionId))
+        {
+            // 没有版本信息的实例（理论上不会出现）退回实例目录，避免把路径拼到 versions 根上
+            return paths.GetInstanceMinecraftDirectory(instance.Id);
+        }
+
+        return VersionFolders.Find(paths, Shared, versionId)
+               ?? Path.Combine(paths.Versions, versionId);
     }
 
+    /// <summary>解析实例实际使用的游戏目录：隔离用版本文件夹，否则用共享目录。</summary>
+    public string Resolve(GameInstance instance) =>
+        instance.VersionIsolation ? GetIsolatedPath(instance) : Shared;
+
     /// <summary>
-    /// 把共享目录里属于玩家的内容复制到实例目录，用于刚开启隔离时给用户一个可用的起点。
+    /// 把共享目录里属于玩家的内容复制到隔离实例的版本文件夹，用于刚开启隔离时给用户一个可用的起点。
     /// 目标已存在的文件不覆盖（共享目录里那份可能更旧），源目录只读不动。
     /// 复制可能涉及上千个文件，调用方应放到后台线程执行。
     /// </summary>
-    public CopySummary CopySharedContent(string instanceId, CancellationToken ct = default)
+    public CopySummary CopySharedContent(GameInstance instance, CancellationToken ct = default)
     {
         var source = Shared;
-        var target = GetIsolatedPath(instanceId);
+        var target = GetIsolatedPath(instance);
 
         if (!Directory.Exists(source))
         {

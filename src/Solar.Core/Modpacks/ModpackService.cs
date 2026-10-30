@@ -232,6 +232,14 @@ public sealed class ModpackService(
             LoaderInstalled = plan.Loader == ModLoader.Vanilla,
         };
 
+        // 整合包在加载器装好前就把文件下进游戏目录，而 VersionId 要到首次启动
+        // 装完加载器才会定下来；若按版本 id 推版本文件夹，目录会漂移、文件变成孤儿。
+        // 因此整合包固定用自己的实例目录，隔离开关的语义不变（关掉仍回共享目录）。
+        if (versionIsolation)
+        {
+            instance.GameDirectoryOverride = gameDirectories.GetOwnGameDirectory(instance.Id);
+        }
+
         // 先落盘记录：下载到一半取消时，已经下好的文件仍然属于一个可识别的实例
         await repository.SaveAsync(instance, ct).ConfigureAwait(false);
 

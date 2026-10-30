@@ -33,7 +33,7 @@
                 <TextBlock
                     Style="{StaticResource BodyTextBlockStyle}"
                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                    Text="每个实例可选择不同版本与加载器；游戏目录里已有的版本会自动导入。在实例设置里可开启版本隔离，让它独占存档与模组" />
+                    Text="每个实例可选择不同版本与加载器；游戏目录里已有的版本会自动导入。开启版本隔离后以该版本的版本文件夹为游戏目录，同版本实例共用存档与模组" />
             </StackPanel>
 
             <!-- 游戏目录里的版本变化（例如刚用官方启动器装了一个）随时可重新扫描 -->

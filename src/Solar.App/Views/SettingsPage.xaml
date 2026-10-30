@@ -155,7 +155,7 @@
                             <TextBlock
                                 Style="{StaticResource CaptionTextBlockStyle}"
                                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                Text="开启隔离的实例使用自己的存档、模组与配置目录，不会与其它实例互相影响。非正式版指快照、预发布与远古版本。"
+                                Text="开启隔离的实例以该版本的版本文件夹作为游戏目录，存档与模组和共享目录分开；同一版本的其他实例会共用它。非正式版指快照、预发布与远古版本。"
                                 TextWrapping="Wrap" />
                         </StackPanel>
 
@@ -201,7 +201,7 @@
                             <TextBlock
                                 Style="{StaticResource CaptionTextBlockStyle}"
                                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                Text="未开启版本隔离的实例共用的存档、模组与配置目录。可直接指向官方启动器的 .minecraft 以复用已有内容；留空则使用程序目录下的 .minecraft。"
+                                Text="未开启版本隔离的实例共用的存档、模组与配置目录；开启隔离的实例改用各自版本的版本文件夹。可直接指向官方启动器的 .minecraft 以复用已有内容；留空则使用程序目录下的 .minecraft。"
                                 TextWrapping="Wrap" />
                         </StackPanel>
 

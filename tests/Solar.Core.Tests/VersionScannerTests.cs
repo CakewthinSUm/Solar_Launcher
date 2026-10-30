@@ -151,7 +151,7 @@ public sealed class VersionScannerTests : IDisposable
         var all = await _repository.GetAllAsync();
         Assert.Equal(2, all.Count);
 
-        // 导入的实例直接用现成的游戏目录，不能开隔离
+        // 档位关闭且版本夹里没有玩家内容：不隔离，用共享目录
         Assert.All(all, i => Assert.False(i.VersionIsolation));
         Assert.All(all, i => Assert.Null(i.GameDirectoryOverride));
 
@@ -164,22 +164,25 @@ public sealed class VersionScannerTests : IDisposable
     }
 
     [Fact]
-    public async Task ImportWithScopeAllPointsGameDirectoryVersionAtItsFolder()
+    public async Task ImportWithScopeAllIsolatesVersionFolder()
     {
-        // PCL 式「版本夹即目录」：游戏目录下的版本，档位要求隔离时把游戏目录指到版本夹本身
+        // PCL 式版本隔离：游戏目录就是版本文件夹，导入时只需要打开隔离开关
         _settings.Current.NewInstanceIsolationScope = VersionIsolationScope.All;
         WriteVersion("1.21.4", VersionJson("1.21.4"));
 
         var imported = Assert.Single(await _scanner.ImportAsync());
 
-        Assert.Equal(Path.Combine(_locator.ExternalVersions, "1.21.4"), imported.GameDirectoryOverride);
-        Assert.False(imported.VersionIsolation);
+        Assert.True(imported.VersionIsolation);
+        Assert.Null(imported.GameDirectoryOverride);
+        Assert.Equal(
+            Path.Combine(_locator.ExternalVersions, "1.21.4"),
+            _directories.Resolve(imported));
     }
 
     [Fact]
     public async Task ImportWithScopeAllIsolatesSharedVersions()
     {
-        // SolarShared/versions 下的自装版本没有「版本夹即目录」语义，需要隔离时退回实例目录
+        // SolarShared/versions 下的版本同样以版本文件夹为游戏目录
         _settings.Current.NewInstanceIsolationScope = VersionIsolationScope.All;
         var directory = Path.Combine(_paths.Versions, "1.21.4");
         Directory.CreateDirectory(directory);
@@ -194,7 +197,7 @@ public sealed class VersionScannerTests : IDisposable
     [Fact]
     public async Task ImportDetectsExistingModsInVersionFolderEvenWhenScopeIsOff()
     {
-        // 对应 PCL 的自动检测：版本夹下已有 mods（或 saves）时，无论全局档位都把游戏目录指过去
+        // 对应 PCL 的自动检测：版本夹下已有 mods（或 saves）时，无论全局档位都隔离
         _settings.Current.NewInstanceIsolationScope = VersionIsolationScope.Off;
         WriteVersion("1.20.1-forge-47.2.0", """
             { "id": "1.20.1-forge-47.2.0", "inheritsFrom": "1.20.1",
@@ -206,10 +209,10 @@ public sealed class VersionScannerTests : IDisposable
 
         var imported = Assert.Single(await _scanner.ImportAsync());
 
+        Assert.True(imported.VersionIsolation);
         Assert.Equal(
             Path.Combine(_locator.ExternalVersions, "1.20.1-forge-47.2.0"),
-            imported.GameDirectoryOverride);
-        Assert.False(imported.VersionIsolation);
+            _directories.Resolve(imported));
     }
 
     [Fact]
@@ -250,11 +253,9 @@ public sealed class VersionScannerTests : IDisposable
         _settings.Current.NewInstanceIsolationScope = VersionIsolationScope.Unstable;
         var byScope = (await _scanner.ImportAsync()).ToDictionary(i => i.VersionId!);
 
-        // 游戏目录下的版本按 PCL 方式隔离：游戏目录指向版本夹本身
-        Assert.Equal(
-            Path.Combine(_locator.ExternalVersions, "24w40a"),
-            byScope["24w40a"].GameDirectoryOverride);
-        Assert.Null(byScope["1.21.4"].GameDirectoryOverride);
+        // 按档位只隔离快照；隔离后游戏目录就是各自的版本文件夹
+        Assert.True(byScope["24w40a"].VersionIsolation);
+        Assert.False(byScope["1.21.4"].VersionIsolation);
     }
 
     [Fact]

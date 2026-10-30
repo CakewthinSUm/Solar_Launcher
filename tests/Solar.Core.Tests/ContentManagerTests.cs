@@ -12,7 +12,7 @@ public sealed class ContentManagerTests : IDisposable
     private readonly string _root = Path.Combine(Path.GetTempPath(), "solar-test-" + Guid.NewGuid().ToString("N")[..8]);
     private readonly AppPaths _paths;
     private readonly ContentManager _content;
-    private readonly GameInstance _instance = new() { Id = "inst" };
+    private readonly GameInstance _instance = new() { Id = "inst", MinecraftVersion = "1.21.4" };
 
     public ContentManagerTests()
     {
@@ -178,7 +178,7 @@ public sealed class ContentManagerTests : IDisposable
         var directory = _content.GetContentDirectory(_instance, ContentKind.Mods);
 
         Assert.Equal(
-            Path.Combine(_paths.GetInstanceMinecraftDirectory("inst"), "mods"),
+            Path.Combine(_paths.Versions, "1.21.4", "mods"),
             directory);
     }
 

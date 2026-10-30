@@ -66,7 +66,9 @@ CurseForge 和 Modrinth 都只认英文。PCL 内置一份 MC 百科条目表
 
 ### 1.5 下载与安装
 
-- 目录：`{PathIndie}/mods/`，`PathIndie` 就是版本隔离后的根目录。
+- 目录：`{PathIndie}/mods/`，`PathIndie` 是实例的游戏目录：开启隔离时就是该版本的
+  版本文件夹（`SolarShared/versions/<版本id>` 或共享 `.minecraft/versions/<版本id>`），
+  未隔离时是共享 `.minecraft`。
 - 目标目录是**用户级选择**：优先上次用过的目录 → 当前实例（若版本+加载器兼容）→
   遍历实例找兼容的 → 兜底 `McFolderSelected`。最后还会弹一次「另存为」。
 - **不做自动依赖下载**。整合包安装是另一条代码路径。
@@ -242,7 +244,8 @@ public interface IModCatalogService
 ```
 
 - **必须选一个目标实例**：Mod 只能落在具体游戏目录里。未开启版本隔离的实例会标注
-  「共享目录」，并在安装前提示「会影响所有未隔离的实例」。
+  「共享目录」，并在安装前提示「会影响所有未隔离的实例」；已隔离的实例装进版本文件夹，
+  同一版本的其他实例也会看到。
 - 实例是原版（`ModLoader.Vanilla`）时给 Warning，但仍允许下载（用户可能稍后再加加载器）。
 - 下载进度复用 `IProgress<DownloadProgress>` 的形状，UI 与现有启动进度条一致。
 - 下载走**独立 HttpClient**：mod 文件动辄几十 MB，超时放宽到 15 分钟，
@@ -317,7 +320,7 @@ Modrinth 的 `icon_url` 是 **WebP**（`..._96.webp`），只有单项目/批量
 
 ```
 安装 Sodium 0.6.13 到「生存服」？
-目标：F:\...\SolarInstances\xxx\.minecraft\mods
+目标：F:\...\SolarShared\versions\<版本id>\mods
 □ 前置（必选，2 项）
    ☑ Fabric API 0.115.0        [已安装，将跳过]
    ☑ Cloth Config 15.0.140
@@ -413,7 +416,8 @@ Modrinth 的 `icon_url` 是 **WebP**（`..._96.webp`），只有单项目/批量
 
 | 现有组件 | 用途 |
 | --- | --- |
-| `InstanceGameDirectory.Resolve(instance)` | 解析 Mod 的目标游戏目录 |
+| `InstanceGameDirectory.Resolve(instance)` | 解析 Mod 的目标游戏目录（隔离时即版本文件夹） |
+| `InstanceGameDirectory.GetIsolatedPath(instance)` | 隔离实例的版本文件夹本身（覆盖路径优先） |
 | `GameInstance.MinecraftVersion` / `Loader` | 搜索与版本列表的默认筛选条件 |
 | `JsonFile` / `SolarJson` | 缓存读写 |
 | `AppPaths.Data` | `modcache/` 的父目录 |
