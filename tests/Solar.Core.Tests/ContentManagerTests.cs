@@ -1,5 +1,5 @@
 using Solar.Core.Content;
-using Solar.Core.Instances;
+using Solar.Core.Versions;
 using Solar.Core.Paths;
 using Solar.Core.Settings;
 using Xunit;
@@ -17,7 +17,7 @@ public sealed class ContentManagerTests : IDisposable
     {
         _paths = new AppPaths(_root);
         _paths.EnsureCreated();
-        _content = new ContentManager(new InstanceGameDirectory(_paths, new FakeSettings()));
+        _content = new ContentManager(new MinecraftPaths(_paths, new FakeSettings()));
     }
 
     [Fact]

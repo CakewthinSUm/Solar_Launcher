@@ -4,25 +4,25 @@ using Solar.App.ViewModels;
 
 namespace Solar.App.Views;
 
-public sealed partial class InstanceSetupPage : PageBase
+public sealed partial class VersionSetupPage : PageBase
 {
-    public InstanceSetupPage() : this(App.GetService<InstanceSetupViewModel>())
+    public VersionSetupPage() : this(App.GetService<VersionSetupViewModel>())
     {
     }
 
-    public InstanceSetupPage(InstanceSetupViewModel viewModel)
+    public VersionSetupPage(VersionSetupViewModel viewModel)
     {
         ViewModel = viewModel;
         DataContext = viewModel;
         InitializeComponent();
     }
 
-    public new InstanceSetupViewModel ViewModel { get; }
+    public new VersionSetupViewModel ViewModel { get; }
 
-    /// <summary>页面被 NavigationCacheMode 缓存复用，每次导航都要告诉 VM 现在是哪个实例。</summary>
+    /// <summary>页面被 NavigationCacheMode 缓存复用，每次导航都要告诉 VM 现在是哪个版本。</summary>
     protected override void OnNavigatedTo(NavigationEventArgs e)
     {
-        ViewModel.InstanceId = e.Parameter as string;
+        ViewModel.VersionId = e.Parameter as string;
         base.OnNavigatedTo(e);
     }
 

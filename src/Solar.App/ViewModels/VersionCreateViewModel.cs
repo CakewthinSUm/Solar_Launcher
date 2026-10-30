@@ -4,36 +4,37 @@ using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
 using Solar.App.Services;
 using Solar.Core.Addons;
-using Solar.Core.Instances;
+using Solar.Core.Versions;
 using Solar.Core.Java;
 using Solar.Core.Loaders;
 using Solar.Core.Minecraft;
 using Solar.Core.Models;
+using Solar.Core.Paths;
 using Solar.Core.Settings;
 
 namespace Solar.App.ViewModels;
 
 /// <summary>
-/// 创建实例页：从下载页点一个版本进来，选组件，一次装完。
+/// 创建版本页：从下载页点一个版本进来，选组件，一次装完。
 /// <para>
 /// 组件列表是懒加载的：进页面先只拉与当前 MC 版本相关的列表，
 /// 用户选了 Fabric 才去拉 Fabric API，选了 OptiFine 才拉 OptiFabric 之类。
 /// </para>
 /// </summary>
-public sealed partial class InstanceCreateViewModel : ViewModelBase
+public sealed partial class VersionCreateViewModel : ViewModelBase
 {
     private readonly IVersionManifestService _manifest;
     private readonly ILoaderVersionService _loaderVersions;
     private readonly IOptiFineService _optiFine;
     private readonly ILiteLoaderService _liteLoader;
     private readonly IAddonCatalog _addons;
-    private readonly IInstanceCreationService _creation;
+    private readonly IVersionCreationService _creation;
     private readonly IJavaDetector _javaDetector;
-    private readonly InstanceGameDirectory _gameDirectories;
+    private readonly MinecraftPaths _gameDirectories;
     private readonly ISettingsService _settings;
     private readonly IDialogService _dialogs;
     private readonly TaskbarProgressService _taskbar;
-    private readonly ILogger<InstanceCreateViewModel> _logger;
+    private readonly ILogger<VersionCreateViewModel> _logger;
 
     private CancellationTokenSource? _loadCts;
     private CancellationTokenSource? _createCts;
@@ -43,7 +44,7 @@ public sealed partial class InstanceCreateViewModel : ViewModelBase
     /// <summary>导航参数；页面缓存复用，每次导航由页面写入。</summary>
     public VersionSummary? Version { get; set; }
 
-    /// <summary>页面顶部的版本下拉；从实例页直接新建时用它挑版本。</summary>
+    /// <summary>页面顶部的版本下拉；从版本页直接新建时用它挑版本。</summary>
     public ObservableCollection<VersionSummary> Versions { get; } = new();
 
     [ObservableProperty]
@@ -56,7 +57,7 @@ public sealed partial class InstanceCreateViewModel : ViewModelBase
     private string _versionSubtitle = "";
 
     [ObservableProperty]
-    private string _instanceName = "";
+    private string _VersionName = "";
 
     [ObservableProperty]
     private bool _versionIsolation;
@@ -83,19 +84,19 @@ public sealed partial class InstanceCreateViewModel : ViewModelBase
     [NotifyPropertyChangedFor(nameof(HasInfoTip))]
     private string? _infoTip;
 
-    public InstanceCreateViewModel(
+    public VersionCreateViewModel(
         IVersionManifestService manifest,
         ILoaderVersionService loaderVersions,
         IOptiFineService optiFine,
         ILiteLoaderService liteLoader,
         IAddonCatalog addons,
-        IInstanceCreationService creation,
+        IVersionCreationService creation,
         IJavaDetector javaDetector,
-        InstanceGameDirectory gameDirectories,
+        MinecraftPaths gameDirectories,
         ISettingsService settings,
         IDialogService dialogs,
         TaskbarProgressService taskbar,
-        ILogger<InstanceCreateViewModel> logger)
+        ILogger<VersionCreateViewModel> logger)
     {
         _manifest = manifest;
         _loaderVersions = loaderVersions;
@@ -172,7 +173,7 @@ public sealed partial class InstanceCreateViewModel : ViewModelBase
             return;
         }
 
-        // 没有带版本进来（从实例页点「新建实例」）：先让用户挑一个版本
+        // 没有带版本进来（从版本页点「新建版本」）：先让用户挑一个版本
         await EnsureVersionListAsync();
         if (SelectedVersion is { } first)
         {
@@ -242,7 +243,7 @@ public sealed partial class InstanceCreateViewModel : ViewModelBase
         }
 
         Selection = new ComponentSelection();
-        InstanceName = "";
+        VersionName = "";
 
         _ = LoadAsync();
     }
@@ -369,7 +370,7 @@ public sealed partial class InstanceCreateViewModel : ViewModelBase
         {
             // 对齐 PCL：按全局档位 + 版本特征（可装 Mod / 非正式版）给出建议值
             VersionIsolation = VersionIsolationPolicy.ShouldIsolate(
-                _settings.Current.NewInstanceIsolationScope,
+                _settings.Current.DefaultIsolationScope,
                 modable: Selection.NeedsIsolation,
                 unstable: VersionIsolationPolicy.IsUnstable(Version?.Type, MinecraftVersion));
         }
@@ -626,13 +627,13 @@ public sealed partial class InstanceCreateViewModel : ViewModelBase
     private void UpdateIsolationHint()
     {
         IsolationHint = VersionIsolation
-            ? "游戏目录是该版本的版本文件夹；同一版本的其他实例会共用这里的存档与模组。"
-            : "与其它未开启隔离的实例共用同一份存档、模组与配置；带 Mod 的实例可能互相冲突。";
+            ? "游戏目录就是该版本的文件夹，存档与模组都在里面。"
+            : "与其它未开启隔离的版本共用同一份存档、模组与配置；带 Mod 的版本可能互相冲突。";
     }
 
     /// <summary>
     /// 任一卡片的选择变化后调用：重建 <see cref="Selection"/>、清掉冲突项、
-    /// 刷新各卡片可用性与提示，并重新生成默认实例名。
+    /// 刷新各卡片可用性与提示，并重新生成默认版本名。
     /// </summary>
     private void Refresh()
     {
@@ -684,9 +685,9 @@ public sealed partial class InstanceCreateViewModel : ViewModelBase
             UpdateCardStates();
             UpdateTips();
 
-            if (string.IsNullOrWhiteSpace(InstanceName) || _autoName)
+            if (string.IsNullOrWhiteSpace(VersionName) || _autoName)
             {
-                InstanceName = Selection.BuildDefaultName(MinecraftVersion);
+                VersionName = Selection.BuildDefaultName(MinecraftVersion);
                 _autoName = true;
             }
 
@@ -756,16 +757,16 @@ public sealed partial class InstanceCreateViewModel : ViewModelBase
             { Loader: ModLoader.Fabric, OptiFine: not null, OptiFabric: null } =>
                 "在 Fabric 上使用 OptiFine 需要同时安装 OptiFabric。",
             { Loader: not ModLoader.Vanilla } when !VersionIsolation =>
-                "当前未开启版本隔离，这个实例的 Mod 会与其它共用游戏目录的实例混在一起。",
+                "当前未开启版本隔离，这个版本的 Mod 会与其它共用游戏目录的版本混在一起。",
             _ => null,
         };
 
         InfoTip = Selection.OptiFineAsMod
-            ? "已选择模组加载器，OptiFine 将作为 Mod 放进实例的 mods 目录。"
+            ? "已选择模组加载器，OptiFine 将作为 Mod 放进版本的 mods 目录。"
             : null;
     }
 
-    partial void OnInstanceNameChanged(string value)
+    partial void OnVersionNameChanged(string value)
     {
         // 用户手动改过名字后就不再自动覆盖
         if (!_suppressRefresh && value != Selection.BuildDefaultName(MinecraftVersion))
@@ -812,7 +813,7 @@ public sealed partial class InstanceCreateViewModel : ViewModelBase
             ErrorMessage = null;
             StatusMessage = null;
 
-            var progress = new Progress<InstanceCreateProgress>(p =>
+            var progress = new Progress<VersionCreateProgress>(p =>
             {
                 CreateStatus = p.Message;
                 if (p.Ratio > 0)
@@ -820,12 +821,12 @@ public sealed partial class InstanceCreateViewModel : ViewModelBase
                     CreateProgress = p.Ratio;
                 }
 
-                // 创建实例大部分时间都花在下载上，进度也同步给任务栏
+                // 创建版本大部分时间都花在下载上，进度也同步给任务栏
                 _taskbar.Report(p.Ratio > 0 ? p.Ratio : null);
             });
 
-            var request = new InstanceCreateRequest(
-                InstanceName,
+            var request = new VersionCreateRequest(
+                VersionName,
                 MinecraftVersion,
                 Selection,
                 VersionIsolation);
@@ -835,24 +836,24 @@ public sealed partial class InstanceCreateViewModel : ViewModelBase
             CreateStatus = "安装完成";
             CreateProgress = 1;
             _taskbar.Flash();
-            StatusMessage = $"已创建实例“{instance.Name}”";
+            StatusMessage = $"已创建版本“{instance.Name}”";
 
             // 由页面负责导航：Frame 在页面手里，服务层的导航器没有接上 Frame
-            InstanceCreated?.Invoke(this, instance);
+            VersionCreated?.Invoke(this, instance);
         }
         catch (OperationCanceledException)
         {
             CreateStatus = "已取消";
-            StatusMessage = "已创建实例但尚未装完，首次启动时会继续安装。";
+            StatusMessage = "已创建版本但尚未装完，首次启动时会继续安装。";
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "创建实例失败");
+            _logger.LogError(ex, "创建版本失败");
             ErrorMessage = ex.Message;
             CreateStatus = "安装失败";
             await _dialogs.ShowMessageAsync(
                 "安装失败",
-                $"{ex.Message}\n\n实例记录已保留，首次启动时会继续安装未完成的部分。");
+                $"{ex.Message}\n\n版本记录已保留，首次启动时会继续安装未完成的部分。");
         }
         finally
         {
@@ -904,24 +905,24 @@ public sealed partial class InstanceCreateViewModel : ViewModelBase
         Refresh();
     }
 
-    /// <summary>页面用：当前实例实际会用的游戏目录，帮用户理解隔离开关。</summary>
+    /// <summary>页面用：当前版本实际会用的游戏目录，帮用户理解隔离开关。</summary>
     public string EffectiveGameDirectory
     {
         get
         {
-            var preview = new GameInstance
+            var preview = new GameVersion
             {
                 Id = "preview",
                 MinecraftVersion = MinecraftVersion,
                 VersionIsolation = VersionIsolation,
             };
 
-            return _gameDirectories.Resolve(preview);
+            return _gameDirectories.ResolveGameDirectory(preview.Id, preview.VersionIsolation);
         }
     }
 
-    /// <summary>创建成功后由页面导航到实例列表。</summary>
-    public event EventHandler<GameInstance>? InstanceCreated;
+    /// <summary>创建成功后由页面导航到版本列表。</summary>
+    public event EventHandler<GameVersion>? VersionCreated;
 
     /// <summary>返回上一页；页面自己处理导航。</summary>
     public event EventHandler? BackRequested;

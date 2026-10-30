@@ -8,7 +8,7 @@ namespace Solar.App.ViewModels;
 /// 创建页上的一张组件卡片（Forge / NeoForge / Fabric / Fabric API / OptiFine …）。
 /// <para>
 /// 卡片只描述「能不能选、当前选了哪个」；真正决定装什么的是
-/// <see cref="ComponentSelection"/>，由 <see cref="InstanceCreateViewModel"/> 汇总。
+/// <see cref="ComponentSelection"/>，由 <see cref="VersionCreateViewModel"/> 汇总。
 /// </para>
 /// </summary>
 public sealed partial class ComponentCardViewModel : ObservableObject

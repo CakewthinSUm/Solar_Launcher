@@ -1,5 +1,5 @@
 using Solar.Core.Download;
-using Solar.Core.Instances;
+using Solar.Core.Versions;
 
 namespace Solar.Core.Launch;
 
@@ -29,7 +29,7 @@ public sealed record LaunchStagePlan(LaunchStage Stage, string Title, double Wei
 /// 把「阶段变化」和「下载进度」两条异步通道合并成一份可显示的启动状态。
 /// <para>
 /// 几条必须在这里处理的规则：
-/// 加载器只在首次启动模组实例时安装，所以阶段列表是动态的；
+/// 加载器只在首次启动模组版本时安装，所以阶段列表是动态的；
 /// 服务端只上报阶段切换、不发送「完成」事件，前进即代表上一步完成；
 /// <see cref="Progress{T}"/> 是异步投递的，下载回调可能晚于 <see cref="LaunchStage.Starting"/> 到达，
 /// 也可能早于 <see cref="LaunchStage.Downloading"/> 到达，需要缓存/丢弃；
@@ -48,7 +48,7 @@ public sealed class LaunchProgressTracker
     private double _overallRatio;
     private DownloadProgress? _pendingDownload;
 
-    public LaunchProgressTracker(GameInstance instance)
+    public LaunchProgressTracker(GameVersion instance)
     {
         _plan = BuildPlan(instance);
         _states = new LaunchStageState[_plan.Count];
@@ -226,7 +226,7 @@ public sealed class LaunchProgressTracker
         Outcome = LaunchOutcome.Canceled;
     }
 
-    private static List<LaunchStagePlan> BuildPlan(GameInstance instance)
+    private static List<LaunchStagePlan> BuildPlan(GameVersion instance)
     {
         var plan = new List<LaunchStagePlan>
         {
@@ -234,7 +234,7 @@ public sealed class LaunchProgressTracker
             new(LaunchStage.DetectingJava, "检测 Java", 10),
         };
 
-        // 只有尚未安装加载器的模组实例，首次启动才会走安装步骤
+        // 只有尚未安装加载器的模组版本，首次启动才会走安装步骤
         if (instance.Loader != ModLoader.Vanilla && !instance.LoaderInstalled)
         {
             plan.Add(new LaunchStagePlan(LaunchStage.InstallingLoader, "安装加载器", 20));

@@ -42,21 +42,21 @@
                     </Grid.ColumnDefinitions>
 
                     <!--
-                        Mod / 光影 / 资源包 / 数据包：实例决定游戏版本与加载器（用于筛选与兼容提示），
+                        Mod / 光影 / 资源包 / 数据包：版本决定游戏版本与加载器（用于筛选与兼容提示），
                         文件统一装进共享 .minecraft，与「管理」页看到的是同一份。
-                        没选实例时仍可浏览，只是不能安装。
+                        没选版本时仍可浏览，只是不能安装。
                     -->
                     <ComboBox
                         Grid.Column="0"
-                        Header="实例"
+                        Header="版本"
                         HorizontalAlignment="Stretch"
                         DisplayMemberPath="Name"
-                        ItemsSource="{x:Bind ViewModel.Instances, Mode=OneWay}"
-                        PlaceholderText="先创建实例才能安装"
-                        SelectedItem="{x:Bind ViewModel.SelectedInstance, Mode=TwoWay}"
-                        Visibility="{x:Bind ViewModel.NeedsInstance, Mode=OneWay, Converter={StaticResource VisibleWhenTrue}}" />
+                        ItemsSource="{x:Bind ViewModel.Versions, Mode=OneWay}"
+                        PlaceholderText="先创建版本才能安装"
+                        SelectedItem="{x:Bind ViewModel.SelectedVersion, Mode=TwoWay}"
+                        Visibility="{x:Bind ViewModel.NeedsVersion, Mode=OneWay, Converter={StaticResource VisibleWhenTrue}}" />
 
-                    <!-- 整合包会新建实例，所以按用户选的目标游戏版本过滤 -->
+                    <!-- 整合包会新建版本，所以按用户选的目标游戏版本过滤 -->
                     <ComboBox
                         Grid.Column="0"
                         Header="游戏版本"
@@ -96,9 +96,9 @@
                 <TextBlock
                     Style="{StaticResource CaptionTextBlockStyle}"
                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                    Text="还没有实例，可以先浏览；安装前需要先在「管理」里创建一个。"
+                    Text="还没有版本，可以先浏览；安装前需要先在「管理」里创建一个。"
                     TextWrapping="Wrap"
-                    Visibility="{x:Bind ViewModel.ShowInstanceHint, Mode=OneWay, Converter={StaticResource VisibleWhenTrue}}" />
+                    Visibility="{x:Bind ViewModel.ShowVersionHint, Mode=OneWay, Converter={StaticResource VisibleWhenTrue}}" />
             </StackPanel>
         </Border>
 

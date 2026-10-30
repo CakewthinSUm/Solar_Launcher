@@ -48,7 +48,7 @@ public sealed partial class AddonProjectPage : PageBase
 
     private async void Install_Click(object sender, RoutedEventArgs e)
     {
-        // 整合包走另一条流程：它不装进已有实例，而是创建一个新实例
+        // 整合包走另一条流程：它不装进已有版本，而是创建一个新版本
         if (ViewModel.GetModpackRequest() is { } modpack)
         {
             await InstallModpackAsync(modpack.Version);
@@ -60,7 +60,7 @@ public sealed partial class AddonProjectPage : PageBase
             return;
         }
 
-        var dialog = new AddonInstallDialog(request.Project, request.Version, request.Instance);
+        var dialog = new AddonInstallDialog(request.Project, request.Version, request.GameVersion);
 
         // 对话框在安装完成后自己 Hide()，返回值不一定是 Primary，以 Result 为准
         await dialog.ShowAsync();
@@ -81,7 +81,7 @@ public sealed partial class AddonProjectPage : PageBase
         if (dialog.Result is { } result)
         {
             ViewModel.StatusMessage =
-                $"整合包已安装为实例「{result.Instance.Name}」，首次启动时会补装游戏与加载器。"
+                $"整合包已安装为版本「{result.Version.Name}」，可以直接启动。"
                 + (result.FailedFiles.Count > 0 ? $"（{result.FailedFiles.Count} 个文件下载失败）" : "");
         }
     }

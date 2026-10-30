@@ -1,5 +1,5 @@
 using Microsoft.Extensions.Logging;
-using Solar.Core.Instances;
+using Solar.Core.Versions;
 
 namespace Solar.Core.Mods;
 

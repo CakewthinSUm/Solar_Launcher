@@ -1,3 +1,5 @@
+using Solar.Core.Versions;
+
 namespace Solar.Core.Mods;
 
 /// <summary>
@@ -53,6 +55,6 @@ public interface IModCatalogService
         ModProject project,
         ModVersion version,
         string? gameVersion,
-        Instances.ModLoader? loader,
+        ModLoader? loader,
         CancellationToken ct = default);
 }

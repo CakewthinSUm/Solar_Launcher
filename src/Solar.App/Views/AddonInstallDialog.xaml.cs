@@ -1,7 +1,7 @@
 using System.ComponentModel;
 using Microsoft.UI.Xaml.Controls;
 using Solar.App.ViewModels;
-using Solar.Core.Instances;
+using Solar.Core.Versions;
 using Solar.Core.Mods;
 
 namespace Solar.App.Views;
@@ -17,7 +17,7 @@ namespace Solar.App.Views;
 /// </summary>
 public sealed partial class AddonInstallDialog : ContentDialog
 {
-    public AddonInstallDialog(ModProject project, ModVersion version, GameInstance instance)
+    public AddonInstallDialog(ModProject project, ModVersion version, GameVersion instance)
         : this(App.GetService<AddonInstallDialogViewModel>(), project, version, instance)
     {
     }
@@ -26,7 +26,7 @@ public sealed partial class AddonInstallDialog : ContentDialog
         AddonInstallDialogViewModel viewModel,
         ModProject project,
         ModVersion version,
-        GameInstance instance)
+        GameVersion instance)
     {
         ViewModel = viewModel;
         DataContext = viewModel;
@@ -48,7 +48,7 @@ public sealed partial class AddonInstallDialog : ContentDialog
     /// <summary>安装成功后的结果；用户取消或失败时为 null。</summary>
     public ModInstallResult? Result { get; private set; }
 
-    private async Task LoadAsync(ModProject project, ModVersion version, GameInstance instance)
+    private async Task LoadAsync(ModProject project, ModVersion version, GameVersion instance)
     {
         await ViewModel.LoadAsync(project, version, instance);
         SubscribeItems();

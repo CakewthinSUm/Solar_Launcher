@@ -1,4 +1,4 @@
-using Solar.Core.Instances;
+using Solar.Core.Versions;
 using Solar.Core.Mods;
 
 namespace Solar.Core.Modpacks;
@@ -54,6 +54,9 @@ public enum ModpackInstallStage
     /// <summary>下载并解析整合包本体。</summary>
     Preparing,
 
+    /// <summary>把加载器装进整合包的版本文件夹（与 PCL 一致，安装时一次装完）。</summary>
+    InstallingLoader,
+
     DownloadingFiles,
 
     ExtractingOverrides,
@@ -70,7 +73,7 @@ public sealed record ModpackInstallProgress(
     string? CurrentFile = null);
 
 public sealed record ModpackInstallResult(
-    GameInstance Instance,
+    GameVersion Version,
     int InstalledFiles,
     int SkippedFiles,
     int OverrideFiles,
@@ -87,11 +90,10 @@ public interface IModpackService
         IProgress<ModpackInstallProgress>? progress = null,
         CancellationToken ct = default);
 
-    /// <summary>创建实例并安装清单里的全部文件与 overrides。失败时实例记录会保留。</summary>
+    /// <summary>创建版本文件夹并安装清单里的全部文件与 overrides。整合包版本始终隔离。</summary>
     Task<ModpackInstallResult> InstallAsync(
         ModpackPlan plan,
-        string? instanceName = null,
-        bool versionIsolation = true,
+        string? versionName = null,
         IProgress<ModpackInstallProgress>? progress = null,
         CancellationToken ct = default);
 

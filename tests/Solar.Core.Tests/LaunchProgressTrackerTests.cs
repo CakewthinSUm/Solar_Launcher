@@ -1,5 +1,5 @@
 using Solar.Core.Download;
-using Solar.Core.Instances;
+using Solar.Core.Versions;
 using Solar.Core.Launch;
 using Xunit;
 
@@ -7,9 +7,9 @@ namespace Solar.Core.Tests;
 
 public class LaunchProgressTrackerTests
 {
-    private static GameInstance Vanilla() => new() { Loader = ModLoader.Vanilla };
+    private static GameVersion Vanilla() => new() { Loader = ModLoader.Vanilla };
 
-    private static GameInstance Modded(bool loaderInstalled) => new()
+    private static GameVersion Modded(bool loaderInstalled) => new()
     {
         Loader = ModLoader.Fabric,
         LoaderVersion = "0.16.9",

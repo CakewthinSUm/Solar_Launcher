@@ -1,4 +1,4 @@
-using Solar.Core.Instances;
+using Solar.Core.Versions;
 using Solar.Core.Launch;
 using Solar.Core.Memory;
 using Solar.Core.Minecraft;
@@ -16,7 +16,8 @@ public class ArgumentBuilderTests
         (int, int)? resolution = null,
         int javaMajorVersion = 8)
     {
-        var paths = new AppPaths(Path.Combine(Path.GetTempPath(), "solar-test-" + Guid.NewGuid().ToString("N")));
+        var appPaths = new AppPaths(Path.Combine(Path.GetTempPath(), "solar-test-" + Guid.NewGuid().ToString("N")));
+        var paths = new MinecraftPaths(appPaths, new TestSettings());
         var version = new ResolvedVersion
         {
             Detail = detail ?? new VersionDetail { Id = "1.21.4", MainClass = "net.minecraft.client.main.Main" },
@@ -25,7 +26,7 @@ public class ArgumentBuilderTests
 
         return new LaunchContext
         {
-            Instance = new GameInstance { Id = "inst1", Name = "测试" },
+            Game = new GameVersion { Id = "inst1", Name = "测试" },
             Version = version,
             Paths = paths,
             Settings = new LauncherSettings { MaxMemoryMb = 4096 },
@@ -214,7 +215,7 @@ public class ArgumentBuilderTests
         var context = CreateContext();
         var larger = new LaunchContext
         {
-            Instance = context.Instance,
+            Game = context.Game,
             Version = context.Version,
             Paths = context.Paths,
             Settings = context.Settings,
@@ -332,7 +333,7 @@ public class ArgumentBuilderTests
     public void CustomWindowTitleOverridesVersionName()
     {
         var context = CreateContext();
-        context.Instance.CustomWindowTitle = "我的世界";
+        context.Game.CustomWindowTitle = "我的世界";
 
         Assert.Equal("我的世界", ArgumentBuilder.Substitute("${version_name}", context));
     }
@@ -341,7 +342,7 @@ public class ArgumentBuilderTests
     public void BlankCustomWindowTitleFallsBackToVersionId()
     {
         var context = CreateContext();
-        context.Instance.CustomWindowTitle = "   ";
+        context.Game.CustomWindowTitle = "   ";
 
         Assert.Equal("1.21.4", ArgumentBuilder.Substitute("${version_name}", context));
     }
@@ -350,7 +351,7 @@ public class ArgumentBuilderTests
     public void CustomWindowTitleIsTrimmed()
     {
         var context = CreateContext();
-        context.Instance.CustomWindowTitle = "  存档服  ";
+        context.Game.CustomWindowTitle = "  存档服  ";
 
         Assert.Equal("存档服", ArgumentBuilder.Substitute("${version_name}", context));
     }
@@ -370,10 +371,19 @@ public class ArgumentBuilderTests
         };
 
         var context = CreateContext(detail);
-        context.Instance.CustomWindowTitle = "整合包：星辰";
+        context.Game.CustomWindowTitle = "整合包：星辰";
 
         var args = new ArgumentBuilder().BuildGameArguments(context);
 
         Assert.Equal(["--version", "整合包：星辰"], args);
+    }
+
+    private sealed class TestSettings : ISettingsService
+    {
+        public LauncherSettings Current { get; } = new();
+
+        public Task LoadAsync(CancellationToken ct = default) => Task.CompletedTask;
+
+        public Task SaveAsync(CancellationToken ct = default) => Task.CompletedTask;
     }
 }

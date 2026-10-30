@@ -2,7 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using Solar.App.Formatting;
 using Solar.App.Services;
 using Solar.Core.Content;
-using Solar.Core.Instances;
+using Solar.Core.Versions;
 using Solar.Core.Modpacks;
 using Solar.Core.Mods;
 
@@ -13,7 +13,7 @@ namespace Solar.App.ViewModels;
 /// <para>
 /// 打开时先把整合包本体下下来解析（Modrinth 是 .mrpack，CurseForge 还要逐个解析
 /// projectID/fileID），所以前半段是“准备”状态，用户能看到正在做什么。
-/// 安装本身会新建一个隔离实例，文件全部下进这个实例的游戏目录。
+/// 安装本身会新建一个隔离版本，文件全部下进这个版本的游戏目录。
 /// </para>
 /// </summary>
 public sealed partial class ModpackInstallDialogViewModel : ViewModelBase
@@ -34,7 +34,7 @@ public sealed partial class ModpackInstallDialogViewModel : ViewModelBase
     private string _filesText = "";
 
     [ObservableProperty]
-    private string _instanceName = "";
+    private string _VersionName = "";
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsBusyNow))]
@@ -57,7 +57,7 @@ public sealed partial class ModpackInstallDialogViewModel : ViewModelBase
     private bool _canInstall;
 
     [ObservableProperty]
-    private string _installText = "创建实例并安装";
+    private string _installText = "创建版本并安装";
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasPlanWarning))]
@@ -104,7 +104,7 @@ public sealed partial class ModpackInstallDialogViewModel : ViewModelBase
             _plan = plan;
 
             Header = $"安装 {plan.Name}";
-            InstanceName = plan.Name;
+            VersionName = plan.Name;
             GameText = FormatGame(plan);
             FilesText = $"共 {plan.Files.Count} 个文件"
                         + (plan.TotalBytes > 0 ? $"，约 {ContentPack.FormatSize(plan.TotalBytes)}" : "");
@@ -137,9 +137,9 @@ public sealed partial class ModpackInstallDialogViewModel : ViewModelBase
             return false;
         }
 
-        if (string.IsNullOrWhiteSpace(InstanceName))
+        if (string.IsNullOrWhiteSpace(VersionName))
         {
-            ErrorMessage = "实例名不能为空。";
+            ErrorMessage = "版本名不能为空。";
             return false;
         }
 
@@ -175,8 +175,7 @@ public sealed partial class ModpackInstallDialogViewModel : ViewModelBase
 
             Result = await _modpacks.InstallAsync(
                 plan,
-                InstanceName,
-                versionIsolation: true,
+                VersionName,
                 progress,
                 _cts.Token);
 
@@ -191,7 +190,7 @@ public sealed partial class ModpackInstallDialogViewModel : ViewModelBase
         catch (OperationCanceledException)
         {
             ProgressText = "已取消";
-            ErrorMessage = "安装已取消。已经下载的文件会保留，实例也还在列表里。";
+            ErrorMessage = "安装已取消。已经下载的文件会保留，版本也还在列表里。";
             return false;
         }
         catch (Exception ex)
@@ -240,7 +239,7 @@ public sealed partial class ModpackInstallDialogViewModel : ViewModelBase
             parts.Add($"有 {plan.FailedFiles.Count} 个文件在解析时失败（作者可能关闭了分发），安装后可能缺少内容。");
         }
 
-        parts.Add("会创建一个独立实例（版本隔离）。游戏本体与加载器在首次启动时自动补装。");
+        parts.Add("会创建一个独立版本（版本隔离）。游戏本体与加载器在首次启动时自动补装。");
 
         return string.Join("\n", parts);
     }

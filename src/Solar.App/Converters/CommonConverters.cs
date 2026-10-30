@@ -48,11 +48,11 @@ public sealed class ModLoaderDisplayConverter : IValueConverter
 {
     public object Convert(object value, Type targetType, object parameter, string language) => value switch
     {
-        Core.Instances.ModLoader.Vanilla => "原版",
-        Core.Instances.ModLoader.Forge => "Forge",
-        Core.Instances.ModLoader.NeoForge => "NeoForge",
-        Core.Instances.ModLoader.Fabric => "Fabric",
-        Core.Instances.ModLoader.Quilt => "Quilt",
+        Core.Versions.ModLoader.Vanilla => "原版",
+        Core.Versions.ModLoader.Forge => "Forge",
+        Core.Versions.ModLoader.NeoForge => "NeoForge",
+        Core.Versions.ModLoader.Fabric => "Fabric",
+        Core.Versions.ModLoader.Quilt => "Quilt",
         _ => value?.ToString() ?? "",
     };
 

@@ -13,7 +13,7 @@
         分区切换改在页面内完成；Tag 就是导航参数里的分区键。
     -->
     <SelectorBar x:Name="Bar" SelectionChanged="Bar_SelectionChanged">
-        <SelectorBarItem Tag="instances" Text="实例" />
+        <SelectorBarItem Tag="Versions" Text="版本" />
         <SelectorBarItem Tag="mods" Text="Mods" />
         <SelectorBarItem Tag="resourcepacks" Text="资源包" />
         <SelectorBarItem Tag="shaderpacks" Text="光影" />

@@ -5,93 +5,57 @@ using Microsoft.Extensions.Logging;
 using Solar.Core.Json;
 using Solar.Core.Models;
 using Solar.Core.Paths;
-using Solar.Core.Settings;
 
-namespace Solar.Core.Instances;
+namespace Solar.Core.Versions;
 
-/// <summary>在游戏目录里发现的一个版本（<c>versions/&lt;id&gt;/&lt;id&gt;.json</c>）。</summary>
+/// <summary>在 MC 文件夹里发现的一个版本（<c>versions/&lt;id&gt;/&lt;id&gt;.json</c>）。</summary>
 public sealed record ScannedVersion(
     string VersionId,
     ModLoader Loader,
     string? LoaderVersion,
     string MinecraftVersion,
     string? Type = null,
-    string? Directory = null,
-    bool InGameDirectory = false)
-{
-    /// <summary>显示名：加载器版本带上加载器名，原版直接用版本号。</summary>
-    public string DisplayName => Loader == ModLoader.Vanilla
-        ? MinecraftVersion
-        : $"{MinecraftVersion} {Loader} {LoaderVersion}".Trim();
-}
+    string? Directory = null);
 
 public interface IVersionScanner
 {
-    /// <summary>列出游戏目录里可用的全部版本；目录不存在时返回空列表。</summary>
+    /// <summary>列出 MC 文件夹里可用的全部版本；目录不存在时返回空列表。</summary>
     IReadOnlyList<ScannedVersion> Scan(CancellationToken ct = default);
-
-    /// <summary>
-    /// 把游戏目录里还没登记成实例的版本导入实例列表，返回新导入的实例。
-    /// 已经存在的版本（同一个 <see cref="GameInstance.EffectiveVersionId"/>）不会重复导入。
-    /// </summary>
-    Task<IReadOnlyList<GameInstance>> ImportAsync(CancellationToken ct = default);
 }
 
 /// <summary>
-/// 扫描游戏目录的 <c>versions/</c>，把里面的版本变成实例。
+/// 扫描 <c>versions/</c>，把里面的版本识别成原版 / 某个加载器。
 /// <para>
-/// 用途是接管已有安装：用户从官方启动器或别的启动器装过的版本，
-/// 不必在 Solar 里重新下载一遍。对齐 PCL 的逻辑：
-/// 版本隔离就是「版本文件夹即游戏目录」，所以导入时只需要决定隔离开关——
-/// 版本夹里已有非空的 mods/saves 时无论全局档位都隔离（零拷贝直接可见），
-/// 否则按档位与版本特征（可装 Mod / 非正式版）判定。
+/// 与 PCL 一致：版本文件夹就是版本，不需要额外的导入或索引。
 /// </para>
 /// </summary>
-public sealed partial class VersionScanner(
-    GameFileLocator locator,
-    IInstanceRepository repository,
-    ISettingsService settings,
-    ILogger<VersionScanner> logger) : IVersionScanner
+public sealed partial class VersionScanner(MinecraftPaths paths, ILogger<VersionScanner> logger) : IVersionScanner
 {
     public IReadOnlyList<ScannedVersion> Scan(CancellationToken ct = default)
     {
         var result = new List<ScannedVersion>();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var externalVersions = Path.GetFullPath(locator.ExternalVersions);
 
-        foreach (var root in locator.VersionRoots)
+        foreach (var directory in EnumerateVersionDirectories(paths.Versions, ct))
         {
-            if (!Directory.Exists(root))
+            ct.ThrowIfCancellationRequested();
+
+            var versionId = Path.GetFileName(directory);
+            var jsonPath = Path.Combine(directory, versionId + ".json");
+
+            // 目录存在但没有 JSON 的不算版本：加载器安装器会先建目录再补齐
+            if (!File.Exists(jsonPath) || !seen.Add(versionId))
             {
                 continue;
             }
 
-            // 共享游戏目录下的 versions/ 才有"版本夹即目录"的语义；
-            // SolarShared/versions 里的版本夹混着共享资源，不能直接当游戏目录
-            var inGameDirectory = string.Equals(
-                Path.GetFullPath(root), externalVersions, StringComparison.OrdinalIgnoreCase);
-
-            foreach (var directory in EnumerateVersionDirectories(root, ct))
+            if (TryRead(jsonPath, out var detail))
             {
-                ct.ThrowIfCancellationRequested();
-
-                var versionId = Path.GetFileName(directory);
-                var jsonPath = Path.Combine(directory, versionId + ".json");
-
-                // 目录存在但没有 JSON 的不算版本：加载器安装器会先建目录再补齐
-                if (!File.Exists(jsonPath) || !seen.Add(versionId))
-                {
-                    continue;
-                }
-
-                if (TryRead(jsonPath, out var detail))
-                {
-                    result.Add(Classify(versionId, detail, directory, inGameDirectory));
-                }
-                else
-                {
-                    logger.LogWarning("跳过无法解析的版本 JSON: {Path}", jsonPath);
-                }
+                result.Add(Classify(versionId, detail, directory));
+            }
+            else
+            {
+                logger.LogWarning("跳过无法解析的版本 JSON: {Path}", jsonPath);
             }
         }
 
@@ -101,69 +65,6 @@ public sealed partial class VersionScanner(
             .ThenBy(v => v.Loader == ModLoader.Vanilla ? 0 : 1)
             .ThenBy(v => v.VersionId, StringComparer.OrdinalIgnoreCase)
             .ToList();
-    }
-
-    public async Task<IReadOnlyList<GameInstance>> ImportAsync(CancellationToken ct = default)
-    {
-        var existing = await repository.GetAllAsync(ct).ConfigureAwait(false);
-        var known = existing
-            .Select(i => i.EffectiveVersionId)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-        var imported = new List<GameInstance>();
-
-        foreach (var version in Scan(ct))
-        {
-            if (!known.Add(version.VersionId))
-            {
-                continue;
-            }
-
-            var scope = settings.Current.NewInstanceIsolationScope;
-            var unstable = VersionIsolationPolicy.IsUnstable(version.Type, version.VersionId)
-                           || VersionIsolationPolicy.IsUnstable(version.Type, version.MinecraftVersion);
-            var modable = version.Loader != ModLoader.Vanilla;
-
-            // PCL 的自动检测：版本夹里已有玩家内容（非空 mods/saves）时，
-            // 无论全局档位都把游戏目录指过去，内容零拷贝直接可见。
-            var hasContent = version.Directory is not null && HasPlayerContent(version.Directory);
-
-            var instance = new GameInstance
-            {
-                // Id 由版本号派生，重复扫描不会产生第二份
-                Id = BuildId(version.VersionId),
-                Name = version.DisplayName,
-                MinecraftVersion = version.MinecraftVersion,
-                Loader = version.Loader,
-                LoaderVersion = version.LoaderVersion,
-                VersionId = version.VersionId,
-
-                // 文件已经在这份游戏目录里了，不需要再装一次
-                LoaderInstalled = true,
-
-                // 隔离后游戏目录就是该版本的版本文件夹，两处版本根都能定位到
-                VersionIsolation = hasContent
-                                   || VersionIsolationPolicy.ShouldIsolate(scope, modable, unstable),
-            };
-
-            try
-            {
-                await repository.SaveAsync(instance, ct).ConfigureAwait(false);
-                imported.Add(instance);
-            }
-            catch (Exception ex)
-            {
-                // 单个版本写盘失败不应该让整次扫描失败
-                logger.LogWarning(ex, "导入版本 {VersionId} 失败", version.VersionId);
-            }
-        }
-
-        if (imported.Count > 0)
-        {
-            logger.LogInformation("从游戏目录导入 {Count} 个版本", imported.Count);
-        }
-
-        return imported;
     }
 
     private static IEnumerable<string> EnumerateVersionDirectories(string root, CancellationToken ct)
@@ -186,7 +87,7 @@ public sealed partial class VersionScanner(
         }
     }
 
-    private static bool TryRead(string jsonPath, out VersionDetail detail)
+    public static bool TryRead(string jsonPath, out VersionDetail detail)
     {
         try
         {
@@ -217,8 +118,7 @@ public sealed partial class VersionScanner(
     /// 优先看 <c>inheritsFrom</c>（加载器版本都会写它），
     /// 再看 id 里的关键字——个别第三方整合包不写 inheritsFrom。
     /// </summary>
-    public static ScannedVersion Classify(string versionId, VersionDetail detail,
-        string? directory = null, bool inGameDirectory = false)
+    public static ScannedVersion Classify(string versionId, VersionDetail detail, string? directory = null)
     {
         var loader = DetectLoader(versionId, detail);
         var minecraftVersion = DetectMinecraftVersion(versionId, detail, loader);
@@ -227,34 +127,7 @@ public sealed partial class VersionScanner(
             : ExtractLoaderVersion(versionId, loader, minecraftVersion);
 
         return new ScannedVersion(versionId, loader, loaderVersion, minecraftVersion,
-            detail.Type, directory, inGameDirectory);
-    }
-
-    /// <summary>版本文件夹下是否已有玩家的内容（非空 mods/ 或 saves/），对应 PCL 的自动检测。</summary>
-    private static bool HasPlayerContent(string directory)
-    {
-        foreach (var name in (ReadOnlySpan<string>)["mods", "saves"])
-        {
-            var path = Path.Combine(directory, name);
-            if (!Directory.Exists(path))
-            {
-                continue;
-            }
-
-            try
-            {
-                if (Directory.EnumerateFileSystemEntries(path).Any())
-                {
-                    return true;
-                }
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-            {
-                // 目录被占用或没有权限时按"没有内容"处理
-            }
-        }
-
-        return false;
+            detail.Type, directory);
     }
 
     private static ModLoader DetectLoader(string versionId, VersionDetail detail)

@@ -1,8 +1,14 @@
 using System.Collections.Concurrent;
 using System.IO.Compression;
+using System.Text.Json;
 using Microsoft.Extensions.Logging;
-using Solar.Core.Instances;
+using Solar.Core.Download;
+using Solar.Core.Java;
+using Solar.Core.Loaders;
+using Solar.Core.Minecraft;
 using Solar.Core.Mods;
+using Solar.Core.Paths;
+using Solar.Core.Versions;
 
 namespace Solar.Core.Modpacks;
 
@@ -10,17 +16,19 @@ namespace Solar.Core.Modpacks;
 /// 整合包的解析与安装。
 /// <para>
 /// 安装策略与 PCL 一致：先在临时目录下载整合包本体，读出 manifest，
-/// 再为它创建一个**独立实例**并把所有文件下进该实例的游戏目录。
-/// 游戏本体与加载器不在这里下载——实例的首次启动会走
-/// <see cref="Launch.GameLaunchService"/> 的补装流程，避免一次安装里
-/// 同时跑两套下载器。
+/// 再为它创建一个**版本文件夹**（加载器也在这里装好），把所有文件下进去。
+/// 整合包版本始终隔离——它的游戏目录就是自己的版本文件夹。
 /// </para>
 /// </summary>
 public sealed class ModpackService(
     ModHttp http,
     IModFileDownloader downloader,
-    IInstanceRepository repository,
-    InstanceGameDirectory gameDirectories,
+    IVersionRepository repository,
+    MinecraftPaths paths,
+    IVersionResolver resolver,
+    IGameDownloader gameDownloader,
+    ILoaderInstaller loaderInstaller,
+    IJavaDetector javaDetector,
     ILogger<ModpackService> logger) : IModpackService
 {
     /// <summary>整合包临时目录的根。清理时只删这个根下面的内容。</summary>
@@ -210,8 +218,7 @@ public sealed class ModpackService(
 
     public async Task<ModpackInstallResult> InstallAsync(
         ModpackPlan plan,
-        string? instanceName = null,
-        bool versionIsolation = true,
+        string? versionName = null,
         IProgress<ModpackInstallProgress>? progress = null,
         CancellationToken ct = default)
     {
@@ -220,31 +227,30 @@ public sealed class ModpackService(
             throw new InvalidOperationException("整合包没有声明 Minecraft 版本。");
         }
 
-        var instance = new GameInstance
+        // 版本文件夹名就是版本名；与现有版本重名时自动加序号
+        var versionId = await UniqueVersionIdAsync(versionName ?? plan.Name, ct).ConfigureAwait(false);
+        var root = paths.GetVersionDirectory(versionId);
+        Directory.CreateDirectory(root);
+
+        var version = new GameVersion
         {
-            Name = await UniqueNameAsync(instanceName ?? plan.Name, ct).ConfigureAwait(false),
+            Id = versionId,
             MinecraftVersion = plan.MinecraftVersion,
             Loader = plan.Loader,
             LoaderVersion = plan.Loader == ModLoader.Vanilla ? null : plan.LoaderVersion,
-            VersionIsolation = versionIsolation,
 
-            // 非原版实例要等首次启动补装加载器；这里不阻塞安装
-            LoaderInstalled = plan.Loader == ModLoader.Vanilla,
+            // 整合包的游戏目录就是自己的版本文件夹
+            VersionIsolation = true,
+            LoaderInstalled = true,
         };
+        version.Name = versionId;
 
-        // 整合包在加载器装好前就把文件下进游戏目录，而 VersionId 要到首次启动
-        // 装完加载器才会定下来；若按版本 id 推版本文件夹，目录会漂移、文件变成孤儿。
-        // 因此整合包固定用自己的实例目录，隔离开关的语义不变（关掉仍回共享目录）。
-        if (versionIsolation)
-        {
-            instance.GameDirectoryOverride = gameDirectories.GetOwnGameDirectory(instance.Id);
-        }
+        // 先把游戏本体与加载器装进这个文件夹：装完版本 JSON 才存在，
+        // 版本立刻能被扫描到，不必等首次启动补装。
+        await InstallGameAsync(plan, versionId, progress, ct).ConfigureAwait(false);
 
-        // 先落盘记录：下载到一半取消时，已经下好的文件仍然属于一个可识别的实例
-        await repository.SaveAsync(instance, ct).ConfigureAwait(false);
-
-        var root = gameDirectories.Resolve(instance);
-        Directory.CreateDirectory(root);
+        // 落盘记录：下载到一半取消时，已经下好的文件仍然属于一个可识别的版本
+        await repository.SaveSettingsAsync(version, ct).ConfigureAwait(false);
 
         var (installed, skipped, failures) = await DownloadFilesAsync(plan, root, progress, ct)
             .ConfigureAwait(false);
@@ -254,8 +260,8 @@ public sealed class ModpackService(
 
         var overrides = await Task.Run(() => ExtractOverrides(plan, root, ct), ct).ConfigureAwait(false);
 
-        progress?.Report(new ModpackInstallProgress(ModpackInstallStage.Saving, "正在保存实例…"));
-        await repository.SaveAsync(instance, ct).ConfigureAwait(false);
+        progress?.Report(new ModpackInstallProgress(ModpackInstallStage.Saving, "正在保存版本…"));
+        await repository.SaveSettingsAsync(version, ct).ConfigureAwait(false);
 
         var allFailures = plan.FailedFiles
             .Concat(failures)
@@ -266,7 +272,55 @@ public sealed class ModpackService(
             "整合包 {Name} 安装完成：{Installed} 个文件，{Skipped} 个跳过，{Overrides} 个覆盖文件，{Failed} 个失败",
             plan.Name, installed, skipped, overrides, allFailures.Count);
 
-        return new ModpackInstallResult(instance, installed, skipped, overrides, allFailures);
+        return new ModpackInstallResult(version, installed, skipped, overrides, allFailures);
+    }
+
+    /// <summary>把整合包声明的游戏本体与加载器装进版本文件夹。</summary>
+    private async Task InstallGameAsync(
+        ModpackPlan plan,
+        string versionId,
+        IProgress<ModpackInstallProgress>? progress,
+        CancellationToken ct)
+    {
+        progress?.Report(new ModpackInstallProgress(
+            ModpackInstallStage.InstallingLoader, "正在准备游戏本体与加载器…"));
+
+        if (plan.Loader != ModLoader.Vanilla)
+        {
+            var runtimes = await javaDetector.DetectAsync(ct).ConfigureAwait(false);
+            if (runtimes.Count == 0)
+            {
+                throw new InvalidOperationException(
+                    "没有找到可用的 Java。请先安装 Java，或在设置中指定 java.exe 路径。");
+            }
+
+            progress?.Report(new ModpackInstallProgress(
+                ModpackInstallStage.InstallingLoader,
+                $"正在安装 {plan.Loader} {plan.LoaderVersion}…"));
+
+            await loaderInstaller.InstallAsync(
+                plan.Loader,
+                plan.MinecraftVersion,
+                plan.LoaderVersion
+                    ?? throw new InvalidOperationException("整合包没有给出加载器版本，无法安装。"),
+                runtimes[0].Path,
+                null,
+                ct,
+                targetVersionId: versionId).ConfigureAwait(false);
+
+            return;
+        }
+
+        // 原版整合包：写一份继承原版的薄 profile，再把原版文件补齐到该版本文件夹
+        var profile = new { id = versionId, inheritsFrom = plan.MinecraftVersion, type = "release" };
+        await File.WriteAllTextAsync(
+            paths.GetVersionJsonPath(versionId),
+            JsonSerializer.Serialize(profile),
+            ct).ConfigureAwait(false);
+
+        var resolved = await resolver.ResolveAsync(versionId, ct).ConfigureAwait(false);
+        var scratch = new GameVersion { Id = versionId, MinecraftVersion = plan.MinecraftVersion };
+        await gameDownloader.DownloadAsync(scratch, resolved, null, ct).ConfigureAwait(false);
     }
 
     private async Task<(int Installed, int Skipped, IReadOnlyList<string> Failed)> DownloadFilesAsync(
@@ -350,7 +404,7 @@ public sealed class ModpackService(
     }
 
     /// <summary>
-    /// 把 overrides 解压到实例目录。Modrinth 有 <c>overrides/</c> 与 <c>client-overrides/</c>，
+    /// 把 overrides 解压到版本目录。Modrinth 有 <c>overrides/</c> 与 <c>client-overrides/</c>，
     /// 后者后解压，同名文件以客户端专用版本为准。
     /// </summary>
     private int ExtractOverrides(ModpackPlan plan, string root, CancellationToken ct)
@@ -414,23 +468,21 @@ public sealed class ModpackService(
         TryDeleteDirectory(directory);
     }
 
-    private async Task<string> UniqueNameAsync(string name, CancellationToken ct)
+    private Task<string> UniqueVersionIdAsync(string name, CancellationToken ct)
     {
-        var baseName = string.IsNullOrWhiteSpace(name) ? "整合包实例" : name.Trim();
-        var existing = await repository.GetAllAsync(ct).ConfigureAwait(false);
-        var used = existing.Select(i => i.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var baseId = VersionScanner.BuildId(string.IsNullOrWhiteSpace(name) ? "整合包" : name.Trim());
 
-        if (!used.Contains(baseName))
+        if (!Directory.Exists(paths.GetVersionDirectory(baseId)))
         {
-            return baseName;
+            return Task.FromResult(baseId);
         }
 
         for (var index = 2; ; index++)
         {
-            var candidate = $"{baseName} ({index})";
-            if (!used.Contains(candidate))
+            var candidate = $"{baseId} ({index})";
+            if (!Directory.Exists(paths.GetVersionDirectory(candidate)))
             {
-                return candidate;
+                return Task.FromResult(candidate);
             }
         }
     }

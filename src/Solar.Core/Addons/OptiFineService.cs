@@ -41,12 +41,13 @@ public interface IOptiFineService
 /// </para>
 /// <para>
 /// 安装器没有命令行参数，靠 <c>user.home</c> 定位游戏目录（<c>&lt;user.home&gt;/.minecraft</c>），
-/// 所以这里搭一个临时的 home，装完把产出搬回 <see cref="AppPaths.Shared"/>。
+/// 所以这里搭一个临时的 home，装完把产出搬回 MC 文件夹。
 /// </para>
 /// </summary>
 public sealed partial class OptiFineService(
     HttpClient http,
     AppPaths paths,
+    MinecraftPaths minecraft,
     ILogger<OptiFineService> logger) : IOptiFineService
 {
     private const string VersionListUrl = "https://bmclapi2.bangbang93.com/optifine/versionList";
@@ -185,7 +186,7 @@ public sealed partial class OptiFineService(
         var producedLibraries = Path.Combine(minecraftDirectory, "libraries", "optifine");
         if (Directory.Exists(producedLibraries))
         {
-            CopyDirectory(producedLibraries, Path.Combine(paths.Libraries, "optifine"));
+            CopyDirectory(producedLibraries, Path.Combine(minecraft.Libraries, "optifine"));
         }
 
         var versionsDirectory = Path.Combine(minecraftDirectory, "versions");
@@ -207,7 +208,7 @@ public sealed partial class OptiFineService(
                         ?? expectedId;
 
         var source = Path.Combine(versionsDirectory, versionId);
-        var target = Path.Combine(paths.Versions, versionId);
+        var target = minecraft.GetVersionDirectory(versionId);
         Directory.CreateDirectory(target);
 
         var jsonPath = Path.Combine(source, versionId + ".json");

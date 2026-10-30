@@ -1,19 +1,20 @@
 using Microsoft.Extensions.Logging;
-using Solar.Core.Instances;
+using Solar.Core.Paths;
 using Solar.Core.Settings;
+using Solar.Core.Versions;
 
 namespace Solar.Core.Memory;
 
-/// <summary>决定某个实例实际使用多大的堆内存。</summary>
+/// <summary>决定某个版本实际使用多大的堆内存。</summary>
 public interface IMemoryAllocationService
 {
     /// <summary>
-    /// 实例级覆盖优先；否则按设置里的分配模式计算：
-    /// 自动模式看物理内存、当前可用内存与实例的模组数量，手动模式用设定值。
+    /// 版本级覆盖优先；否则按设置里的分配模式计算：
+    /// 自动模式看物理内存、当前可用内存与版本的模组数量，手动模式用设定值。
     /// </summary>
-    int Resolve(GameInstance instance);
+    int Resolve(GameVersion instance);
 
-    /// <summary>自动模式此刻会给出的值（忽略实例覆盖），供界面预览。</summary>
+    /// <summary>自动模式此刻会给出的值（忽略版本覆盖），供界面预览。</summary>
     int Recommend(int modCount);
 
     SystemMemoryInfo GetSystemMemory();
@@ -21,13 +22,13 @@ public interface IMemoryAllocationService
 
 public sealed class MemoryAllocationService(
     ISettingsService settings,
-    InstanceGameDirectory gameDirectories,
+    MinecraftPaths paths,
     ISystemMemoryInfo memoryInfo,
     ILogger<MemoryAllocationService> logger) : IMemoryAllocationService
 {
-    public int Resolve(GameInstance instance)
+    public int Resolve(GameVersion instance)
     {
-        // 实例级覆盖是一个明确的固定值，不再参与自动计算
+        // 版本级覆盖是一个明确的固定值，不再参与自动计算
         if (instance.MaxMemoryMb is { } overridden)
         {
             return MemoryAllocator.Clamp(overridden);
@@ -39,12 +40,12 @@ public sealed class MemoryAllocationService(
             return MemoryAllocator.Clamp(current.MaxMemoryMb);
         }
 
-        var mods = CountMods(gameDirectories.Resolve(instance));
+        var mods = CountMods(paths.ResolveGameDirectory(instance.Id, instance.VersionIsolation));
         var memory = memoryInfo.GetCurrent();
         var recommended = MemoryAllocator.Recommend(memory.TotalMb, memory.AvailableMb, mods);
 
         logger.LogInformation(
-            "自动分配内存: 实例 {Instance}, 模组 {Mods} 个, 物理内存 {Total}MB, 可用 {Available}MB → {Memory}MB",
+            "自动分配内存: 版本 {Instance}, 模组 {Mods} 个, 物理内存 {Total}MB, 可用 {Available}MB → {Memory}MB",
             instance.Name,
             mods,
             memory.TotalMb,

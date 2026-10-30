@@ -66,11 +66,11 @@ CurseForge 和 Modrinth 都只认英文。PCL 内置一份 MC 百科条目表
 
 ### 1.5 下载与安装
 
-- 目录：`{PathIndie}/mods/`，`PathIndie` 是实例的游戏目录：开启隔离时就是该版本的
-  版本文件夹（`SolarShared/versions/<版本id>` 或共享 `.minecraft/versions/<版本id>`），
+- 目录：`{PathIndie}/mods/`，`PathIndie` 是版本的游戏目录：开启隔离时就是该版本的
+  版本文件夹（`.minecraft/versions/<版本id>` 或共享 `.minecraft/versions/<版本id>`），
   未隔离时是共享 `.minecraft`。
-- 目标目录是**用户级选择**：优先上次用过的目录 → 当前实例（若版本+加载器兼容）→
-  遍历实例找兼容的 → 兜底 `McFolderSelected`。最后还会弹一次「另存为」。
+- 目标目录是**用户级选择**：优先上次用过的目录 → 当前版本（若版本+加载器兼容）→
+  遍历版本找兼容的 → 兜底 `McFolderSelected`。最后还会弹一次「另存为」。
 - **不做自动依赖下载**。整合包安装是另一条代码路径。
 - 文件名默认按「中文名 + 原名」重命名（`~` 换成 `-`，否则 Mixin 加载失败）。
 - 下载引擎：多线程 Range 分片（<1MB 不分片）、单源失败换源、全源失败降级为
@@ -225,11 +225,11 @@ public interface IModCatalogService
 
 ### 2.5 版本列表与依赖
 
-- 请求时**带上实例的版本与加载器**做服务端过滤，UI 默认只看兼容版本，
+- 请求时**带上版本的版本与加载器**做服务端过滤，UI 默认只看兼容版本，
   另有「显示全部版本」开关。
 - 默认选中「最新正式版」（`release` 优先，其次 `beta`/`alpha`）。
 - 依赖解析：拿到选中版本后，取 `Required` 依赖 → 用同样的
-  「实例版本 + 加载器」去查它的版本 → 取最新正式版。深度上限 5 层并做 visited 去重，
+  「版本版本 + 加载器」去查它的版本 → 取最新正式版。深度上限 5 层并做 visited 去重，
   避免循环依赖。
 - 安装对话框中列成清单：必选前置默认勾上、可选前置默认不勾、不可用（找不到兼容版本）
   的前置标红并提示。
@@ -237,16 +237,16 @@ public interface IModCatalogService
 ### 2.6 安装
 
 ```
-目标目录 = InstanceGameDirectory.Resolve(instance) + "\mods"
+目标目录 = MinecraftPaths.ResolveGameDirectory(version.Id, version.VersionIsolation) + "\mods"
 下载到    {目标目录}\{文件名}.part
 校验      SHA1（Modrinth 必带；CF 的 hashes 里也有 sha1）
 落盘      File.Move(.part -> 正式名)，同名文件已存在则先问「覆盖 / 跳过」
 ```
 
-- **必须选一个目标实例**：Mod 只能落在具体游戏目录里。未开启版本隔离的实例会标注
-  「共享目录」，并在安装前提示「会影响所有未隔离的实例」；已隔离的实例装进版本文件夹，
-  同一版本的其他实例也会看到。
-- 实例是原版（`ModLoader.Vanilla`）时给 Warning，但仍允许下载（用户可能稍后再加加载器）。
+- **必须选一个目标版本**：Mod 只能落在具体游戏目录里。未开启版本隔离的版本会标注
+  「共享目录」，并在安装前提示「会影响所有未隔离的版本」；已隔离的版本装进版本文件夹，
+  同一版本的其他版本也会看到。
+- 版本是原版（`ModLoader.Vanilla`）时给 Warning，但仍允许下载（用户可能稍后再加加载器）。
 - 下载进度复用 `IProgress<DownloadProgress>` 的形状，UI 与现有启动进度条一致。
 - 下载走**独立 HttpClient**：mod 文件动辄几十 MB，超时放宽到 15 分钟，
   与 API 请求（10 秒超时）分开，避免一个慢下载卡住搜索。
@@ -290,7 +290,7 @@ Modrinth 的 `icon_url` 是 **WebP**（`..._96.webp`），只有单项目/批量
 
 ```
 ┌ 标题：Mod ─────────────────────────────────────────────┐
-│ 目标实例 [1.21.4 Fabric ▾]   来源 [全部 ▾]   排序 [相关度 ▾] │
+│ 目标版本 [1.21.4 Fabric ▾]   来源 [全部 ▾]   排序 [相关度 ▾] │
 │ [🔍 搜索 Mod…                                        ]  │
 │ 分类：[全部] [性能优化] [科技] [魔法] …                    │
 ├──────────────────────────────────────────────────────┤
@@ -302,8 +302,8 @@ Modrinth 的 `icon_url` 是 **WebP**（`..._96.webp`），只有单项目/批量
 └──────────────────────────────────────────────────────┘
 ```
 
-- 「目标实例」下拉同时决定默认的游戏版本与加载器筛选；切换实例立刻重查。
-- 没选实例也能浏览，只是不能安装（安装按钮提示先选实例）。
+- 「目标版本」下拉同时决定默认的游戏版本与加载器筛选；切换版本立刻重查。
+- 没选版本也能浏览，只是不能安装（安装按钮提示先选版本）。
 - 分页用「加载更多」（offset 累加），不做页码——PCL 的累加式分页同理，但更简单。
 
 **详情页 `ModProjectPage`**
@@ -312,7 +312,7 @@ Modrinth 的 `icon_url` 是 **WebP**（`..._96.webp`），只有单项目/批量
 - 正文：Modrinth 有 `body`（Markdown）→ 用一个极简 Markdown → `RichTextBlock` 转换器
   （标题/粗体/链接/列表/图片）；CurseForge 镜像拿不到正文（`/description` 返回 404），
   只显示 summary + 截图 + 「在 CurseForge 上查看」外链。
-- 版本列表：默认只显示与实例版本+加载器兼容的，按发布时间倒序；
+- 版本列表：默认只显示与版本版本+加载器兼容的，按发布时间倒序；
   每行显示版本名、类型徽章（正式/Beta/Alpha）、文件名、大小、发布时间、前置数量。
 - 「前置资源」区块：列出选中版本的必选/可选依赖。
 
@@ -320,7 +320,7 @@ Modrinth 的 `icon_url` 是 **WebP**（`..._96.webp`），只有单项目/批量
 
 ```
 安装 Sodium 0.6.13 到「生存服」？
-目标：F:\...\SolarShared\versions\<版本id>\mods
+目标：F:\...\.minecraft\versions\<版本id>\mods
 □ 前置（必选，2 项）
    ☑ Fabric API 0.115.0        [已安装，将跳过]
    ☑ Cloth Config 15.0.140
@@ -416,9 +416,9 @@ Modrinth 的 `icon_url` 是 **WebP**（`..._96.webp`），只有单项目/批量
 
 | 现有组件 | 用途 |
 | --- | --- |
-| `InstanceGameDirectory.Resolve(instance)` | 解析 Mod 的目标游戏目录（隔离时即版本文件夹） |
-| `InstanceGameDirectory.GetIsolatedPath(instance)` | 隔离实例的版本文件夹本身（覆盖路径优先） |
-| `GameInstance.MinecraftVersion` / `Loader` | 搜索与版本列表的默认筛选条件 |
+| `MinecraftPaths.ResolveGameDirectory(id, isolated)` | 解析 Mod 的目标游戏目录（隔离时即版本文件夹） |
+| `MinecraftPaths.GetVersionDirectory(id)` | 版本文件夹本身 |
+| `GameVersion.MinecraftVersion` / `Loader` | 搜索与版本列表的默认筛选条件 |
 | `JsonFile` / `SolarJson` | 缓存读写 |
 | `AppPaths.Data` | `modcache/` 的父目录 |
 | `ViewModelBase` / `PageBase` | 新页面直接继承 |

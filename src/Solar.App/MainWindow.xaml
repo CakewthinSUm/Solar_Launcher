@@ -60,8 +60,8 @@
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
                 <!--
-                    管理：单个入口，点开直接落在实例列表。
-                    实例 / Mods / 资源包 / 光影 的分区切换放在页面顶部的分区栏里，
+                    管理：单个入口，点开直接落在版本列表。
+                    版本 / Mods / 资源包 / 光影 的分区切换放在页面顶部的分区栏里，
                     侧边栏不再展开第二层，同一份导航也就不会出现两处入口。
                 -->
                 <NavigationViewItem x:Name="ManageNavItem" Content="管理" Tag="manage">

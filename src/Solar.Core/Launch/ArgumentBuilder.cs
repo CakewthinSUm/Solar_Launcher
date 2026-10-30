@@ -1,24 +1,21 @@
 using System.Text;
-using Solar.Core.Instances;
 using Solar.Core.Minecraft;
 using Solar.Core.Models;
 using Solar.Core.Paths;
 using Solar.Core.Settings;
+using Solar.Core.Versions;
 
 namespace Solar.Core.Launch;
 
-/// <summary>启动一个实例所需的全部输入，由启动器服务组装后交给参数构建器。</summary>
+/// <summary>启动一个版本所需的全部输入，由启动器服务组装后交给参数构建器。</summary>
 public sealed class LaunchContext
 {
-    public required GameInstance Instance { get; init; }
+    public required GameVersion Game { get; init; }
     public required ResolvedVersion Version { get; init; }
-    public required AppPaths Paths { get; init; }
+    public required MinecraftPaths Paths { get; init; }
     public required LauncherSettings Settings { get; init; }
 
-    /// <summary>
-    /// 库与版本文件的查找器：SolarShared 与游戏目录两处都查。
-    /// 为空时只认 <see cref="AppPaths.Libraries"/> 与 <see cref="AppPaths.Versions"/>。
-    /// </summary>
+    /// <summary>库与版本文件的查找器；为空时直接用 <see cref="MinecraftPaths"/> 下的路径。</summary>
     public GameFileLocator? FileLocator { get; init; }
 
     public required string JavaPath { get; init; }
@@ -42,7 +39,7 @@ public sealed class LaunchContext
 
     /// <summary>
     /// 实际使用的堆上限（MB），由 <see cref="LaunchContextFactory"/> 结合设置里的
-    /// 分配方式与实例级覆盖算好。这里不再关心它从哪来。
+    /// 分配方式与版本级覆盖算好。这里不再关心它从哪来。
     /// </summary>
     public int MaxMemoryMb { get; init; } = 4096;
 
@@ -407,10 +404,10 @@ public sealed class ArgumentBuilder
 
         "user_type" => context.UserType,
         "user_properties" => "{}",
-        // 实例设置了自定义标题时覆盖 version_name：游戏的窗口标题取自 --version 参数的值
-        "version_name" => string.IsNullOrWhiteSpace(context.Instance.CustomWindowTitle)
+        // 版本设置了自定义标题时覆盖 version_name：游戏的窗口标题取自 --version 参数的值
+        "version_name" => string.IsNullOrWhiteSpace(context.Game.CustomWindowTitle)
             ? context.Version.Id
-            : context.Instance.CustomWindowTitle.Trim(),
+            : context.Game.CustomWindowTitle.Trim(),
         "version_type" => context.VersionType,
         "game_directory" => context.GameDirectory,
         "assets_root" => context.AssetsDirectory,

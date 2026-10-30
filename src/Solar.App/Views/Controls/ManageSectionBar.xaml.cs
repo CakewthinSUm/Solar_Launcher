@@ -5,7 +5,7 @@ using Microsoft.UI.Xaml.Controls;
 namespace Solar.App.Views.Controls;
 
 /// <summary>
-/// 「管理」页顶部的分区切换栏：实例 / Mods / 资源包 / 光影。
+/// 「管理」页顶部的分区切换栏：版本 / Mods / 资源包 / 光影。
 /// 侧边栏的「管理」不再展开子项，分区由这里切换，页面各自决定怎么导航。
 /// </summary>
 public sealed partial class ManageSectionBar : UserControl
@@ -40,7 +40,7 @@ public sealed partial class ManageSectionBar : UserControl
 
     /// <summary>
     /// 页面导航进来时控件往往还没加载，SelectorBar 加载过程中会把选中项拨回第一项，
-    /// 所以加载完成后再排一次同步，否则第一次进入 Mods / 资源包 / 光影 时会停在「实例」上。
+    /// 所以加载完成后再排一次同步，否则第一次进入 Mods / 资源包 / 光影 时会停在「版本」上。
     /// </summary>
     private void ManageSectionBar_Loaded(object sender, RoutedEventArgs e) =>
         DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, ApplySelection);

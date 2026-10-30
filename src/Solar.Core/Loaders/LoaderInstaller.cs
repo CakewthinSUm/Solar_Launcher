@@ -3,12 +3,13 @@ using System.IO.Compression;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
+using System.Text.Json.Nodes;
 using Solar.Core.Download;
-using Solar.Core.Instances;
 using Solar.Core.Json;
 using Solar.Core.Minecraft;
 using Solar.Core.Models;
 using Solar.Core.Paths;
+using Solar.Core.Versions;
 
 namespace Solar.Core.Loaders;
 
@@ -27,7 +28,7 @@ public interface ILoaderInstaller
         string javaPath,
         IProgress<LoaderInstallProgress>? progress = null,
         CancellationToken ct = default,
-        string? scratchInstanceId = null);
+        string? targetVersionId = null);
 }
 
 /// <summary>
@@ -45,6 +46,7 @@ public interface ILoaderInstaller
 /// </summary>
 public sealed class LoaderInstaller(
     AppPaths paths,
+    MinecraftPaths minecraft,
     HttpClient http,
     IVersionResolver resolver,
     IGameDownloader downloader,
@@ -64,33 +66,34 @@ public sealed class LoaderInstaller(
         string javaPath,
         IProgress<LoaderInstallProgress>? progress = null,
         CancellationToken ct = default,
-        string? scratchInstanceId = null)
+        string? targetVersionId = null)
     {
         // 先确保原版就绪：加载器的版本 JSON 依赖它，processor 也需要原版 jar
         progress?.Report(new LoaderInstallProgress("正在准备原版文件", 0, 1));
         var vanilla = await resolver.ResolveAsync(minecraftVersion, ct).ConfigureAwait(false);
 
-        // 预下载时 natives 会解压到实例目录；创建流程传真实实例 Id，
-        // 避免留下 installer-temp 这种没人清理的目录。
-        var instance = new GameInstance
+        // 预下载时 natives 会解压到版本目录；用原版 id 作为临时版本，避免留下孤儿目录。
+        var scratch = new GameVersion
         {
-            Id = scratchInstanceId ?? "installer-temp",
+            Id = minecraftVersion,
             MinecraftVersion = minecraftVersion,
         };
-        await downloader.DownloadAsync(instance, vanilla, null, ct).ConfigureAwait(false);
+        await downloader.DownloadAsync(scratch, vanilla, null, ct).ConfigureAwait(false);
 
         return loader switch
         {
             ModLoader.Fabric => await InstallFabricLikeAsync(
-                FabricProfile, "fabric", minecraftVersion, loaderVersion, instance, progress, ct).ConfigureAwait(false),
+                FabricProfile, "fabric", minecraftVersion, loaderVersion,
+                targetVersionId, scratch, progress, ct).ConfigureAwait(false),
             ModLoader.Quilt => await InstallFabricLikeAsync(
-                QuiltProfile, "quilt", minecraftVersion, loaderVersion, instance, progress, ct).ConfigureAwait(false),
+                QuiltProfile, "quilt", minecraftVersion, loaderVersion,
+                targetVersionId, scratch, progress, ct).ConfigureAwait(false),
             ModLoader.Forge => await InstallForgeLikeAsync(
                 string.Format(ForgeInstallerUrl, minecraftVersion, loaderVersion),
-                minecraftVersion, javaPath, instance, progress, ct).ConfigureAwait(false),
+                minecraftVersion, javaPath, targetVersionId, scratch, progress, ct).ConfigureAwait(false),
             ModLoader.NeoForge => await InstallForgeLikeAsync(
                 string.Format(NeoForgeInstallerUrl, loaderVersion),
-                minecraftVersion, javaPath, instance, progress, ct).ConfigureAwait(false),
+                minecraftVersion, javaPath, targetVersionId, scratch, progress, ct).ConfigureAwait(false),
             _ => throw new NotSupportedException($"不支持的加载器: {loader}"),
         };
     }
@@ -101,7 +104,8 @@ public sealed class LoaderInstaller(
         string loaderName,
         string minecraftVersion,
         string loaderVersion,
-        GameInstance scratchInstance,
+        string? targetVersionId,
+        GameVersion scratch,
         IProgress<LoaderInstallProgress>? progress,
         CancellationToken ct)
     {
@@ -112,16 +116,17 @@ public sealed class LoaderInstaller(
         var detail = JsonSerializer.Deserialize<VersionDetail>(json, SolarJson.Options)
                      ?? throw new InvalidOperationException($"{loaderName} 返回的版本 JSON 无效。");
 
-        var versionId = detail.Id;
-        var targetDirectory = Path.Combine(paths.Versions, versionId);
+        var versionId = string.IsNullOrWhiteSpace(targetVersionId) ? detail.Id : targetVersionId;
+        var targetDirectory = Path.Combine(minecraft.Versions, versionId);
         Directory.CreateDirectory(targetDirectory);
         await File.WriteAllTextAsync(
-            Path.Combine(targetDirectory, versionId + ".json"), json, ct).ConfigureAwait(false);
+            Path.Combine(targetDirectory, versionId + ".json"), RewriteId(json, versionId), ct)
+            .ConfigureAwait(false);
 
         // 加载器自己的库（含它引用的原版库）交给下载器补齐
         progress?.Report(new LoaderInstallProgress("正在下载加载器库", 0, 1));
         var resolved = await resolver.ResolveAsync(versionId, ct).ConfigureAwait(false);
-        await downloader.DownloadAsync(scratchInstance, resolved, null, ct).ConfigureAwait(false);
+        await downloader.DownloadAsync(scratch, resolved, null, ct).ConfigureAwait(false);
 
         logger.LogInformation("{Loader} {Version} 安装完成: {Id}", loaderName, loaderVersion, versionId);
         return versionId;
@@ -132,7 +137,8 @@ public sealed class LoaderInstaller(
         string installerUrl,
         string minecraftVersion,
         string javaPath,
-        GameInstance scratchInstance,
+        string? targetVersionId,
+        GameVersion scratch,
         IProgress<LoaderInstallProgress>? progress,
         CancellationToken ct)
     {
@@ -154,16 +160,17 @@ public sealed class LoaderInstaller(
             var versionDetail = JsonSerializer.Deserialize<VersionDetail>(versionJson, SolarJson.Options)
                                 ?? throw new InvalidOperationException("安装器的 version.json 无效。");
 
-            var versionId = versionDetail.Id;
-            var targetDirectory = Path.Combine(paths.Versions, versionId);
+            var versionId = string.IsNullOrWhiteSpace(targetVersionId) ? versionDetail.Id : targetVersionId;
+            var targetDirectory = Path.Combine(minecraft.Versions, versionId);
             Directory.CreateDirectory(targetDirectory);
             await File.WriteAllTextAsync(
-                Path.Combine(targetDirectory, versionId + ".json"), versionJson, ct).ConfigureAwait(false);
+                Path.Combine(targetDirectory, versionId + ".json"), RewriteId(versionJson, versionId), ct)
+                .ConfigureAwait(false);
 
             // 先补齐版本 JSON 声明的库
             progress?.Report(new LoaderInstallProgress("正在下载加载器库", 0, 1));
             var resolved = await resolver.ResolveAsync(versionId, ct).ConfigureAwait(false);
-            await downloader.DownloadAsync(scratchInstance, resolved, null, ct).ConfigureAwait(false);
+            await downloader.DownloadAsync(scratch, resolved, null, ct).ConfigureAwait(false);
 
             // 再跑 processor 产出客户端 artifact
             var profileEntry = archive.GetEntry("install_profile.json");
@@ -210,7 +217,7 @@ public sealed class LoaderInstaller(
             ["MINECRAFT_VERSION"] = minecraftVersion,
 
             // 原版客户端 jar：FART 以它为输入做重命名
-            ["MINECRAFT_JAR"] = Path.Combine(paths.Versions, minecraftVersion, minecraftVersion + ".jar"),
+            ["MINECRAFT_JAR"] = Path.Combine(minecraft.Versions, minecraftVersion, minecraftVersion + ".jar"),
 
             // 原版 jar 的 SHA1，部分 processor 用它做校验
             ["MINECRAFT_JAR_SHA"] = "",
@@ -249,7 +256,7 @@ public sealed class LoaderInstaller(
 
             var outputs = processor.Outputs?.Keys
                 .Select(k => ForgeDataResolver.ExpandPlaceholders(
-                    k, resolvedData, paths.Libraries, extractDirectory))
+                    k, resolvedData, minecraft.Libraries, extractDirectory))
                 .ToList() ?? [];
 
             // 输出已存在且哈希匹配就跳过，便于中断后重跑
@@ -271,11 +278,11 @@ public sealed class LoaderInstaller(
         string javaPath,
         CancellationToken ct)
     {
-        var jarPath = ForgeDataResolver.GetLibraryPath(processor.Jar, paths.Libraries);
+        var jarPath = ForgeDataResolver.GetLibraryPath(processor.Jar, minecraft.Libraries);
         var mainClass = ReadMainClass(jarPath);
 
         var classPath = processor.Classpath
-            .Select(c => ForgeDataResolver.GetLibraryPath(c, paths.Libraries))
+            .Select(c => ForgeDataResolver.GetLibraryPath(c, minecraft.Libraries))
             .Append(jarPath)
             .ToList();
 
@@ -344,12 +351,12 @@ public sealed class LoaderInstaller(
     {
         // 先展开 {KEY}
         var result = ForgeDataResolver.ExpandPlaceholders(
-            argument, data, paths.Libraries, extractDirectory);
+            argument, data, minecraft.Libraries, extractDirectory);
 
         // 再处理整段就是一个 [坐标] 的参数
         if (result.Length > 2 && result[0] == '[' && result[^1] == ']')
         {
-            return ForgeDataResolver.GetLibraryPath(result[1..^1], paths.Libraries);
+            return ForgeDataResolver.GetLibraryPath(result[1..^1], minecraft.Libraries);
         }
 
         return result;
@@ -400,7 +407,7 @@ public sealed class LoaderInstaller(
 
             files.Add(new CmlLib.Core.Files.GameFile(library.Name)
             {
-                Path = Path.Combine(paths.Libraries, relative),
+                Path = Path.Combine(minecraft.Libraries, relative),
                 Url = url,
                 Hash = library.Downloads?.Artifact?.Sha1,
                 Size = library.Downloads?.Artifact?.Size ?? 0,
@@ -442,13 +449,13 @@ public sealed class LoaderInstaller(
         // 先放入字面量与 maven 坐标，再统一展开 {占位符}
         foreach (var (key, value) in raw)
         {
-            result[key] = ForgeDataResolver.Resolve(value, result, paths.Libraries, extractDirectory);
+            result[key] = ForgeDataResolver.Resolve(value, result, minecraft.Libraries, extractDirectory);
         }
 
         // 再跑一遍，让引用了其他键的条目也能解析
         foreach (var key in raw.Keys.ToList())
         {
-            result[key] = ForgeDataResolver.Resolve(raw[key], result, paths.Libraries, extractDirectory);
+            result[key] = ForgeDataResolver.Resolve(raw[key], result, minecraft.Libraries, extractDirectory);
         }
 
         return result;
@@ -497,6 +504,29 @@ public sealed class LoaderInstaller(
         await using var stream = entry.Open();
         using var reader = new StreamReader(stream);
         return await reader.ReadToEndAsync(ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// 把版本 JSON 里的 <c>id</c> 改成目标文件夹名。
+    /// 用户给版本起了自定义名字时，文件夹名、JSON 文件名与 JSON 里的 id 必须一致，
+    /// 否则解析器会按 id 去找一个不存在的版本。
+    /// </summary>
+    private static string RewriteId(string json, string versionId)
+    {
+        try
+        {
+            if (JsonNode.Parse(json) is JsonObject root)
+            {
+                root["id"] = versionId;
+                return root.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
+            }
+        }
+        catch (JsonException)
+        {
+            // 解析不了就原样写回，让后续流程报出更具体的错误
+        }
+
+        return json;
     }
 
     private static void TryDeleteDirectory(string directory)

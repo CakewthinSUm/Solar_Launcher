@@ -73,6 +73,6 @@ public sealed class NavigationService(IServiceProvider services) : INavigationSe
         return true;
     }
 
-    /// <summary>页面实例交给 DI 创建，从而支持构造函数注入。</summary>
+    /// <summary>页面版本交给 DI 创建，从而支持构造函数注入。</summary>
     internal Page? ResolvePage(Type pageType) => services.GetService(pageType) as Page;
 }

@@ -1,9 +1,9 @@
-using Solar.Core.Instances;
+using Solar.Core.Versions;
 using Solar.Core.Loaders;
 
 namespace Solar.Core.Addons;
 
-/// <summary>创建实例时可以勾选的附加组件。</summary>
+/// <summary>创建版本时可以勾选的附加组件。</summary>
 public enum ComponentKind
 {
     Forge,
@@ -39,7 +39,7 @@ public sealed record ComponentSelection
 
     public bool NeedsIsolation => Loader != ModLoader.Vanilla || HasAnyAddon;
 
-    /// <summary>界面上的一句话摘要，用于默认实例名。</summary>
+    /// <summary>界面上的一句话摘要，用于默认版本名。</summary>
     public string BuildDefaultName(string minecraftVersion)
     {
         var parts = new List<string> { minecraftVersion };

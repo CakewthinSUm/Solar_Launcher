@@ -12,7 +12,7 @@ PCL2（`Meloong-Git/PCL`）的做法作为参照，文末附本次实际请求�
 | 类型 | Modrinth `project_type` facet | CurseForge `classId` | 安装落点 |
 | --- | --- | --- | --- |
 | Mod | `mod` | 6 | `mods/` |
-| 整合包 | `modpack` | 4471 | 新建隔离实例 |
+| 整合包 | `modpack` | 4471 | 新建隔离版本 |
 | 资源包 | `resourcepack` | 12 | `resourcepacks/` |
 | 光影 | `shader` | 6552 | `shaderpacks/` |
 | 数据包 | `datapack` | 6945 | `saves/<存档>/datapacks/` |
@@ -47,14 +47,14 @@ CurseForge 的数据包是独立的 `classId=6945`，不需要这层过滤。
 | `AddonDownloadPage` | 搜索、来源/排序筛选、加载更多 |
 | `AddonProjectPage` | 详情正文、截图、版本列表 |
 | `AddonInstallDialog` | Mod / 光影 / 资源包 / 数据包的单文件或带前置安装 |
-| `ModpackInstallDialog` | 整合包：解析、起名、创建实例、整包下载 |
+| `ModpackInstallDialog` | 整合包：解析、起名、创建版本、整包下载 |
 
 筛选条件的来源：
 
-- **Mod / 光影 / 资源包 / 数据包**：顶部选中的实例提供游戏版本；Mod 额外提供加载器。
-  没选实例时仍可浏览，只是不能安装。
-- **整合包**：整合包自带游戏版本与加载器，安装会新建实例。列表页改为让用户
-  选择要浏览的游戏版本（来自版本清单的正式版），而不是绑定已有实例。
+- **Mod / 光影 / 资源包 / 数据包**：顶部选中的版本提供游戏版本；Mod 额外提供加载器。
+  没选版本时仍可浏览，只是不能安装。
+- **整合包**：整合包自带游戏版本与加载器，安装会新建版本。列表页改为让用户
+  选择要浏览的游戏版本（来自版本清单的正式版），而不是绑定已有版本。
 
 Minecraft 分区仍由原来的 `DownloadPage` 负责，两者不混在同一个视图模型里。
 
@@ -120,17 +120,17 @@ zip 内包含 `manifest.json`：
 ```
 下载整包到 %TEMP%\SolarLauncher\modpacks\<guid>\
   → 解析 manifest，得到 MC 版本 / 加载器 / 文件清单
-  → 创建隔离实例（写入 instances.json）
+  → 创建隔离版本（写入 versions/*/.solar/version.json）
   → 并行下载文件（4 路），SHA1 校验，.part 原子落盘
   → 解压 overrides / client-overrides（zip-slip 校验）
-  → 保存实例
+  → 保存版本
 ```
 
-游戏本体与加载器不在这里下载。实例的 `LoaderInstalled = false`，首次启动时由
+游戏本体与加载器不在这里下载。版本的 `LoaderInstalled = false`，首次启动时由
 `GameLaunchService.EnsureLoaderAsync` 安装加载器，并补齐游戏文件。
 这样建整合包时不必同步等待几百 MB 的游戏下载，也不会同时跑两套下载器。
 
-取消或失败时实例记录与已下载文件会保留，对话框会明确提示；
+取消或失败时版本记录与已下载文件会保留，对话框会明确提示；
 临时目录在对话框关闭时由 `IModpackService.Cleanup` 删除。
 
 ---
@@ -140,7 +140,7 @@ zip 内包含 `manifest.json`：
 整合包来自网络，所有路径都按不可信输入处理：
 
 - 拒绝 `..`、空段、绝对路径、盘符（`C:`）与越界路径。
-- 目标路径必须落在实例游戏目录之下（`CombineUnderRoot` 双重检查）。
+- 目标路径必须落在版本游戏目录之下（`CombineUnderRoot` 双重检查）。
 - 文件先写 `.part`，SHA1 通过后才改名；失败不会留下半截可执行文件。
 - 临时目录只删除自己创建的 `%TEMP%\SolarLauncher\modpacks\*`。
 
@@ -171,7 +171,7 @@ src/Solar.Core/Mods/
 src/Solar.Core/Modpacks/
   ModpackModels.cs         ModpackPlan / 进度 / 服务接口
   ModpackManifestReader.cs 两种 manifest 的纯解析 + 路径安全
-  ModpackService.cs        整包下载、创建实例、文件下载、overrides 解压
+  ModpackService.cs        整包下载、创建版本、文件下载、overrides 解压
 src/Solar.App/
   ViewModels/AddonDownloadViewModel.cs
   ViewModels/AddonProjectViewModel.cs

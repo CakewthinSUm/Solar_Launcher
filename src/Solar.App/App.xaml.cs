@@ -6,7 +6,7 @@ using Solar.App.ViewModels;
 using Solar.App.Views;
 using Solar.Core;
 using Solar.Core.Accounts;
-using Solar.Core.Instances;
+using Solar.Core.Versions;
 using Solar.Core.Java;
 using Solar.Core.Minecraft;
 using Solar.Core.Paths;
@@ -62,9 +62,9 @@ public partial class App : Application
         services.AddSingleton<TaskbarProgressService>();
 
         services.AddTransient<HomeViewModel>();
-        services.AddTransient<InstancesViewModel>();
-        services.AddTransient<InstanceSetupViewModel>();
-        services.AddTransient<InstanceCreateViewModel>();
+        services.AddTransient<VersionsViewModel>();
+        services.AddTransient<VersionSetupViewModel>();
+        services.AddTransient<VersionCreateViewModel>();
         services.AddTransient<DownloadViewModel>();
         services.AddTransient<AddonDownloadViewModel>();
         services.AddTransient<AddonProjectViewModel>();
@@ -74,9 +74,9 @@ public partial class App : Application
         services.AddTransient<SettingsViewModel>();
         services.AddTransient<AccountsViewModel>();
         services.AddTransient<HomePage>();
-        services.AddTransient<InstancesPage>();
-        services.AddTransient<InstanceSetupPage>();
-        services.AddTransient<InstanceCreatePage>();
+        services.AddTransient<VersionsPage>();
+        services.AddTransient<VersionSetupPage>();
+        services.AddTransient<VersionCreatePage>();
         services.AddTransient<DownloadPage>();
         services.AddTransient<AddonDownloadPage>();
         services.AddTransient<AddonProjectPage>();
@@ -99,6 +99,9 @@ public partial class App : Application
         {
             await Services.GetRequiredService<ISettingsService>().LoadAsync();
             await Services.GetRequiredService<IAccountStore>().LoadAsync();
+
+            // 设置加载后才能确定 MC 文件夹；标准目录按需创建
+            Services.GetRequiredService<MinecraftPaths>().EnsureCreated();
         }
         catch (Exception ex)
         {

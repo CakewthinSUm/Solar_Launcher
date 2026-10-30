@@ -1,5 +1,5 @@
 using Solar.Core.Addons;
-using Solar.Core.Instances;
+using Solar.Core.Versions;
 using Xunit;
 
 namespace Solar.Core.Tests;

@@ -1,5 +1,5 @@
 using Microsoft.Extensions.Logging.Abstractions;
-using Solar.Core.Instances;
+using Solar.Core.Versions;
 using Solar.Core.Memory;
 using Solar.Core.Paths;
 using Solar.Core.Settings;
@@ -70,7 +70,7 @@ public sealed class MemoryAllocationTests : IDisposable
 
         var service = CreateService(settings, totalMb: 32768, availableMb: 28672);
 
-        Assert.Equal(6144, service.Resolve(new GameInstance { Id = "inst" }));
+        Assert.Equal(6144, service.Resolve(new GameVersion { Id = "inst" }));
     }
 
     [Fact]
@@ -83,7 +83,7 @@ public sealed class MemoryAllocationTests : IDisposable
         var service = CreateService(settings, totalMb: 16384, availableMb: 12288);
 
         // 原版自动值 2GB，而不是手动设定的 8GB
-        Assert.Equal(2048, service.Resolve(new GameInstance { Id = "inst" }));
+        Assert.Equal(2048, service.Resolve(new GameVersion { Id = "inst" }));
     }
 
     [Fact]
@@ -95,7 +95,7 @@ public sealed class MemoryAllocationTests : IDisposable
             settings.Current.MemoryAllocationMode = mode;
 
             var service = CreateService(settings, totalMb: 16384, availableMb: 12288);
-            var instance = new GameInstance { Id = "inst", MaxMemoryMb = 8192 };
+            var instance = new GameVersion { Id = "inst", MaxMemoryMb = 8192 };
 
             Assert.Equal(8192, service.Resolve(instance));
         }
@@ -109,11 +109,11 @@ public sealed class MemoryAllocationTests : IDisposable
         settings.Current.MaxMemoryMb = 128;   // 配置文件被手改过
 
         var service = CreateService(settings, totalMb: 16384, availableMb: 12288);
-        Assert.Equal(MemoryAllocator.MinimumMb, service.Resolve(new GameInstance { Id = "inst" }));
+        Assert.Equal(MemoryAllocator.MinimumMb, service.Resolve(new GameVersion { Id = "inst" }));
     }
 
     [Fact]
-    public void ModCountComesFromInstanceGameDirectory()
+    public void ModCountComesFromMinecraftPaths()
     {
         var settings = new FakeSettings();
         settings.Current.MemoryAllocationMode = MemoryAllocationMode.Automatic;
@@ -131,7 +131,7 @@ public sealed class MemoryAllocationTests : IDisposable
         File.WriteAllText(Path.Combine(mods, "disabled.jar.disabled"), "");
 
         var service = CreateService(settings, totalMb: 16384, availableMb: 12288);
-        Assert.Equal(3072, service.Resolve(new GameInstance { Id = "inst" }));
+        Assert.Equal(3072, service.Resolve(new GameVersion { Id = "inst" }));
     }
 
     [Fact]
@@ -145,7 +145,7 @@ public sealed class MemoryAllocationTests : IDisposable
         var paths = new AppPaths(_root);
         return new MemoryAllocationService(
             settings,
-            new InstanceGameDirectory(paths, settings),
+            new MinecraftPaths(paths, settings),
             new FakeMemoryInfo(totalMb, availableMb),
             NullLogger<MemoryAllocationService>.Instance);
     }

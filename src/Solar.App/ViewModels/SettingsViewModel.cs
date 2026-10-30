@@ -66,7 +66,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
 
     /// <summary>0 = 每次询问，1 = 总是开启，2 = 总是关闭。ComboBox 只认索引。</summary>
     [ObservableProperty]
-    private int _newInstanceIsolationIndex;
+    private int _DefaultIsolationIndex;
 
     /// <summary>首次启动写进 options.txt 的语言：0 = 简体中文，1 = 繁體中文，2 = English。</summary>
     [ObservableProperty]
@@ -175,7 +175,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
                    || NormalizedVersionManifestUrl != saved.VersionManifestUrl
                    || Math.Clamp(DownloadThreads, 1, 32) != saved.DownloadThreads
                    || NullIfBlank(DownloadMirrorUrl) != saved.DownloadMirrorUrl
-                   || (VersionIsolationScope)Math.Clamp(NewInstanceIsolationIndex, 0, 4) != saved.NewInstanceIsolationScope
+                   || (VersionIsolationScope)Math.Clamp(DefaultIsolationIndex, 0, 4) != saved.DefaultIsolationScope
                    || (GameLanguage)Math.Clamp(GameLanguageIndex, 0, 2) != saved.GameLanguage
                    || (AfterLaunchAction)Math.Clamp(AfterLaunchActionIndex, 0, 2) != saved.AfterLaunchAction
                    || (ModSourcePreference)Math.Clamp(ModSourcePreferenceIndex, 0, 2) != saved.ModSourcePreference
@@ -222,7 +222,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
         VersionManifestUrl = s.VersionManifestUrl;
         DownloadThreads = s.DownloadThreads;
         DownloadMirrorUrl = s.DownloadMirrorUrl ?? "";
-        NewInstanceIsolationIndex = (int)s.NewInstanceIsolationScope;
+        DefaultIsolationIndex = (int)s.DefaultIsolationScope;
         GameLanguageIndex = (int)s.GameLanguage;
         AfterLaunchActionIndex = (int)s.AfterLaunchAction;
         ModSourcePreferenceIndex = (int)s.ModSourcePreference;
@@ -257,7 +257,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
                 MemoryAllocator.MinimumMb,
                 MemoryAllocator.MaximumMb);
 
-            // 预览按共享游戏目录里的模组数量估算；实例开启隔离后用的是自己的目录，实际值可能不同
+            // 预览按共享游戏目录里的模组数量估算；版本开启隔离后用的是自己的目录，实际值可能不同
             var mods = MemoryAllocationService.CountMods(
                 _paths.ResolveMinecraftDirectory(_settings.Current.MinecraftDirectory));
             var recommended = MemoryAllocator.Recommend(info.TotalMb, info.AvailableMb, mods);
@@ -432,7 +432,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
         s.VersionManifestUrl = NormalizedVersionManifestUrl;
         s.DownloadThreads = Math.Clamp(DownloadThreads, 1, 32);
         s.DownloadMirrorUrl = NullIfBlank(DownloadMirrorUrl);
-        s.NewInstanceIsolationScope = (VersionIsolationScope)Math.Clamp(NewInstanceIsolationIndex, 0, 4);
+        s.DefaultIsolationScope = (VersionIsolationScope)Math.Clamp(DefaultIsolationIndex, 0, 4);
         s.GameLanguage = (GameLanguage)Math.Clamp(GameLanguageIndex, 0, 2);
         s.AfterLaunchAction = (AfterLaunchAction)Math.Clamp(AfterLaunchActionIndex, 0, 2);
 

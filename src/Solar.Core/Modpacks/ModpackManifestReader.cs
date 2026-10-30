@@ -1,6 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Solar.Core.Instances;
+using Solar.Core.Versions;
 
 namespace Solar.Core.Modpacks;
 

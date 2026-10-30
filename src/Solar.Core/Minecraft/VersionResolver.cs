@@ -36,13 +36,13 @@ public interface IVersionResolver
 
 public sealed class VersionResolver(
     HttpClient http,
-    AppPaths paths,
+    MinecraftPaths paths,
     GameFileLocator locator,
     IVersionManifestService manifestService,
     ILogger<VersionResolver> logger) : IVersionResolver
 {
-    /// <summary>新下载的落点：Solar 自己的 versions 目录。</summary>
-    public string GetVersionDirectory(string versionId) => Path.Combine(paths.Versions, versionId);
+    /// <summary>新下载的落点：MC 文件夹下的 versions 目录。</summary>
+    public string GetVersionDirectory(string versionId) => paths.GetVersionDirectory(versionId);
     public string GetVersionJsonPath(string versionId) => Path.Combine(GetVersionDirectory(versionId), versionId + ".json");
 
     /// <summary>

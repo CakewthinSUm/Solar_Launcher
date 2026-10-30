@@ -1,4 +1,4 @@
-using Solar.Core.Instances;
+using Solar.Core.Versions;
 
 namespace Solar.Core.Mods;
 
@@ -72,7 +72,7 @@ public static class ModProjectTypes
     };
 
     /// <summary>
-    /// 内容目录名。整合包没有固定目录——它自己就是一个实例，返回 null。
+    /// 内容目录名。整合包没有固定目录——它自己就是一个版本，返回 null。
     /// </summary>
     public static string? ContentFolder(this ModProjectType type) => type switch
     {
@@ -86,8 +86,8 @@ public static class ModProjectTypes
     /// <summary>只有 Mod 需要按加载器筛选；其余类型传了加载器反而会搜不到东西。</summary>
     public static bool UsesLoader(this ModProjectType type) => type == ModProjectType.Mod;
 
-    /// <summary>整合包需要新建实例，其余类型装进已有实例。</summary>
-    public static bool CreatesInstance(this ModProjectType type) => type == ModProjectType.Modpack;
+    /// <summary>整合包需要新建版本，其余类型装进已有版本。</summary>
+    public static bool CreatesVersion(this ModProjectType type) => type == ModProjectType.Modpack;
 
     /// <summary>从 Modrinth 的 <c>project_type</c> 还原；未知值当作 Mod。</summary>
     public static ModProjectType FromModrinth(string? value) => value?.ToLowerInvariant() switch

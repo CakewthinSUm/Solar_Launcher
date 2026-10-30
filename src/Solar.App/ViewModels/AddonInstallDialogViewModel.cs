@@ -3,7 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using Solar.App.Formatting;
 using Solar.App.Services;
 using Solar.Core.Download;
-using Solar.Core.Instances;
+using Solar.Core.Versions;
 using Solar.Core.Mods;
 
 namespace Solar.App.ViewModels;
@@ -27,7 +27,7 @@ public sealed partial class AddonInstallItemViewModel(ModInstallItem item) : Obs
     public bool IsSelectable => Item.IsAvailable;
 
     public string StateText => !Item.IsAvailable
-        ? "没有适配当前实例的版本"
+        ? "没有适配当前游戏版本的文件"
         : Item.AlreadyInstalled
             ? WillOverwrite ? "已安装，将被覆盖" : "已安装，将跳过"
             : "";
@@ -72,7 +72,7 @@ public sealed partial class AddonInstallDialogViewModel : ViewModelBase
 
     private ModProject? _project;
     private ModVersion? _version;
-    private GameInstance? _instance;
+    private GameVersion? _instance;
     private CancellationTokenSource? _cts;
 
     /// <summary>选中存档时先改目录再重建清单，避免重建过程中触发第二次重建。</summary>
@@ -112,7 +112,7 @@ public sealed partial class AddonInstallDialogViewModel : ViewModelBase
     [ObservableProperty]
     private string? _selectedWorld;
 
-    /// <summary>原版实例这类装进去也不会生效的情况，在最靠近写文件的地方再提醒一次。</summary>
+    /// <summary>原版版本这类装进去也不会生效的情况，在最靠近写文件的地方再提醒一次。</summary>
     public string? TargetWarning { get; private set; }
 
     public bool HasTargetWarning => !string.IsNullOrWhiteSpace(TargetWarning);
@@ -138,7 +138,7 @@ public sealed partial class AddonInstallDialogViewModel : ViewModelBase
         _taskbar = taskbar;
     }
 
-    public async Task LoadAsync(ModProject project, ModVersion version, GameInstance instance)
+    public async Task LoadAsync(ModProject project, ModVersion version, GameVersion instance)
     {
         _project = project;
         _version = version;
@@ -205,7 +205,7 @@ public sealed partial class AddonInstallDialogViewModel : ViewModelBase
 
         // 全部装过时把「覆盖」开关的用途点出来，否则用户会以为对话框坏了
         OverwriteHint = Items.Count > 0 && Items.All(i => i.Item.AlreadyInstalled)
-            ? "这个版本的文件已经在实例里了。勾选「覆盖已存在的同名文件」可以重新下载。"
+            ? "这个版本的文件已经在版本里了。勾选「覆盖已存在的同名文件」可以重新下载。"
             : "";
         OnPropertyChanged(nameof(OverwriteHint));
         OnPropertyChanged(nameof(HasOverwriteHint));
@@ -283,7 +283,7 @@ public sealed partial class AddonInstallDialogViewModel : ViewModelBase
 
     private void UpdateTargetDirectory()
     {
-        if (_instance is null || Type.CreatesInstance())
+        if (_instance is null || Type.CreatesVersion())
         {
             TargetDirectory = "";
             return;
@@ -313,7 +313,7 @@ public sealed partial class AddonInstallDialogViewModel : ViewModelBase
             {
                 // 文件统一装进共享游戏目录，与「管理 → Mods」看到的是同一份
                 ModProjectType.Mod => _instance.Loader == ModLoader.Vanilla
-                    ? "这个实例是原版，没有加载器。Mod 装进去也不会被加载。"
+                    ? "这个版本是原版，没有加载器。Mod 装进去也不会被加载。"
                     : null,
 
                 ModProjectType.Shader =>
@@ -360,7 +360,7 @@ public sealed partial class AddonInstallDialogViewModel : ViewModelBase
 
             foreach (var item in plan.Items)
             {
-                // 聚合层不知道目标实例，这里补上「是否已存在」的判断
+                // 聚合层不知道目标版本，这里补上「是否已存在」的判断
                 var installed = item.Version is { } v
                                 && _installer.IsInstalled(null, project.ProjectType, v.File, world);
                 Items.Add(new AddonInstallItemViewModel(item with { AlreadyInstalled = installed })

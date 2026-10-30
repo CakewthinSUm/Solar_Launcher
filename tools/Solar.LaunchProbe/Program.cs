@@ -4,7 +4,7 @@ using Microsoft.Extensions.Logging;
 using Solar.Core;
 using Solar.Core.Accounts;
 using Solar.Core.Download;
-using Solar.Core.Instances;
+using Solar.Core.Versions;
 using Solar.Core.Java;
 using Solar.Core.Launch;
 using Solar.Core.Minecraft;
@@ -40,7 +40,7 @@ if (runtimes.Count == 0)
     return 1;
 }
 
-var instance = new GameInstance
+var instance = new GameVersion
 {
     Id = "launchprobe",
     Name = "启动验证",

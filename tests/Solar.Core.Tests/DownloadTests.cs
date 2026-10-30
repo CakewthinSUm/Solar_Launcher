@@ -4,6 +4,7 @@ using Solar.Core.Download;
 using Solar.Core.Minecraft;
 using Solar.Core.Models;
 using Solar.Core.Paths;
+using Solar.Core.Settings;
 using Xunit;
 using AssetObject = Solar.Core.Models.AssetObject;
 
@@ -76,8 +77,10 @@ public class MirrorRewritingTests
 
 public class GameFileBuilderTests
 {
-    private static AppPaths NewPaths() =>
-        new(Path.Combine(Path.GetTempPath(), "solar-files-" + Guid.NewGuid().ToString("N")));
+    private static MinecraftPaths NewPaths() =>
+        new(
+            new AppPaths(Path.Combine(Path.GetTempPath(), "solar-files-" + Guid.NewGuid().ToString("N"))),
+            new TestSettings());
 
     private static readonly RuleContext Windows = new() { OsName = "windows", Arch = "x64" };
 
@@ -297,6 +300,24 @@ public class NativeExtractTaskTests
         using var writer = new StreamWriter(entry.Open());
         writer.Write(content);
     }
+
+    private sealed class TestSettings : ISettingsService
+    {
+        public LauncherSettings Current { get; } = new();
+
+        public Task LoadAsync(CancellationToken ct = default) => Task.CompletedTask;
+
+        public Task SaveAsync(CancellationToken ct = default) => Task.CompletedTask;
+    }
 }
 
 
+
+internal sealed class TestSettings : ISettingsService
+{
+    public LauncherSettings Current { get; } = new();
+
+    public Task LoadAsync(CancellationToken ct = default) => Task.CompletedTask;
+
+    public Task SaveAsync(CancellationToken ct = default) => Task.CompletedTask;
+}
