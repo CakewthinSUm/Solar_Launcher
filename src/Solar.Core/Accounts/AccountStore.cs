@@ -17,11 +17,11 @@ public interface IAccountStore
 }
 
 /// <summary>
-/// 账户列表持久化到 <c>SolarData/accounts.json</c>。
+/// 账户列表持久化到 <c>%APPDATA%\SolarLauncher\accounts.json</c>。
 /// <para>
 /// 这里只存展示信息（用户名、UUID、XUID），不含任何令牌。
 /// OAuth / XSTS / Minecraft 令牌由 CmlLib 的账户管理器写在
-/// <c>SolarData/msa-accounts.json</c>，它自己负责刷新与存储，
+/// <c>%APPDATA%\SolarLauncher\msa-accounts.json</c>，它自己负责刷新与存储，
 /// 我们不复制一份，避免出现两份互相不同步的令牌。
 /// </para>
 /// </summary>

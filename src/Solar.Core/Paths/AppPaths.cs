@@ -1,16 +1,31 @@
 namespace Solar.Core.Paths;
 
 /// <summary>
-/// 应用用到的所有目录。全部位于一个可搬移的根目录下，符合便携版的要求。
-/// 默认根目录为可执行文件所在目录（开发时为 bin/.../SolarLauncher.exe）。
+/// 应用用到的所有目录。
+/// <para>
+/// 正式运行时分成两处：游戏资源（<see cref="Shared"/>、<see cref="Instances"/>、
+/// <see cref="DefaultMinecraft"/>）仍在程序目录下，可以随程序一起搬移；
+/// 配置、账户、日志与缓存放在 <c>%APPDATA%\SolarLauncher</c>，
+/// 换一份程序副本、删掉程序目录都不会丢登录状态。
+/// </para>
+/// <para>
+/// 显式传入 <c>root</c> 时按完全便携的布局处理：数据目录就在该根目录下的
+/// <c>SolarData</c>。测试与便携部署用这个形态，正式运行不传参数。
+/// </para>
 /// </summary>
 public sealed class AppPaths
 {
-    /// <summary>数据根目录，如 <c>D:\Games\SolarLauncher</c>。</summary>
+    private const string DataDirectoryName = "SolarData";
+    private const string AppFolderName = "SolarLauncher";
+
+    /// <summary>程序目录，如 <c>D:\Games\SolarLauncher</c>。</summary>
     public string Root { get; }
 
-    /// <summary>配置文件、账户缓存、日志。</summary>
-    public string Data => Path.Combine(Root, "SolarData");
+    /// <summary>
+    /// 配置文件、账户缓存、日志与下载缓存。
+    /// 默认 <c>%APPDATA%\SolarLauncher</c>；显式指定根目录时为根目录下的 <c>SolarData</c>。
+    /// </summary>
+    public string Data { get; }
 
     /// <summary>共享资源（assets、libraries、versions、java），可被多个游戏目录共用。</summary>
     public string Shared => Path.Combine(Root, "SolarShared");
@@ -33,9 +48,86 @@ public sealed class AppPaths
     public string AccountsFile => Path.Combine(Data, "accounts.json");
     public string InstanceIndexFile => Path.Combine(Data, "instances.json");
 
-    public AppPaths(string? root = null)
+    public AppPaths(string? root = null, string? dataRoot = null)
     {
         Root = Path.GetFullPath(root ?? ResolveDefaultRoot());
+
+        if (dataRoot is not null)
+        {
+            Data = Path.GetFullPath(dataRoot);
+            return;
+        }
+
+        if (root is not null)
+        {
+            // 显式给了根目录 = 便携布局，数据也留在根目录下
+            Data = Path.Combine(Root, DataDirectoryName);
+            return;
+        }
+
+        Data = DefaultDataDirectory();
+
+        // 旧版本把 SolarData 写在 exe 旁边，更早的单文件版还写在临时解压目录里。
+        // 升级后整份搬到 %APPDATA%，否则设置和登录状态看起来就“丢了”。
+        MigrateDataDirectory(Path.Combine(Root, DataDirectoryName), Data);
+        MigrateDataDirectory(Path.Combine(AppContext.BaseDirectory, DataDirectoryName), Data);
+    }
+
+    /// <summary>正式运行时的数据目录：<c>%APPDATA%\SolarLauncher</c>。</summary>
+    private static string DefaultDataDirectory()
+    {
+        var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+        if (string.IsNullOrEmpty(appData))
+        {
+            // 极端情况下拿不到 %APPDATA%，退到程序目录，至少还能用
+            appData = AppContext.BaseDirectory;
+        }
+
+        return Path.Combine(appData, AppFolderName);
+    }
+
+    /// <summary>
+    /// 把旧数据目录整体搬到新位置。
+    /// <para>
+    /// 目标已有内容时一律不动，避免覆盖用户当前的数据；同卷直接改名，
+    /// 跨卷退化成复制后删除，都失败就保持原样，不影响本次运行。
+    /// </para>
+    /// </summary>
+    private static void MigrateDataDirectory(string from, string to)
+    {
+        if (!Directory.Exists(from))
+        {
+            return;
+        }
+
+        if (Directory.Exists(to) && Directory.EnumerateFileSystemEntries(to).Any())
+        {
+            return;
+        }
+
+        try
+        {
+            if (!Directory.Exists(to))
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(to)!);
+                Directory.Move(from, to);
+                return;
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // 跨卷改名会失败：下面走复制
+        }
+
+        try
+        {
+            CopyDirectory(from, to);
+            Directory.Delete(from, recursive: true);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // 搬不了就让数据留在原处，至少不丢
+        }
     }
 
     /// <summary>
@@ -76,9 +168,15 @@ public sealed class AppPaths
         return root;
     }
 
-    /// <summary>便携版写在根目录下的数据目录，迁移时整体搬走。</summary>
+    /// <summary>
+    /// 留在程序目录下的数据目录，迁移时整体搬走。
+    /// <para>
+    /// 不含 <c>SolarData</c>：配置与账户已经改放 <c>%APPDATA%</c>，
+    /// 由构造函数里的 <see cref="MigrateDataDirectory"/> 单独处理。
+    /// </para>
+    /// </summary>
     private static readonly string[] DataDirectoryNames =
-        ["SolarData", "SolarShared", "SolarInstances", ".minecraft"];
+        ["SolarShared", "SolarInstances", ".minecraft"];
 
     /// <summary>
     /// 把旧版本留在临时解压目录里的数据搬到新根目录（exe 旁边）。
