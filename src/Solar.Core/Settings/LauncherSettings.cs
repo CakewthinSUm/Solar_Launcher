@@ -4,7 +4,7 @@ using Solar.Core.Json;
 
 namespace Solar.Core.Settings;
 
-/// <summary>全局启动器设置，持久化到 <c>SolarData/settings.json</c>。</summary>
+/// <summary>全局启动器设置，持久化到 <c>%APPDATA%\SolarLauncher\settings.json</c>。</summary>
 public sealed class LauncherSettings : IJsonOnDeserialized
 {
     /// <summary>内存分配方式：自动按内存与模组数量计算，或使用 <see cref="MaxMemoryMb"/>。</summary>

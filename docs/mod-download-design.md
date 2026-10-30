@@ -252,10 +252,10 @@ public interface IModCatalogService
 
 | 内容 | 位置 | 有效期 |
 | --- | --- | --- |
-| 项目详情 | `SolarData/modcache/project/{source}_{id}.json` | 24 小时 |
-| 版本列表 | `SolarData/modcache/versions/{source}_{id}_{ver}_{loader}.json` | 1 小时 |
-| 分类/标签 | `SolarData/modcache/categories_{source}.json` | 7 天 |
-| 图标 | `SolarData/modcache/icons/{hash}.img` | 7 天 |
+| 项目详情 | `%APPDATA%\SolarLauncher\modcache\project/{source}_{id}.json` | 24 小时 |
+| 版本列表 | `%APPDATA%\SolarLauncher\modcache\versions/{source}_{id}_{ver}_{loader}.json` | 1 小时 |
+| 分类/标签 | `%APPDATA%\SolarLauncher\modcache\categories_{source}.json` | 7 天 |
+| 图标 | `%APPDATA%\SolarLauncher\modcache\icons/{hash}.img` | 7 天 |
 
 - 写缓存复用现成的 `JsonFile.WriteAsync`（原子写入）。
 - Modrinth 限流是 **300 次/分钟/IP**，用 `SemaphoreSlim(4)` 控制并发 + 100ms 最小间隔即可，

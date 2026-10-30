@@ -31,7 +31,8 @@ public partial class App : Application
         {
             try
             {
-                var logDirectory = Path.Combine(AppContext.BaseDirectory, "SolarData", "logs");
+                // 用真实的日志目录：单文件发布时 AppContext.BaseDirectory 是临时解压目录
+                var logDirectory = Services.GetRequiredService<AppPaths>().Logs;
                 Directory.CreateDirectory(logDirectory);
                 File.AppendAllText(
                     Path.Combine(logDirectory, "crash.log"),
