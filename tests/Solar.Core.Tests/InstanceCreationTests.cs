@@ -313,22 +313,24 @@ public sealed class InstanceCreationTests : IDisposable
             new(paths, new FakeSettings());
 
         public string GetContentDirectory(
-            GameInstance instance,
+            GameInstance? instance,
             Solar.Core.Mods.ModProjectType type,
             string? world = null) =>
-            Path.Combine(_gameDirectories.Resolve(instance), type.ContentFolder() ?? "mods");
+            Path.Combine(
+                instance is null ? _gameDirectories.Shared : _gameDirectories.Resolve(instance),
+                type.ContentFolder() ?? "mods");
 
         public bool IsInstalled(
-            GameInstance instance,
+            GameInstance? instance,
             Solar.Core.Mods.ModProjectType type,
             Solar.Core.Mods.ModFile file,
             string? world = null) =>
             File.Exists(Path.Combine(GetContentDirectory(instance, type, world), file.FileName));
 
-        public IReadOnlyList<string> GetWorlds(GameInstance instance) => [];
+        public IReadOnlyList<string> GetWorlds(GameInstance? instance) => [];
 
         public Task<Solar.Core.Mods.ModInstallResult> InstallAsync(
-            GameInstance instance,
+            GameInstance? instance,
             Solar.Core.Mods.ModProjectType type,
             Solar.Core.Mods.ModInstallPlan plan,
             string? world = null,

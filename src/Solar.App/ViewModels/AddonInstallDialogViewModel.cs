@@ -60,8 +60,8 @@ public sealed partial class AddonInstallItemViewModel(ModInstallItem item) : Obs
 /// 安装对话框的视图模型：生成清单、展示进度、执行安装。
 /// <para>
 /// Mod 会展开必选前置，其余类型只有文件本身；数据包还需要先选一个存档。
-/// 目标目录由 <see cref="IModInstaller.GetContentDirectory"/> 统一决定，
-/// 保证开启版本隔离的实例写进自己的游戏目录。
+/// 目标目录由 <see cref="IModInstaller.GetContentDirectory"/> 统一决定：
+/// 这里一律传 <c>null</c>，装进共享游戏目录，与「管理」页看到的是同一份。
 /// </para>
 /// </summary>
 public sealed partial class AddonInstallDialogViewModel : ViewModelBase
@@ -112,7 +112,7 @@ public sealed partial class AddonInstallDialogViewModel : ViewModelBase
     [ObservableProperty]
     private string? _selectedWorld;
 
-    /// <summary>共享目录 / 原版实例这类会影响别人的情况，在最靠近写文件的地方再提醒一次。</summary>
+    /// <summary>原版实例这类装进去也不会生效的情况，在最靠近写文件的地方再提醒一次。</summary>
     public string? TargetWarning { get; private set; }
 
     public bool HasTargetWarning => !string.IsNullOrWhiteSpace(TargetWarning);
@@ -153,7 +153,7 @@ public sealed partial class AddonInstallDialogViewModel : ViewModelBase
             if (project.ProjectType == ModProjectType.DataPack)
             {
                 Worlds.Clear();
-                foreach (var world in _installer.GetWorlds(instance))
+                foreach (var world in _installer.GetWorlds(null))
                 {
                     Worlds.Add(world);
                 }
@@ -245,7 +245,7 @@ public sealed partial class AddonInstallDialogViewModel : ViewModelBase
             });
 
             Result = await _installer.InstallAsync(
-                _instance,
+                null,
                 Type,
                 plan,
                 SelectedWorld,
@@ -293,7 +293,7 @@ public sealed partial class AddonInstallDialogViewModel : ViewModelBase
         {
             TargetDirectory = IsDataPack && string.IsNullOrWhiteSpace(SelectedWorld)
                 ? "先选择一个存档"
-                : _installer.GetContentDirectory(_instance, Type, SelectedWorld);
+                : _installer.GetContentDirectory(null, Type, SelectedWorld);
         }
         catch (Exception ex)
         {
@@ -311,11 +311,10 @@ public sealed partial class AddonInstallDialogViewModel : ViewModelBase
         {
             TargetWarning = Type switch
             {
-                ModProjectType.Mod => !_instance.VersionIsolation
-                    ? "这个实例没有开启版本隔离，文件会装进共享的游戏目录，所有未隔离的实例都会看到它。"
-                    : _instance.Loader == ModLoader.Vanilla
-                        ? "这个实例是原版，没有加载器。Mod 装进去也不会被加载。"
-                        : null,
+                // 文件统一装进共享游戏目录，与「管理 → Mods」看到的是同一份
+                ModProjectType.Mod => _instance.Loader == ModLoader.Vanilla
+                    ? "这个实例是原版，没有加载器。Mod 装进去也不会被加载。"
+                    : null,
 
                 ModProjectType.Shader =>
                     "光影需要 Iris 或 OptiFine 才能生效；装好后在游戏的「选项 → 光影」里启用。",
@@ -324,7 +323,7 @@ public sealed partial class AddonInstallDialogViewModel : ViewModelBase
                     "资源包装好后，在游戏的「选项 → 资源包」里启用。",
 
                 ModProjectType.DataPack => Worlds.Count == 0
-                    ? "这个实例还没有存档。请先在游戏里创建一个世界，再回来安装数据包。"
+                    ? "还没有存档。请先在游戏里创建一个世界，再回来安装数据包。"
                     : "数据包只对选中的存档生效。",
 
                 _ => null,
@@ -363,7 +362,7 @@ public sealed partial class AddonInstallDialogViewModel : ViewModelBase
             {
                 // 聚合层不知道目标实例，这里补上「是否已存在」的判断
                 var installed = item.Version is { } v
-                                && _installer.IsInstalled(instance, project.ProjectType, v.File, world);
+                                && _installer.IsInstalled(null, project.ProjectType, v.File, world);
                 Items.Add(new AddonInstallItemViewModel(item with { AlreadyInstalled = installed })
                 {
                     WillOverwrite = OverwriteExisting,
@@ -379,7 +378,7 @@ public sealed partial class AddonInstallDialogViewModel : ViewModelBase
                 project,
                 version,
                 ModDependencyKind.Required,
-                _installer.IsInstalled(instance, project.ProjectType, version.File, world),
+                _installer.IsInstalled(null, project.ProjectType, version.File, world),
                 IsAvailable: true)));
         }
         finally

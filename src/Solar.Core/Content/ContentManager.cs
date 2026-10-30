@@ -4,20 +4,20 @@ namespace Solar.Core.Content;
 
 public interface IContentManager
 {
-    /// <summary>列出实例游戏目录里某一类内容的全部条目。</summary>
-    IReadOnlyList<ContentPack> List(GameInstance instance, ContentKind kind);
+    /// <summary>列出共享游戏目录里某一类内容的全部条目。</summary>
+    IReadOnlyList<ContentPack> List(ContentKind kind);
 
     /// <summary>内容文件夹的实际路径；目录不存在时也会返回路径，调用方自行决定是否创建。</summary>
-    string GetContentDirectory(GameInstance instance, ContentKind kind);
+    string GetContentDirectory(ContentKind kind);
 
     /// <summary>
     /// 把文件或文件夹放进内容目录。同名条目已存在时直接报错，
     /// 由调用方先问过用户是否覆盖，再走 <paramref name="overwrite"/> 重试。
     /// </summary>
-    Task ImportAsync(GameInstance instance, ContentKind kind, string sourcePath, bool overwrite, CancellationToken ct = default);
+    Task ImportAsync(ContentKind kind, string sourcePath, bool overwrite, CancellationToken ct = default);
 
     /// <summary>删除条目。文件夹整体删除。</summary>
-    void Delete(GameInstance instance, ContentKind kind, ContentPack pack);
+    void Delete(ContentKind kind, ContentPack pack);
 
     /// <summary>在资源管理器里定位该条目。</summary>
     void RevealInExplorer(ContentPack pack);
@@ -30,17 +30,21 @@ public interface IContentManager
 }
 
 /// <summary>
-/// 内容管理：直接读写实例游戏目录下的 mods / resourcepacks / shaderpacks。
+/// 内容管理：直接读写共享游戏目录（设置里的 .minecraft）下的 mods / resourcepacks / shaderpacks。
+/// <para>
+/// 暂不区分实例与版本隔离：隔离实例自己的 <c>SolarInstances/&lt;id&gt;/.minecraft</c>、
+/// 以及扫描导入时“版本夹即目录”的覆盖路径都不参与，页面始终管理共享的那一份。
 /// 不维护额外索引，文件系统就是唯一事实来源，用户手动往里放东西也能看到。
+/// </para>
 /// </summary>
 public sealed class ContentManager(InstanceGameDirectory gameDirectories) : IContentManager
 {
-    public string GetContentDirectory(GameInstance instance, ContentKind kind) =>
-        Path.Combine(gameDirectories.Resolve(instance), ContentFolders.GetFolderName(kind));
+    public string GetContentDirectory(ContentKind kind) =>
+        Path.Combine(gameDirectories.Shared, ContentFolders.GetFolderName(kind));
 
-    public IReadOnlyList<ContentPack> List(GameInstance instance, ContentKind kind)
+    public IReadOnlyList<ContentPack> List(ContentKind kind)
     {
-        var directory = GetContentDirectory(instance, kind);
+        var directory = GetContentDirectory(kind);
         if (!Directory.Exists(directory))
         {
             return [];
@@ -72,7 +76,6 @@ public sealed class ContentManager(InstanceGameDirectory gameDirectories) : ICon
     }
 
     public async Task ImportAsync(
-        GameInstance instance,
         ContentKind kind,
         string sourcePath,
         bool overwrite,
@@ -85,7 +88,7 @@ public sealed class ContentManager(InstanceGameDirectory gameDirectories) : ICon
         }
 
         var isSourceDirectory = Directory.Exists(sourcePath);
-        var directory = GetContentDirectory(instance, kind);
+        var directory = GetContentDirectory(kind);
         Directory.CreateDirectory(directory);
 
         var target = Path.Combine(directory, Path.GetFileName(sourcePath));
@@ -154,11 +157,11 @@ public sealed class ContentManager(InstanceGameDirectory gameDirectories) : ICon
         return true;
     }
 
-    public void Delete(GameInstance instance, ContentKind kind, ContentPack pack)
+    public void Delete(ContentKind kind, ContentPack pack)
     {
         // 只删内容目录里的条目：pack 来自列表，但仍做一次包含性检查，
         // 避免误传外部路径把别处的文件删掉。
-        var directory = GetContentDirectory(instance, kind);
+        var directory = GetContentDirectory(kind);
         if (!IsInside(directory, pack.FullPath))
         {
             throw new InvalidOperationException($"{pack.FullPath} 不在 {directory} 内，已拒绝删除。");
