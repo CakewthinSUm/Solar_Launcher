@@ -71,7 +71,7 @@
                         <InfoBar
                             x:Name="NoInstanceWarning"
                             IsClosable="False"
-                            Message="还没有可启动的实例，请先到「管理 → 实例」创建一个"
+                            Message="还没有可启动的实例，请先到「管理」创建一个"
                             Severity="Warning" />
 
                         <InfoBar

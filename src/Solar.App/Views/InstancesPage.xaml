@@ -6,6 +6,7 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:views="using:Solar.App.Views"
+    xmlns:controls="using:Solar.App.Views.Controls"
     xmlns:conv="using:Solar.App.Converters"
     xmlns:models="using:Solar.Core.Instances"
     mc:Ignorable="d">
@@ -28,8 +29,9 @@
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
+            <!-- 分区栏兼任页面标题：实例是「管理」的默认分区，其余三项切到内容页 -->
             <StackPanel Grid.Column="0" Spacing="4">
-                <TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="实例" />
+                <controls:ManageSectionBar x:Name="SectionBar" SectionSelected="SectionBar_SectionSelected" />
                 <TextBlock
                     Style="{StaticResource BodyTextBlockStyle}"
                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
