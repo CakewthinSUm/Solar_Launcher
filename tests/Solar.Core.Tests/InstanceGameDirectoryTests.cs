@@ -5,7 +5,7 @@ using Xunit;
 
 namespace Solar.Core.Tests;
 
-/// <summary>开启版本隔离时把共享目录内容复制到实例目录的行为。</summary>
+/// <summary>版本隔离的游戏目录解析：隔离用版本文件夹，关闭用共享目录。</summary>
 public sealed class InstanceGameDirectoryTests : IDisposable
 {
     private readonly string _root = Path.Combine(Path.GetTempPath(), "solar-test-" + Guid.NewGuid().ToString("N")[..8]);
@@ -24,27 +24,65 @@ public sealed class InstanceGameDirectoryTests : IDisposable
     public void NonIsolatedInstanceUsesSharedDirectory()
     {
         _settings.Current.MinecraftDirectory = Path.Combine(_root, "shared-mc");
-        var instance = new GameInstance { Id = "inst" };
+        var instance = new GameInstance { Id = "inst", MinecraftVersion = "1.21.4" };
 
         Assert.Equal(Path.Combine(_root, "shared-mc"), _directories.Resolve(instance));
     }
 
     [Fact]
-    public void IsolatedInstanceUsesItsOwnDirectory()
+    public void IsolatedInstanceUsesItsVersionFolder()
     {
         _settings.Current.MinecraftDirectory = Path.Combine(_root, "shared-mc");
-        var instance = new GameInstance { Id = "inst", VersionIsolation = true };
+        var instance = new GameInstance { Id = "inst", MinecraftVersion = "1.21.4", VersionIsolation = true };
 
-        Assert.Equal(Path.Combine(_root, "SolarInstances", "inst", ".minecraft"), _directories.Resolve(instance));
+        var expected = WriteVersion(_paths.Versions, "1.21.4");
+
+        Assert.Equal(expected, _directories.Resolve(instance));
+        Assert.NotEqual(_directories.Shared, _directories.Resolve(instance));
     }
 
     [Fact]
-    public void OverrideTakesPrecedenceOverIsolation()
+    public void IsolatedInstanceFallsBackToSolarVersionsBeforeDownload()
+    {
+        // 新建实例时版本 JSON 可能还没下载，目录必须稳定在下载落点
+        var instance = new GameInstance { Id = "inst", MinecraftVersion = "1.21.4", VersionIsolation = true };
+
+        Assert.Equal(Path.Combine(_paths.Versions, "1.21.4"), _directories.Resolve(instance));
+    }
+
+    [Fact]
+    public void IsolatedInstanceFindsVersionInSharedGameDirectory()
+    {
+        var shared = Path.Combine(_root, "shared-mc");
+        _settings.Current.MinecraftDirectory = shared;
+        var instance = new GameInstance { Id = "inst", MinecraftVersion = "1.21.4", VersionIsolation = true };
+
+        var expected = WriteVersion(Path.Combine(shared, "versions"), "1.21.4");
+
+        Assert.Equal(expected, _directories.Resolve(instance));
+    }
+
+    [Fact]
+    public void SolarSharedTakesPrecedenceOverSharedGameDirectory()
+    {
+        var shared = Path.Combine(_root, "shared-mc");
+        _settings.Current.MinecraftDirectory = shared;
+        var instance = new GameInstance { Id = "inst", MinecraftVersion = "1.21.4", VersionIsolation = true };
+
+        WriteVersion(Path.Combine(shared, "versions"), "1.21.4");
+        var expected = WriteVersion(_paths.Versions, "1.21.4");
+
+        Assert.Equal(expected, _directories.Resolve(instance));
+    }
+
+    [Fact]
+    public void OverrideTakesPrecedenceOverVersionFolder()
     {
         var versionFolder = Path.Combine(_root, "versions", "1.21.4");
         var instance = new GameInstance
         {
             Id = "inst",
+            MinecraftVersion = "1.21.4",
             VersionIsolation = true,
             GameDirectoryOverride = versionFolder,
         };
@@ -53,56 +91,75 @@ public sealed class InstanceGameDirectoryTests : IDisposable
     }
 
     [Fact]
-    public void OverrideAloneIsUsedWithoutIsolationFlag()
+    public void OverrideIsIgnoredWhenIsolationIsOff()
     {
-        var versionFolder = Path.Combine(_root, "versions", "1.21.4");
-        var instance = new GameInstance { Id = "inst", GameDirectoryOverride = versionFolder };
-
-        Assert.Equal(versionFolder, _directories.Resolve(instance));
-    }
-
-    [Fact]
-    public void RelativeOverrideResolvesAgainstRoot()
-    {
-        var instance = new GameInstance { Id = "inst", GameDirectoryOverride = "versions\\1.21.4" };
-
-        Assert.Equal(Path.Combine(_root, "versions", "1.21.4"), _directories.Resolve(instance));
-    }
-
-    [Fact]
-    public void BlankOverrideFallsBackToNormalResolution()
-    {
+        // 覆盖路径只在隔离时生效：关掉开关就该回到共享目录
         _settings.Current.MinecraftDirectory = Path.Combine(_root, "shared-mc");
-        var instance = new GameInstance { Id = "inst", GameDirectoryOverride = "   " };
+        var instance = new GameInstance
+        {
+            Id = "inst",
+            MinecraftVersion = "1.21.4",
+            GameDirectoryOverride = Path.Combine(_root, "versions", "1.21.4"),
+        };
 
         Assert.Equal(Path.Combine(_root, "shared-mc"), _directories.Resolve(instance));
     }
 
     [Fact]
-    public void OverrideDoesNotAffectOtherInstances()
+    public void RelativeOverrideResolvesAgainstRoot()
     {
-        _settings.Current.MinecraftDirectory = Path.Combine(_root, "shared-mc");
-        var overridden = new GameInstance { Id = "a", GameDirectoryOverride = @"D:\elsewhere\versions\x" };
-        var plain = new GameInstance { Id = "b" };
+        var instance = new GameInstance
+        {
+            Id = "inst",
+            MinecraftVersion = "1.21.4",
+            VersionIsolation = true,
+            GameDirectoryOverride = "versions\\1.21.4",
+        };
 
-        Assert.Equal(@"D:\elsewhere\versions\x", _directories.Resolve(overridden));
-        Assert.Equal(Path.Combine(_root, "shared-mc"), _directories.Resolve(plain));
+        Assert.Equal(Path.Combine(_root, "versions", "1.21.4"), _directories.Resolve(instance));
     }
 
     [Fact]
-    public void CopyBringsModsAndSavesOver()
+    public void BlankOverrideFallsBackToVersionFolder()
+    {
+        var instance = new GameInstance
+        {
+            Id = "inst",
+            MinecraftVersion = "1.21.4",
+            VersionIsolation = true,
+            GameDirectoryOverride = "   ",
+        };
+
+        Assert.Equal(Path.Combine(_paths.Versions, "1.21.4"), _directories.Resolve(instance));
+    }
+
+    [Fact]
+    public void TwoInstancesOfTheSameVersionShareTheVersionFolder()
+    {
+        // PCL 语义：同版本只有一个版本文件夹
+        var first = new GameInstance { Id = "a", MinecraftVersion = "1.21.4", VersionIsolation = true };
+        var second = new GameInstance { Id = "b", MinecraftVersion = "1.21.4", VersionIsolation = true };
+
+        Assert.Equal(_directories.Resolve(first), _directories.Resolve(second));
+    }
+
+    [Fact]
+    public void CopyBringsModsAndSavesIntoVersionFolder()
     {
         var shared = _directories.Shared;
         WriteFile(Path.Combine(shared, "mods", "sodium.jar"), "mod");
         WriteFile(Path.Combine(shared, "saves", "world", "level.dat"), "save");
         WriteFile(Path.Combine(shared, "options.txt"), "options");
 
-        var summary = _directories.CopySharedContent("inst");
+        var instance = new GameInstance { Id = "inst", MinecraftVersion = "1.21.4", VersionIsolation = true };
+        var summary = _directories.CopySharedContent(instance);
 
+        var target = _directories.GetIsolatedPath(instance);
+        Assert.Equal(Path.Combine(_paths.Versions, "1.21.4"), target);
         Assert.Equal(3, summary.CopiedFiles);
         Assert.Equal(0, summary.SkippedFiles);
-        Assert.Equal("mod", ReadFile(Path.Combine(_directories.GetIsolatedPath("inst"), "mods", "sodium.jar")));
-        Assert.Equal("save", ReadFile(Path.Combine(_directories.GetIsolatedPath("inst"), "saves", "world", "level.dat")));
+        Assert.Equal("mod", ReadFile(Path.Combine(target, "mods", "sodium.jar")));
+        Assert.Equal("save", ReadFile(Path.Combine(target, "saves", "world", "level.dat")));
     }
 
     [Fact]
@@ -112,15 +169,18 @@ public sealed class InstanceGameDirectoryTests : IDisposable
         WriteFile(Path.Combine(shared, "mods", "a.jar"), "shared");
         WriteFile(Path.Combine(shared, "mods", "b.jar"), "shared");
 
-        // 实例目录里已经有一份不同的 a.jar（比如之前隔离过）
-        WriteFile(Path.Combine(_directories.GetIsolatedPath("inst"), "mods", "a.jar"), "instance");
+        var instance = new GameInstance { Id = "inst", MinecraftVersion = "1.21.4", VersionIsolation = true };
+        var target = _directories.GetIsolatedPath(instance);
 
-        var summary = _directories.CopySharedContent("inst");
+        // 版本文件夹里已经有一份不同的 a.jar（比如之前隔离过）
+        WriteFile(Path.Combine(target, "mods", "a.jar"), "instance");
+
+        var summary = _directories.CopySharedContent(instance);
 
         Assert.Equal(1, summary.CopiedFiles);
         Assert.Equal(1, summary.SkippedFiles);
-        Assert.Equal("instance", ReadFile(Path.Combine(_directories.GetIsolatedPath("inst"), "mods", "a.jar")));
-        Assert.Equal("shared", ReadFile(Path.Combine(_directories.GetIsolatedPath("inst"), "mods", "b.jar")));
+        Assert.Equal("instance", ReadFile(Path.Combine(target, "mods", "a.jar")));
+        Assert.Equal("shared", ReadFile(Path.Combine(target, "mods", "b.jar")));
     }
 
     [Fact]
@@ -129,7 +189,8 @@ public sealed class InstanceGameDirectoryTests : IDisposable
         var shared = _directories.Shared;
         WriteFile(Path.Combine(shared, "mods", "a.jar"), "shared");
 
-        _directories.CopySharedContent("inst");
+        _directories.CopySharedContent(
+            new GameInstance { Id = "inst", MinecraftVersion = "1.21.4", VersionIsolation = true });
 
         Assert.Equal("shared", ReadFile(Path.Combine(shared, "mods", "a.jar")));
         Assert.Single(Directory.EnumerateFiles(Path.Combine(shared, "mods")));
@@ -141,7 +202,8 @@ public sealed class InstanceGameDirectoryTests : IDisposable
         // 设置指向一个还不存在的目录
         _settings.Current.MinecraftDirectory = Path.Combine(_root, "nope");
 
-        var summary = _directories.CopySharedContent("inst");
+        var summary = _directories.CopySharedContent(
+            new GameInstance { Id = "inst", MinecraftVersion = "1.21.4", VersionIsolation = true });
 
         Assert.Equal(0, summary.CopiedFiles);
         Assert.Equal(0, summary.SkippedFiles);
@@ -152,10 +214,20 @@ public sealed class InstanceGameDirectoryTests : IDisposable
     {
         Directory.CreateDirectory(_directories.Shared);
 
-        var summary = _directories.CopySharedContent("inst");
+        var instance = new GameInstance { Id = "inst", MinecraftVersion = "1.21.4", VersionIsolation = true };
+        var summary = _directories.CopySharedContent(instance);
 
         Assert.Equal(0, summary.CopiedFiles);
-        Assert.True(Directory.Exists(_directories.GetIsolatedPath("inst")));
+        Assert.True(Directory.Exists(_directories.GetIsolatedPath(instance)));
+    }
+
+    /// <summary>在指定版本根下造一个版本文件夹（含同名 JSON），返回它的路径。</summary>
+    private static string WriteVersion(string root, string versionId)
+    {
+        var directory = Path.Combine(root, versionId);
+        Directory.CreateDirectory(directory);
+        File.WriteAllText(Path.Combine(directory, versionId + ".json"), "{}");
+        return directory;
     }
 
     private static void WriteFile(string path, string content)

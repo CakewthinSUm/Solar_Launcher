@@ -44,8 +44,12 @@ var instance = await repository.GetAsync("smoke") ?? new GameInstance
 };
 
 instance.MinecraftVersion = versionId;
-// 冒烟测试用独立游戏目录，不污染真实 .minecraft
+// 冒烟测试用独立游戏目录，不污染真实 .minecraft。
+// 新布局下隔离开启会把游戏目录指到版本文件夹（SolarShared/versions），
+// 这里用覆盖路径钉在实例目录里，保持“测试数据只留在实例目录”的原意。
 instance.VersionIsolation = true;
+instance.GameDirectoryOverride = provider.GetRequiredService<Solar.Core.Paths.AppPaths>()
+    .GetInstanceMinecraftDirectory("smoke");
 await repository.SaveAsync(instance);
 
 var lastReport = DateTimeOffset.MinValue;

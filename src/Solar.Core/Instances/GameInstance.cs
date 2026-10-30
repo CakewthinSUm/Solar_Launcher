@@ -48,17 +48,17 @@ public sealed class GameInstance
     public List<string> CompanionMods { get; set; } = [];
 
     /// <summary>
-    /// 版本隔离：开启后该实例使用自己的游戏目录
-    /// <c>SolarInstances/&lt;id&gt;/.minecraft</c>，存档、模组、配置都与其它实例分开。
-    /// 关闭时与其它未隔离的实例共用设置里的那份 .minecraft。
+    /// 版本隔离（对齐 PCL）：开启后游戏目录就是该版本的版本文件夹
+    /// （<c>SolarShared/versions/&lt;id&gt;</c> 或共享游戏目录下的 <c>versions/&lt;id&gt;</c>），
+    /// 存档、模组、配置与其它版本分开；关闭时与其它未隔离的实例共用设置里的 .minecraft。
+    /// 同一版本建多个实例时它们会共用这个版本文件夹。
     /// </summary>
     public bool VersionIsolation { get; set; }
 
     /// <summary>
-    /// PCL 式游戏目录覆盖：非空时实例直接以该路径为游戏目录，
-    /// 典型值是版本文件夹本身 <c>versions/&lt;id&gt;</c>（"版本夹即目录"），
-    /// 由扫描导入设置——存档与模组本来就在版本夹里，零拷贝直接可见。
-    /// 优先级高于 <see cref="VersionIsolation"/>；为空时行为与旧版完全一致。
+    /// 显式的游戏目录：非空且开启隔离时，实例直接以该路径为游戏目录。
+    /// 典型值是整合包实例的私有目录（加载器要到首次启动才装，版本 id 会变，
+    /// 不能靠 id 推版本文件夹）。关闭隔离时该值不生效。
     /// </summary>
     public string? GameDirectoryOverride { get; set; }
 
@@ -117,6 +117,5 @@ public sealed class GameInstance
 
     /// <summary>列表里的附加标记；用共享目录的实例为空，便于直接拼在说明行末尾。</summary>
     [JsonIgnore]
-    public string IsolationBadge =>
-        GameDirectoryOverride is not null || VersionIsolation ? " · 已隔离" : "";
+    public string IsolationBadge => VersionIsolation ? " · 已隔离" : "";
 }

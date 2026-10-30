@@ -42,10 +42,9 @@ public interface IVersionScanner
 /// <para>
 /// 用途是接管已有安装：用户从官方启动器或别的启动器装过的版本，
 /// 不必在 Solar 里重新下载一遍。对齐 PCL 的逻辑：
-/// 位于共享游戏目录下的版本导入时以版本文件夹本身为游戏目录
-/// （PCL 式"版本夹即目录"，存档与模组本来就在里面，零拷贝直接可见）；
-/// Solar 自装版本（SolarShared/versions）需要隔离时退回实例自己的
-/// <c>SolarInstances/&lt;id&gt;/.minecraft</c>。
+/// 版本隔离就是「版本文件夹即游戏目录」，所以导入时只需要决定隔离开关——
+/// 版本夹里已有非空的 mods/saves 时无论全局档位都隔离（零拷贝直接可见），
+/// 否则按档位与版本特征（可装 Mod / 非正式版）判定。
 /// </para>
 /// </summary>
 public sealed partial class VersionScanner(
@@ -124,8 +123,10 @@ public sealed partial class VersionScanner(
             var unstable = VersionIsolationPolicy.IsUnstable(version.Type, version.VersionId)
                            || VersionIsolationPolicy.IsUnstable(version.Type, version.MinecraftVersion);
             var modable = version.Loader != ModLoader.Vanilla;
-            var hasContent = version.InGameDirectory && version.Directory is not null
-                             && HasPlayerContent(version.Directory);
+
+            // PCL 的自动检测：版本夹里已有玩家内容（非空 mods/saves）时，
+            // 无论全局档位都把游戏目录指过去，内容零拷贝直接可见。
+            var hasContent = version.Directory is not null && HasPlayerContent(version.Directory);
 
             var instance = new GameInstance
             {
@@ -139,24 +140,11 @@ public sealed partial class VersionScanner(
 
                 // 文件已经在这份游戏目录里了，不需要再装一次
                 LoaderInstalled = true,
-            };
 
-            if (version.InGameDirectory && version.Directory is not null
-                && (hasContent || VersionIsolationPolicy.ShouldIsolate(scope, modable, unstable)))
-            {
-                // PCL 式「版本夹即目录」：内容本来就在版本夹里（或该按档位隔离），
-                // 直接把游戏目录指过去。VersionIsolation 保持 false——它专指
-                // SolarInstances/<id>/.minecraft，混用会让"复制共享内容"流程指向错误的地方。
-                instance.GameDirectoryOverride = version.Directory;
-            }
-            else if (!version.InGameDirectory && scope != Settings.VersionIsolationScope.Off
-                     && VersionIsolationPolicy.ShouldIsolate(scope, modable, unstable))
-            {
-                // SolarShared/versions 下的自装版本没有"版本夹即目录"的语义
-                //（会污染共享资源树），需要隔离时退回 Solar 原生机制。
-                instance.VersionIsolation = true;
-            }
-            // 其余情况维持现状：两者都 false，用共享目录
+                // 隔离后游戏目录就是该版本的版本文件夹，两处版本根都能定位到
+                VersionIsolation = hasContent
+                                   || VersionIsolationPolicy.ShouldIsolate(scope, modable, unstable),
+            };
 
             try
             {

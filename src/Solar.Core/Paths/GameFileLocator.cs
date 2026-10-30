@@ -31,9 +31,9 @@ public sealed class GameFileLocator(AppPaths paths, InstanceGameDirectory gameDi
     public string ExternalAssets => Path.Combine(gameDirectories.Shared, "assets");
 
     /// <summary>版本目录的搜索顺序：先自己的，再游戏目录里的。</summary>
-    public IEnumerable<string> VersionRoots => Normalize([PrimaryVersions, ExternalVersions]);
+    public IEnumerable<string> VersionRoots => VersionFolders.Roots(paths, gameDirectories.Shared);
 
-    public IEnumerable<string> LibraryRoots => Normalize([PrimaryLibraries, ExternalLibraries]);
+    public IEnumerable<string> LibraryRoots => VersionFolders.Normalize([PrimaryLibraries, ExternalLibraries]);
 
     /// <summary>找已存在的版本 JSON；都没有时返回 null。</summary>
     public string? FindVersionJson(string versionId)
@@ -82,10 +82,4 @@ public sealed class GameFileLocator(AppPaths paths, InstanceGameDirectory gameDi
 
         return Path.Combine(PrimaryLibraries, relativePath);
     }
-
-    /// <summary>两个根目录可能被配成同一个（例如游戏目录指到程序目录下），去重后再用。</summary>
-    private static IEnumerable<string> Normalize(IEnumerable<string> roots) =>
-        roots.Where(root => !string.IsNullOrWhiteSpace(root))
-            .Select(Path.GetFullPath)
-            .Distinct(StringComparer.OrdinalIgnoreCase);
 }

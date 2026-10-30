@@ -56,20 +56,9 @@ public sealed partial class InstanceSetupViewModel : ViewModelBase
         ? ""
         : _gameDirectories.Resolve(_instance);
 
-    public string IsolationHint
-    {
-        get
-        {
-            if (!string.IsNullOrEmpty(_instance?.GameDirectoryOverride))
-            {
-                return "该实例以版本文件夹作为游戏目录（PCL 式隔离），存档与模组就在版本文件夹内。";
-            }
-
-            return VersionIsolation
-                ? "该实例使用独立的存档、模组与配置，不会读到其它实例的内容。"
-                : "与其它未开启隔离的实例共用同一份存档、模组与配置，多个带 Mod 的实例可能互相冲突。";
-        }
-    }
+    public string IsolationHint => VersionIsolation
+        ? "游戏目录是该版本的版本文件夹；同一版本的其他实例会共用这里的存档与模组。"
+        : "与其它未开启隔离的实例共用同一份存档、模组与配置，多个带 Mod 的实例可能互相冲突。";
 
     public override async Task OnNavigatedToAsync(object? parameter)
     {
@@ -134,14 +123,14 @@ public sealed partial class InstanceSetupViewModel : ViewModelBase
             {
                 if (await _dialogs.ShowConfirmAsync(
                         "开启版本隔离",
-                        "是否把共享游戏目录里的 Mod、存档与配置复制到该实例？\n" +
+                        "是否把共享游戏目录里的 Mod、存档与配置复制到该版本的版本文件夹？\n" +
                         "复制不会改动共享目录，已存在的同名文件也不会被覆盖。\n" +
-                        "选择「不复制」则该实例从空目录开始。",
+                        "选择「不复制」则该实例从版本文件夹的现有内容开始。",
                         "复制",
                         "不复制"))
                 {
                     // 可能有上千个文件，放到后台线程避免卡住界面
-                    copyResult = await Task.Run(() => _gameDirectories.CopySharedContent(_instance.Id));
+                    copyResult = await Task.Run(() => _gameDirectories.CopySharedContent(_instance));
                 }
             }
 

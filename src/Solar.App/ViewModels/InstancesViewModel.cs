@@ -15,6 +15,7 @@ public sealed partial class InstancesViewModel : ViewModelBase
 {
     private readonly IInstanceRepository _repository;
     private readonly IVersionScanner _scanner;
+    private readonly InstanceGameDirectory _gameDirectories;
     private readonly IDialogService _dialogs;
     private readonly ILogger<InstancesViewModel> _logger;
 
@@ -24,11 +25,13 @@ public sealed partial class InstancesViewModel : ViewModelBase
     public InstancesViewModel(
         IInstanceRepository repository,
         IVersionScanner scanner,
+        InstanceGameDirectory gameDirectories,
         IDialogService dialogs,
         ILogger<InstancesViewModel> logger)
     {
         _repository = repository;
         _scanner = scanner;
+        _gameDirectories = gameDirectories;
         _dialogs = dialogs;
         _logger = logger;
     }
@@ -113,11 +116,16 @@ public sealed partial class InstancesViewModel : ViewModelBase
             return;
         }
 
-        // 未隔离的实例不拥有游戏目录，删它只清掉记录与 natives；
-        // 隔离实例的游戏目录在实例文件夹里，会跟着一起删。
+        // 一般实例的游戏目录在版本文件夹或共享目录里，删实例不会动存档与模组；
+        // 整合包实例的游戏目录就在实例目录内，会跟着一起删。
         var detail = instance.VersionIsolation
-            ? "该实例已开启版本隔离，它的存档与模组会被一并删除。"
+            ? "存档与模组在该版本的版本文件夹里，不会被删除。"
             : "存档与模组在共享的游戏目录里，不会被删除。";
+
+        if (Directory.Exists(_gameDirectories.GetOwnGameDirectory(instance.Id)))
+        {
+            detail += "\n实例目录里还有一份游戏目录（.minecraft），会一并删除。";
+        }
 
         if (!await _dialogs.ShowConfirmAsync("删除实例", $"确定要删除“{instance.Name}”吗？\n{detail}", "删除", "取消"))
         {

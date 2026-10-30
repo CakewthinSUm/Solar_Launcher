@@ -35,11 +35,13 @@
 | ![实例](docs/images/instances.png) | ![创建实例](docs/images/instance-create.png) |
 
 ### 📦 版本隔离
-给单个实例开启隔离后，它使用自己独立的 `.minecraft` 目录 —— 存档、模组、配置全部独立，
+对齐 PCL：开启隔离后，游戏目录就是该版本的**版本文件夹**（`SolarShared/versions/<版本id>`，
+导入了官方启动器目录时则是那份 `.minecraft/versions/<版本id>`），存档、模组与配置都放在里面。
 可以同时放一个 Fabric 实例和一个 Forge 实例而互不冲突。
 
-开启时可以选择把共享目录的 `mods` / `config` / `saves` / `resourcepacks` 复制一份过来，
-目标已存在的文件不会覆盖。关闭隔离只切回共享目录，实例目录原样保留。
+同一版本的多个实例会共用这个版本文件夹——PCL 里同版本也只有一份。
+切换隔离只改一个开关，不会搬动已有文件；开启时可以选择把共享目录的
+`mods` / `config` / `saves` / `resourcepacks` 复制一份过去，目标已存在的文件不会覆盖。
 
 `assets` 与 `libraries` 始终共享，不受隔离影响。
 
@@ -242,16 +244,19 @@ dotnet run --project src/Solar.App
                            （settings.json / accounts.json / msa-accounts.json / instances.json / logs）
 <exe 所在目录>\
 SolarShared/               共享资源：versions / libraries / assets / runtime
-SolarInstances/            每个实例一个目录，内含 natives、instance.json
-                           以及开启版本隔离后的 .minecraft/
+                           versions/<id>/ 同时是隔离实例的游戏目录（存档、模组、配置写在里面）
+SolarInstances/            每个实例一个目录：natives、instance.json
+                           （整合包实例的游戏目录 .minecraft/ 也在这里，因为它的加载器
+                             要到首次启动才安装）
 .minecraft/                共享游戏目录：存档、模组、配置（默认位置，可在设置中改）
 ```
 
 旧版本写在 exe 旁边的 `SolarData/` 会在首次启动时自动搬到 `%APPDATA%\SolarLauncher`，
 登录状态不会丢；目标目录已有数据时不会覆盖。
 
-共享游戏目录（`.minecraft`）默认被所有实例使用，因此换实例不会丢存档。
+共享游戏目录（`.minecraft`）供未开启隔离的实例使用，因此换实例不会丢存档。
 把它指向官方启动器的 `.minecraft` 就能直接复用已有的模组与存档。
+开启隔离的实例改用各自版本的版本文件夹；同一版本的实例共用同一个。
 不同版本的 natives 始终按实例隔离在 `SolarInstances/<id>/natives`。
 
 ---

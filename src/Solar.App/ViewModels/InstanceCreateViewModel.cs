@@ -626,7 +626,7 @@ public sealed partial class InstanceCreateViewModel : ViewModelBase
     private void UpdateIsolationHint()
     {
         IsolationHint = VersionIsolation
-            ? "该实例使用独立的存档、模组与配置，不会与其它实例互相影响。"
+            ? "游戏目录是该版本的版本文件夹；同一版本的其他实例会共用这里的存档与模组。"
             : "与其它未开启隔离的实例共用同一份存档、模组与配置；带 Mod 的实例可能互相冲突。";
     }
 

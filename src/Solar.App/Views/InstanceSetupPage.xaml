@@ -64,7 +64,7 @@
                         <TextBlock
                             Style="{StaticResource CaptionTextBlockStyle}"
                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                            Text="切换隔离后不会自动搬动已有文件；开启时可选择把共享目录的 Mod 与存档复制过来。"
+                            Text="切换隔离不会搬动已有文件；开启后游戏目录为该版本的版本文件夹，同一版本的其他实例会共用它。"
                             TextWrapping="Wrap" />
                     </StackPanel>
                 </Border>
