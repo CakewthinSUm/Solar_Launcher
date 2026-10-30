@@ -6,12 +6,13 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:views="using:Solar.App.Views"
+    xmlns:controls="using:Solar.App.Views.Controls"
     xmlns:content="using:Solar.Core.Content"
     mc:Ignorable="d">
 
     <!--
-        Mods / 资源包 / 光影共用这一页，分区由侧边栏「管理」下的子项决定，
-        与下载页的做法一致：不在页面里再放一层 tab，避免同一份导航出现两处入口。
+        Mods / 资源包 / 光影共用这一页，分区由页面顶部的分区栏决定；
+        侧边栏「管理」只保留一个入口，实例分区在 InstancesPage，两边用同一条栏互相切换。
     -->
     <!-- 底部不留内边距，列表铺到窗口下边缘；留白由列表自己的 Padding 给 -->
     <Grid Padding="24,16,24,0" RowSpacing="16">
@@ -21,9 +22,9 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <!-- 标题 -->
+        <!-- 分区栏兼任页面标题 -->
         <StackPanel Grid.Row="0" Spacing="4">
-            <TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="{x:Bind ViewModel.SectionTitle, Mode=OneWay}" />
+            <controls:ManageSectionBar x:Name="SectionBar" SectionSelected="SectionBar_SectionSelected" />
             <TextBlock
                 Style="{StaticResource BodyTextBlockStyle}"
                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"

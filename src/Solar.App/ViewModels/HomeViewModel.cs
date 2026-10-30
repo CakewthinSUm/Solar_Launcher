@@ -134,7 +134,7 @@ public sealed partial class HomeViewModel : ViewModelBase
 
     public string SelectedInstanceSummary => SelectedInstance is { } instance
         ? $"{instance.MinecraftVersion} · {instance.DisplayLoader}"
-        : "先到“管理 → 实例”创建一个实例";
+        : "先到“管理”创建一个实例";
 
     public override async Task OnNavigatedToAsync(object? parameter)
     {

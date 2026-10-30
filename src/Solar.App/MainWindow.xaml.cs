@@ -49,9 +49,6 @@ public sealed partial class MainWindow : Window
     /// <summary>上次停留的下载子分区；点父项「下载」时回到这里，而不是每次都跳到 Minecraft。</summary>
     private NavigationViewItem _lastDownloadItem;
 
-    /// <summary>上次停留的管理子分区；点父项「管理」时回到这里。</summary>
-    private NavigationViewItem _lastManageItem;
-
     /// <summary>用户已决定离开设置页，本次重新发起的导航不再询问一次。</summary>
     private bool _leavingSettingsConfirmed;
 
@@ -77,9 +74,6 @@ public sealed partial class MainWindow : Window
 
         // 还没进过下载页时，点父项默认落在 Minecraft 分区
         _lastDownloadItem = MinecraftNavItem;
-
-        // 同理，管理默认落在「实例」
-        _lastManageItem = ManageInstancesNavItem;
 
         // 首页与导航项同一次导航，避免启动时出现两次页面切换动画
         NavigateTo(typeof(HomePage), null);
@@ -195,12 +189,22 @@ public sealed partial class MainWindow : Window
         ContentFrame.GoBack();
     }
 
-    private void ContentFrame_Navigated(object sender, NavigationEventArgs e) =>
+    private void ContentFrame_Navigated(object sender, NavigationEventArgs e)
+    {
         AppTitleBar.IsBackButtonEnabled = ContentFrame.CanGoBack;
 
+        // 页面自己发起的导航（管理页里的分区栏）不经过 NavigateTo，
+        // 这里同步一次参数，免得之后点侧边栏时把同一页误判成另一个分区。
+        _currentParameter = e.Parameter;
+    }
+
     /// <summary>
-    /// 父项「下载」与「管理」都是 <c>SelectsOnInvoked=False</c>：点击它们只展开/收起，自己不参与选中。
-    /// 页面切到上次停留的子分区，选中项则等父项展开后再补上。
+    /// 父项「下载」是 <c>SelectsOnInvoked=False</c>：点击只展开/收起，自己不参与选中，
+    /// 页面切到上次停留的子分区，选中项等父项展开后再补上。
+    /// <para>
+    /// 「管理」是可选中项，第一次点击由 <see cref="NavView_SelectionChanged"/> 导航；
+    /// 这里再处理一次，是为了让已经在管理里（例如停在 Mods）时再点一次能回到实例列表。
+    /// </para>
     /// </summary>
     private void NavView_ItemInvoked(NavigationView sender, NavigationViewItemInvokedEventArgs args)
     {
@@ -217,8 +221,7 @@ public sealed partial class MainWindow : Window
                 break;
 
             case "manage":
-                NavigateToManageSection(_lastManageItem);
-                ExpandAndSelect(ManageNavItem, _lastManageItem);
+                NavigateTo(typeof(InstancesPage), null);
                 break;
         }
     }
@@ -267,10 +270,10 @@ public sealed partial class MainWindow : Window
                     NavigateToDownloadSection(selected);
                     break;
 
-                // 「管理」下的四个子项：实例页 + 三类内容页
-                case not null when tag.StartsWith("manage-", StringComparison.Ordinal):
-                    _lastManageItem = selected;
-                    NavigateToManageSection(selected);
+                // 「管理」是单个入口：点开就是实例列表，
+                // Mods / 资源包 / 光影 由页面顶部的分区栏切换，不再占用侧边栏。
+                case "manage":
+                    NavigateTo(typeof(InstancesPage), null);
                     break;
 
                 default:
@@ -295,21 +298,6 @@ public sealed partial class MainWindow : Window
         }
 
         NavigateTo(typeof(AddonDownloadPage), key);
-    }
-
-    /// <summary>
-    /// 「管理」的子项：「实例」是独立的实例页，其余三项是同一个内容页的不同分区。
-    /// </summary>
-    private void NavigateToManageSection(NavigationViewItem item)
-    {
-        var key = SectionKey(item, "manage-");
-        if (key is null or "instances")
-        {
-            NavigateTo(typeof(InstancesPage), null);
-            return;
-        }
-
-        NavigateTo(typeof(ContentPage), key);
     }
 
     /// <summary>
