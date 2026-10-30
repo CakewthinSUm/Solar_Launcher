@@ -111,7 +111,7 @@ public sealed class InstanceCreationTests : IDisposable
 
         Assert.Contains("fabric-api.jar", instance.CompanionMods);
 
-        var modsDirectory = Path.Combine(_paths.GetInstanceMinecraftDirectory(instance.Id), "mods");
+        var modsDirectory = Path.Combine(_paths.Versions, instance.EffectiveVersionId, "mods");
         Assert.True(Directory.Exists(modsDirectory));
         Assert.True(File.Exists(Path.Combine(modsDirectory, "fabric-api.jar")));
     }

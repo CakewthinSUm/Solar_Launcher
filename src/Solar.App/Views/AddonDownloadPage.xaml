@@ -96,7 +96,7 @@
                 <TextBlock
                     Style="{StaticResource CaptionTextBlockStyle}"
                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                    Text="还没有实例，可以先浏览；安装前需要在「管理 → 实例」创建一个。"
+                    Text="还没有实例，可以先浏览；安装前需要先在「管理」里创建一个。"
                     TextWrapping="Wrap"
                     Visibility="{x:Bind ViewModel.ShowInstanceHint, Mode=OneWay, Converter={StaticResource VisibleWhenTrue}}" />
             </StackPanel>

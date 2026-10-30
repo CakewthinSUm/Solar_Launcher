@@ -22,7 +22,7 @@ public sealed record ContentSectionInfo(ContentKind Kind, string Key, string Tit
 }
 
 /// <summary>
-/// 内容管理页：Mods、资源包、光影共用这一个视图模型，当前分区由侧边栏子项的导航参数决定。
+/// 内容管理页：Mods、资源包、光影共用这一个视图模型，当前分区由页面顶部分区栏的导航参数决定。
 /// 列表直接读共享游戏目录（设置里的 .minecraft）下的对应文件夹，不区分实例与版本隔离，
 /// 文件系统就是唯一事实来源，用户手动往里放东西也能看到。
 /// </summary>

@@ -12,7 +12,7 @@ public interface IInstanceRepository
 }
 
 /// <summary>
-/// 实例列表存放在 <c>SolarData/instances.json</c>，实例自身目录里也留一份
+/// 实例列表存放在 <c>%APPDATA%\SolarLauncher\instances.json</c>，实例自身目录里也留一份
 /// <c>instance.json</c>，便于手动搬移目录。
 /// </summary>
 public sealed class InstanceRepository(AppPaths paths) : IInstanceRepository

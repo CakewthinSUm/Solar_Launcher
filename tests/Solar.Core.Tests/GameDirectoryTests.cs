@@ -73,7 +73,7 @@ public sealed class GameDirectoryTests : IDisposable
     }
 
     [Fact]
-    public void IsolatedInstanceUsesItsOwnGameDirectory()
+    public void IsolatedInstanceUsesItsVersionFolder()
     {
         var settings = new FakeSettings();
         settings.Current.MinecraftDirectory = Path.Combine(_root, "shared-mc");
@@ -82,17 +82,19 @@ public sealed class GameDirectoryTests : IDisposable
         var account = new AccountSession("Steve", "uuid", "0", "", "msa");
 
         var isolated = factory.Create(
-            new GameInstance { Id = "inst-a", VersionIsolation = true }, version, "java.exe", account);
+            new GameInstance { Id = "inst-a", MinecraftVersion = "1.21.4", VersionIsolation = true },
+            version, "java.exe", account);
         var shared = factory.Create(
-            new GameInstance { Id = "inst-b" }, version, "java.exe", account);
+            new GameInstance { Id = "inst-b", MinecraftVersion = "1.21.4" }, version, "java.exe", account);
 
-        Assert.Equal(Path.Combine(_root, "SolarInstances", "inst-a", ".minecraft"), isolated.GameDirectory);
+        Assert.Equal(Path.Combine(_root, "SolarShared", "versions", "1.21.4"), isolated.GameDirectory);
         Assert.NotEqual(isolated.GameDirectory, shared.GameDirectory);
 
-        // 两个隔离实例之间也互不影响
+        // PCL 语义：同版本的实例共用同一个版本文件夹
         var otherIsolated = factory.Create(
-            new GameInstance { Id = "inst-c", VersionIsolation = true }, version, "java.exe", account);
-        Assert.NotEqual(isolated.GameDirectory, otherIsolated.GameDirectory);
+            new GameInstance { Id = "inst-c", MinecraftVersion = "1.21.4", VersionIsolation = true },
+            version, "java.exe", account);
+        Assert.Equal(isolated.GameDirectory, otherIsolated.GameDirectory);
     }
 
     [Fact]

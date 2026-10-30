@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="Solar.App.Views.Controls.ManageSectionBar"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    Loaded="ManageSectionBar_Loaded"
+    mc:Ignorable="d">
+
+    <!--
+        「管理」四个分区的切换栏。侧边栏只留「管理」一个入口，
+        分区切换改在页面内完成；Tag 就是导航参数里的分区键。
+    -->
+    <SelectorBar x:Name="Bar" SelectionChanged="Bar_SelectionChanged">
+        <SelectorBarItem Tag="instances" Text="实例" />
+        <SelectorBarItem Tag="mods" Text="Mods" />
+        <SelectorBarItem Tag="resourcepacks" Text="资源包" />
+        <SelectorBarItem Tag="shaderpacks" Text="光影" />
+    </SelectorBar>
+</UserControl>

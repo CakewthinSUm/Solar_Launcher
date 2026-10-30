@@ -6,6 +6,7 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:views="using:Solar.App.Views"
+    xmlns:controls="using:Solar.App.Views.Controls"
     xmlns:conv="using:Solar.App.Converters"
     xmlns:models="using:Solar.Core.Instances"
     mc:Ignorable="d">
@@ -28,12 +29,13 @@
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
+            <!-- 分区栏兼任页面标题：实例是「管理」的默认分区，其余三项切到内容页 -->
             <StackPanel Grid.Column="0" Spacing="4">
-                <TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="实例" />
+                <controls:ManageSectionBar x:Name="SectionBar" SectionSelected="SectionBar_SectionSelected" />
                 <TextBlock
                     Style="{StaticResource BodyTextBlockStyle}"
                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                    Text="每个实例可选择不同版本与加载器；游戏目录里已有的版本会自动导入。在实例设置里可开启版本隔离，让它独占存档与模组" />
+                    Text="每个实例可选择不同版本与加载器；游戏目录里已有的版本会自动导入。开启版本隔离后以该版本的版本文件夹为游戏目录，同版本实例共用存档与模组" />
             </StackPanel>
 
             <!-- 游戏目录里的版本变化（例如刚用官方启动器装了一个）随时可重新扫描 -->

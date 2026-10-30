@@ -209,7 +209,7 @@ public sealed partial class AddonDownloadViewModel : ViewModelBase
     public bool ShowInstanceHint => NeedsInstance && HasNoInstances;
 
     public string EmptyHint => NeedsInstance && HasNoInstances
-        ? "还没有实例。先在「管理 → 实例」创建一个，搜索才能按版本与加载器过滤。"
+        ? "还没有实例。先在「管理」创建一个，搜索才能按版本与加载器过滤。"
         : Section.EmptyHint;
 
     /// <summary>

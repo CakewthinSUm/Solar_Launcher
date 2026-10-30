@@ -36,7 +36,22 @@ public sealed partial class HomeViewModel : ViewModelBase
     private long _lastUiSyncTimestamp;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SelectedInstanceSummary))]
+    [NotifyPropertyChangedFor(nameof(CanChangeIsolation))]
+    [NotifyPropertyChangedFor(nameof(IsolationHint))]
     private GameInstance? _selectedInstance;
+
+    /// <summary>所选实例的版本隔离开关，与实例记录双向同步，改动立即落盘。</summary>
+    [ObservableProperty]
+    private bool _versionIsolation;
+
+    /// <summary>正在把隔离开关写盘，期间禁止再次切换，避免连点产生竞态。</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanChangeIsolation))]
+    private bool _isSavingIsolation;
+
+    /// <summary>程序正在把选中实例的值写进开关，这一次变化不算用户操作。</summary>
+    private bool _syncingIsolation;
 
     [ObservableProperty]
     private string _javaStatus = "未检测";
@@ -46,6 +61,7 @@ public sealed partial class HomeViewModel : ViewModelBase
 
     /// <summary>底部进度卡片的开合状态；真正的形变动画由 LaunchDock 监听它触发。</summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanChangeIsolation))]
     private bool _isLaunchCardOpen;
 
     [ObservableProperty]
@@ -134,15 +150,79 @@ public sealed partial class HomeViewModel : ViewModelBase
 
     public string SelectedInstanceSummary => SelectedInstance is { } instance
         ? $"{instance.MinecraftVersion} · {instance.DisplayLoader}"
-        : "先到“管理 → 实例”创建一个实例";
+        : "先到“管理”创建一个实例";
+
+    /// <summary>主页能否直接切换隔离：要有选中实例，且不在启动流程里。</summary>
+    public bool CanChangeIsolation =>
+        SelectedInstance is not null && !IsLaunchCardOpen && !IsSavingIsolation;
+
+    /// <summary>开关下方的一行说明，解释当前实例实际用哪份游戏目录。</summary>
+    public string IsolationHint
+    {
+        get
+        {
+            if (SelectedInstance is null)
+            {
+                return "";
+            }
+
+            return VersionIsolation
+                ? "游戏目录是该版本的版本文件夹；同一版本的其他实例会共用这里的存档与模组。"
+                : "与其它未开启隔离的实例共用存档、模组与配置。";
+        }
+    }
 
     public override async Task OnNavigatedToAsync(object? parameter)
     {
         await RefreshAsync();
     }
 
-    partial void OnSelectedInstanceChanged(GameInstance? value) =>
-        OnPropertyChanged(nameof(SelectedInstanceSummary));
+    partial void OnSelectedInstanceChanged(GameInstance? value)
+    {
+        // 选中实例变了，把它的隔离开关同步过来；这次写入不算用户操作
+        _syncingIsolation = true;
+        VersionIsolation = value?.VersionIsolation ?? false;
+        _syncingIsolation = false;
+    }
+
+    partial void OnVersionIsolationChanged(bool value)
+    {
+        OnPropertyChanged(nameof(IsolationHint));
+
+        if (_syncingIsolation || SelectedInstance is not { } instance || instance.VersionIsolation == value)
+        {
+            return;
+        }
+
+        instance.VersionIsolation = value;
+        _ = PersistIsolationAsync(instance, value);
+    }
+
+    /// <summary>主页没有保存按钮，切换后立即写盘；失败时把开关拨回去。</summary>
+    private async Task PersistIsolationAsync(GameInstance instance, bool enabled)
+    {
+        try
+        {
+            IsSavingIsolation = true;
+            await _instances.SaveAsync(instance);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "保存实例 {Name} 的版本隔离设置失败", instance.Name);
+
+            // 界面不能显示一个没生效的状态
+            instance.VersionIsolation = !enabled;
+            _syncingIsolation = true;
+            VersionIsolation = !enabled;
+            _syncingIsolation = false;
+
+            ErrorMessage = $"保存版本隔离设置失败：{ex.Message}";
+        }
+        finally
+        {
+            IsSavingIsolation = false;
+        }
+    }
 
     [RelayCommand]
     private async Task RefreshAsync()
