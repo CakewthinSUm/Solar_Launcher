@@ -23,7 +23,7 @@ public interface IAssetIndexService
 
 public sealed class AssetIndexService(
     HttpClient http,
-    AppPaths paths,
+    MinecraftPaths paths,
     ILogger<AssetIndexService> logger) : IAssetIndexService
 {
     public string GetIndexPath(string id) => Path.Combine(paths.Assets, "indexes", id + ".json");

@@ -1,4 +1,4 @@
-using Solar.Core.Instances;
+using Solar.Core.Versions;
 
 namespace Solar.Core.Mods;
 
@@ -68,7 +68,7 @@ public static class ModLoaderMapping
     };
 
     /// <summary>
-    /// 判断版本是否适配实例。加载器为空（旧模组常常不标）时按“可能适配”处理，
+    /// 判断版本是否适配版本。加载器为空（旧模组常常不标）时按“可能适配”处理，
     /// 与 PCL 的宽松策略一致，否则大量 1.12 时代的老模组会被直接过滤掉。
     /// </summary>
     public static bool Matches(ModVersion version, string? gameVersion, ModLoader? loader)

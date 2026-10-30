@@ -53,7 +53,7 @@
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
 
-                    <!-- 标题：状态 + 启动时的实例快照，右侧是取消/收起 -->
+                    <!-- 标题：状态 + 启动时的版本快照，右侧是取消/收起 -->
                     <Grid ColumnSpacing="12">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
@@ -67,7 +67,7 @@
                             <TextBlock
                                 Style="{StaticResource CaptionTextBlockStyle}"
                                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                Text="{x:Bind ViewModel.LaunchingInstanceName, Mode=OneWay}"
+                                Text="{x:Bind ViewModel.LaunchingVersionName, Mode=OneWay}"
                                 TextTrimming="CharacterEllipsis" />
                         </StackPanel>
 

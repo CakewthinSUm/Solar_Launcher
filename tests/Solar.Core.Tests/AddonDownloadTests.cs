@@ -1,7 +1,11 @@
 using System.IO.Compression;
 using System.Text;
 using Microsoft.Extensions.Logging.Abstractions;
-using Solar.Core.Instances;
+using Solar.Core.Download;
+using Solar.Core.Java;
+using Solar.Core.Loaders;
+using Solar.Core.Minecraft;
+using Solar.Core.Versions;
 using Solar.Core.Modpacks;
 using Solar.Core.Mods;
 using Solar.Core.Paths;
@@ -264,7 +268,7 @@ public class ContentInstallerTests : IDisposable
         Path.GetTempPath(), "solar-content-" + Guid.NewGuid().ToString("N")[..8]);
 
     private readonly ModInstaller _installer;
-    private readonly InstanceGameDirectory _directories;
+    private readonly MinecraftPaths _directories;
 
     public ContentInstallerTests()
     {
@@ -272,14 +276,14 @@ public class ContentInstallerTests : IDisposable
         paths.EnsureCreated();
 
         var settings = new FakeSettings();
-        _directories = new InstanceGameDirectory(paths, settings);
+        _directories = new MinecraftPaths(paths, settings);
         _installer = new ModInstaller(
             _directories,
             new ModFileDownloader(new ModEndpoints(settings), NullLogger<ModFileDownloader>.Instance),
             NullLogger<ModInstaller>.Instance);
     }
 
-    private static GameInstance Instance() => new()
+    private static GameVersion Instance() => new()
     {
         Id = "abc",
         Name = "test",
@@ -290,7 +294,7 @@ public class ContentInstallerTests : IDisposable
     [Fact]
     public void EachTypeMapsToItsOwnFolderUnderSharedMinecraft()
     {
-        var game = _directories.Shared;
+        var game = _directories.MinecraftRoot;
 
         Assert.Equal(Path.Combine(game, "mods"),
             _installer.GetContentDirectory(null, ModProjectType.Mod));
@@ -308,7 +312,8 @@ public class ContentInstallerTests : IDisposable
         // 创建实例时装附加 Mod 走这条：隔离实例必须写进自己的目录才读得到
         var instance = Instance();
 
-        Assert.Equal(Path.Combine(_directories.Resolve(instance), "mods"),
+        Assert.Equal(Path.Combine(
+                _directories.ResolveGameDirectory(instance.Id, instance.VersionIsolation), "mods"),
             _installer.GetContentDirectory(instance, ModProjectType.Mod));
     }
 
@@ -329,7 +334,7 @@ public class ContentInstallerTests : IDisposable
     [Fact]
     public void WorldsAreDirectoriesWithLevelDatNewestFirst()
     {
-        var saves = Path.Combine(_directories.Shared, "saves");
+        var saves = Path.Combine(_directories.MinecraftRoot, "saves");
         Directory.CreateDirectory(Path.Combine(saves, "Old World"));
         File.WriteAllText(Path.Combine(saves, "Old World", "level.dat"), "x");
         Directory.CreateDirectory(Path.Combine(saves, "New World"));
@@ -402,7 +407,8 @@ public class ModpackInstallTests : IDisposable
         Path.GetTempPath(), "solar-modpack-" + Guid.NewGuid().ToString("N")[..8]);
 
     private readonly AppPaths _paths;
-    private readonly InstanceRepository _repository;
+    private readonly MinecraftPaths _mcPaths;
+    private readonly VersionRepository _repository;
     private readonly ModpackService _service;
     private readonly FakeDownloader _downloader = new();
 
@@ -416,12 +422,24 @@ public class ModpackInstallTests : IDisposable
         var http = new ModHttp(
             new HttpClient(new NeverUsedHandler()), endpoints, NullLogger<ModHttp>.Instance);
 
-        _repository = new InstanceRepository(_paths);
+        _mcPaths = new MinecraftPaths(_paths, settings);
+        _mcPaths.EnsureCreated();
+
+        _repository = new VersionRepository(
+            _mcPaths,
+            new VersionScanner(_mcPaths, NullLogger<VersionScanner>.Instance),
+            settings,
+            NullLogger<VersionRepository>.Instance);
+
         _service = new ModpackService(
             http,
             _downloader,
             _repository,
-            new InstanceGameDirectory(_paths, settings),
+            _mcPaths,
+            new FakeResolver(),
+            new FakeGameDownloader(),
+            new FakeLoaderInstaller(_mcPaths),
+            new FakeJavaDetector(),
             NullLogger<ModpackService>.Instance);
     }
 
@@ -454,17 +472,17 @@ public class ModpackInstallTests : IDisposable
         Assert.Equal(0, result.SkippedFiles);
         Assert.Contains("../evil.jar", result.FailedFiles);
 
-        var instance = result.Instance;
+        var instance = result.Version;
         Assert.True(instance.VersionIsolation);
         Assert.Equal(ModLoader.Fabric, instance.Loader);
         Assert.Equal("0.16.0", instance.LoaderVersion);
-        Assert.False(instance.LoaderInstalled);
+        Assert.True(instance.LoaderInstalled);
 
-        // 实例确实落盘了，能被其它页面看到
+        // 版本确实落盘了，能被其它页面看到
         var saved = Assert.Single(await _repository.GetAllAsync());
         Assert.Equal(instance.Id, saved.Id);
 
-        var game = _paths.GetInstanceMinecraftDirectory(instance.Id);
+        var game = _mcPaths.GetVersionDirectory(instance.Id);
         Assert.Equal("stub", await File.ReadAllTextAsync(Path.Combine(game, "mods", "a.jar")));
         Assert.Equal("override", await File.ReadAllTextAsync(Path.Combine(game, "mods", "pack.jar")));
 
@@ -497,7 +515,7 @@ public class ModpackInstallTests : IDisposable
 
         var result = await _service.InstallAsync(plan, "CF Pack");
 
-        var game = _paths.GetInstanceMinecraftDirectory(result.Instance.Id);
+        var game = _mcPaths.GetVersionDirectory(result.Version.Id);
         Assert.Equal("cf", await File.ReadAllTextAsync(Path.Combine(game, "config", "test.txt")));
         Assert.False(File.Exists(Path.Combine(game, "config", "ignored.txt")));
         Assert.Equal(1, result.OverrideFiles);
@@ -555,5 +573,61 @@ public class ModpackInstallTests : IDisposable
         protected override Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request, CancellationToken ct) =>
             throw new InvalidOperationException("安装测试不应该发起网络请求：" + request.RequestUri);
+    }
+
+    private sealed class FakeLoaderInstaller(MinecraftPaths paths) : ILoaderInstaller
+    {
+        public Task<string> InstallAsync(
+            ModLoader loader,
+            string minecraftVersion,
+            string loaderVersion,
+            string javaPath,
+            IProgress<LoaderInstallProgress>? progress = null,
+            CancellationToken ct = default,
+            string? targetVersionId = null)
+        {
+            var versionId = targetVersionId ?? $"{minecraftVersion}-{loader}";
+
+            // 真实安装器会写版本 JSON；版本列表靠它识别版本
+            Directory.CreateDirectory(paths.GetVersionDirectory(versionId));
+            File.WriteAllText(
+                paths.GetVersionJsonPath(versionId),
+                $$"""{"id":"{{versionId}}","inheritsFrom":"{{minecraftVersion}}","mainClass":"Main"}""");
+
+            return Task.FromResult(versionId);
+        }
+    }
+
+    private sealed class FakeResolver : IVersionResolver
+    {
+        public Task<ResolvedVersion> ResolveAsync(string versionId, CancellationToken ct = default) =>
+            Task.FromResult(new ResolvedVersion
+            {
+                Detail = new Solar.Core.Models.VersionDetail { Id = versionId, MainClass = "Main" },
+                Chain = [],
+            });
+
+        public Task<Solar.Core.Models.VersionDetail> DownloadVersionJsonAsync(
+            Solar.Core.Models.VersionSummary summary, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+    }
+
+    private sealed class FakeGameDownloader : IGameDownloader
+    {
+        public Task DownloadAsync(
+            GameVersion instance,
+            ResolvedVersion version,
+            IProgress<DownloadProgress>? progress = null,
+            CancellationToken ct = default) =>
+            Task.CompletedTask;
+    }
+
+    private sealed class FakeJavaDetector : IJavaDetector
+    {
+        public Task<IReadOnlyList<JavaRuntime>> DetectAsync(CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyList<JavaRuntime>>([new JavaRuntime("java.exe", "21", 21)]);
+
+        public JavaRuntime? Select(IReadOnlyList<JavaRuntime> runtimes, JavaRequirement requirement) =>
+            runtimes.FirstOrDefault(requirement.IsSatisfiedBy);
     }
 }

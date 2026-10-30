@@ -3,7 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
 using Solar.App.Formatting;
-using Solar.Core.Instances;
+using Solar.Core.Versions;
 using Solar.Core.Mods;
 using Solar.Core.Text;
 
@@ -23,7 +23,7 @@ public sealed partial class AddonProjectViewModel : ViewModelBase
     private readonly IModInstaller _installer;
     private readonly ILogger<AddonProjectViewModel> _logger;
 
-    private GameInstance? _instance;
+    private GameVersion? _instance;
     private ModProject? _project;
 
     /// <summary>版本列表请求的序号，防止「只看兼容」快速来回切换时旧结果覆盖新结果。</summary>
@@ -97,26 +97,26 @@ public sealed partial class AddonProjectViewModel : ViewModelBase
 
     public ModProjectType Type => _project?.ProjectType ?? ModProjectType.Mod;
 
-    public bool IsModpack => Type.CreatesInstance();
+    public bool IsModpack => Type.CreatesVersion();
 
-    /// <summary>整合包会新建实例，不需要先选目标实例。</summary>
-    public bool NeedsInstance => !IsModpack;
+    /// <summary>整合包会新建版本，不需要先选目标版本。</summary>
+    public bool NeedsVersion => !IsModpack;
 
     public string InstallText => IsModpack ? "安装整合包" : "安装";
 
-    /// <summary>没有选中实例时不能安装，页面要说明原因。</summary>
+    /// <summary>没有选中版本时不能安装，页面要说明原因。</summary>
     public bool CanInstall => SelectedVersion is not null
-                              && (IsModpack || (_instance is not null && CanInstallToInstance));
+                              && (IsModpack || (_instance is not null && CanInstallToVersion));
 
-    /// <summary>数据包必须有存档；其余类型只要有实例即可。</summary>
-    private bool CanInstallToInstance =>
+    /// <summary>数据包必须有存档；其余类型只要有版本即可。</summary>
+    private bool CanInstallToVersion =>
         _instance is not null
         && (Type != ModProjectType.DataPack || _installer.GetWorlds(null).Count > 0);
 
-    /// <summary>没选实例时没有「兼容」这个概念，切换开关没有意义，直接禁用。</summary>
+    /// <summary>没选版本时没有「兼容」这个概念，切换开关没有意义，直接禁用。</summary>
     public bool CanFilterVersions => _instance is not null && !IsModpack;
 
-    /// <summary>实例与原版 / 共享目录相关的提示。为空表示没有需要注意的地方。</summary>
+    /// <summary>版本与原版 / 共享目录相关的提示。为空表示没有需要注意的地方。</summary>
     public string? CompatibilityWarning { get; private set; }
 
     public bool HasCompatibilityWarning => !string.IsNullOrWhiteSpace(CompatibilityWarning);
@@ -125,9 +125,9 @@ public sealed partial class AddonProjectViewModel : ViewModelBase
     {
         get
         {
-            if (NeedsInstance && _instance is null)
+            if (NeedsVersion && _instance is null)
             {
-                return "先回到列表页选一个目标实例，才能安装。";
+                return "先回到列表页选一个目标版本，才能安装。";
             }
 
             if (SelectedVersion is null)
@@ -135,9 +135,9 @@ public sealed partial class AddonProjectViewModel : ViewModelBase
                 return "先选一个版本。";
             }
 
-            if (Type == ModProjectType.DataPack && _instance is not null && !CanInstallToInstance)
+            if (Type == ModProjectType.DataPack && _instance is not null && !CanInstallToVersion)
             {
-                return "这个实例还没有存档。先在游戏里创建一个世界，数据包只能装进具体存档。";
+                return "这个版本还没有存档。先在游戏里创建一个世界，数据包只能装进具体存档。";
             }
 
             return "";
@@ -162,7 +162,7 @@ public sealed partial class AddonProjectViewModel : ViewModelBase
             return Task.CompletedTask;
         }
 
-        _instance = request.Instance;
+        _instance = request.GameVersion;
         ApplyProject(request.Project);
 
         // 头部已经有内容了，详情与版本在后台补齐，不阻塞页面
@@ -179,14 +179,14 @@ public sealed partial class AddonProjectViewModel : ViewModelBase
     }
 
     /// <summary>页面在用户点「安装」时调用：先由对话框服务展示清单，这里只负责准备数据。</summary>
-    public (ModProject Project, ModVersion Version, GameInstance Instance)? GetInstallRequest() =>
+    public (ModProject Project, ModVersion Version, GameVersion GameVersion)? GetInstallRequest() =>
         _project is not null && SelectedVersion is not null && _instance is not null
             ? (_project, SelectedVersion.Version, _instance)
             : null;
 
-    /// <summary>整合包安装需要创建一个新实例，不依赖目标实例。</summary>
+    /// <summary>整合包安装需要创建一个新版本，不依赖目标版本。</summary>
     public (ModProject Project, ModVersion Version)? GetModpackRequest() =>
-        _project is { } project && project.ProjectType.CreatesInstance() && SelectedVersion is not null
+        _project is { } project && project.ProjectType.CreatesVersion() && SelectedVersion is not null
             ? (project, SelectedVersion.Version)
             : null;
 
@@ -264,10 +264,10 @@ public sealed partial class AddonProjectViewModel : ViewModelBase
                 new ModVersionQuery
                 {
                     Type = type,
-                    GameVersion = type.CreatesInstance() ? null : _instance?.MinecraftVersion,
+                    GameVersion = type.CreatesVersion() ? null : _instance?.MinecraftVersion,
                     Loader = type.UsesLoader() ? _instance?.Loader : null,
 
-                    // 没选实例时没有筛选条件，服务端不传 loaders/game_versions 就等于全量；
+                    // 没选版本时没有筛选条件，服务端不传 loaders/game_versions 就等于全量；
                     // 这是「浏览」状态，不是「只看兼容」，所以不要再额外套一层
                     IncludeIncompatible = ShowAllVersions || _instance is null,
                     Limit = 100,
@@ -280,7 +280,7 @@ public sealed partial class AddonProjectViewModel : ViewModelBase
             }
 
             var previousId = SelectedVersion?.Version.Id;
-            var gameVersion = type.CreatesInstance() ? null : _instance?.MinecraftVersion;
+            var gameVersion = type.CreatesVersion() ? null : _instance?.MinecraftVersion;
             var loader = type.UsesLoader() ? _instance?.Loader : null;
 
             Versions.Clear();
@@ -360,7 +360,7 @@ public sealed partial class AddonProjectViewModel : ViewModelBase
         OnPropertyChanged(nameof(HasGallery));
         OnPropertyChanged(nameof(Type));
         OnPropertyChanged(nameof(IsModpack));
-        OnPropertyChanged(nameof(NeedsInstance));
+        OnPropertyChanged(nameof(NeedsVersion));
         OnPropertyChanged(nameof(InstallText));
         OnPropertyChanged(nameof(CanFilterVersions));
         UpdateCompatibilityWarning(project);
@@ -370,25 +370,25 @@ public sealed partial class AddonProjectViewModel : ViewModelBase
     {
         string? warning = null;
 
-        if (project.ProjectType.CreatesInstance())
+        if (project.ProjectType.CreatesVersion())
         {
-            // 整合包会创建一个独立实例，不存在“装错实例”的问题
+            // 整合包会创建一个独立版本，不存在“装错版本”的问题
             warning = null;
         }
         else if (_instance is null)
         {
-            warning = "还没有选目标实例。回到列表页选一个实例，才能安装。";
+            warning = "还没有选目标版本。回到列表页选一个版本，才能安装。";
         }
         else if (project.ProjectType == ModProjectType.Mod && _instance.Loader == ModLoader.Vanilla)
         {
-            warning = "这个实例是原版，没有装加载器。Mod 放进去也不会生效，除非之后加上 Fabric / Forge。";
+            warning = "这个版本是原版，没有装加载器。Mod 放进去也不会生效，除非之后加上 Fabric / Forge。";
         }
         else if (project.ProjectType == ModProjectType.Mod
                  && project.Loaders.Count > 0
                  && !project.Loaders.Contains(_instance.Loader))
         {
             warning = $"这个 Mod 标注的加载器是 {ModDisplay.Loaders(project.Loaders)}，"
-                      + $"与实例的 {ModDisplay.LoaderName(_instance.Loader)} 不一致。";
+                      + $"与版本的 {ModDisplay.LoaderName(_instance.Loader)} 不一致。";
         }
         else if (project.ProjectType == ModProjectType.DataPack && _installer.GetWorlds(null).Count == 0)
         {

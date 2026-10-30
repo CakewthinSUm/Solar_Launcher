@@ -1,10 +1,10 @@
 using System.Text.RegularExpressions;
 
-namespace Solar.Core.Instances;
+namespace Solar.Core.Versions;
 
 /// <summary>
 /// 版本隔离的建议值判定，对齐 PCL 的逻辑。
-/// 扫描导入与实例创建页共用：给定全局档位和版本特征，回答"该不该隔离"。
+/// 扫描与创建页共用：给定全局档位和版本特征，回答"该不该隔离"。
 /// </summary>
 public static partial class VersionIsolationPolicy
 {

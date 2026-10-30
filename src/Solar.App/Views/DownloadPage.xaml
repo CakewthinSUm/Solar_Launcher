@@ -128,7 +128,7 @@
             </Grid>
 
             <!--
-                点一行进入创建实例页：装什么版本、带哪些组件都在那里选。
+                点一行进入创建版本页：装什么版本、带哪些组件都在那里选。
                 SelectionMode=None + IsItemClickEnabled 让整行可点，但不高亮选中态。
             -->
             <ListView

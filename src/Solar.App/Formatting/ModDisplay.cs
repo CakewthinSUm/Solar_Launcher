@@ -1,4 +1,4 @@
-using Solar.Core.Instances;
+using Solar.Core.Versions;
 using Solar.Core.Mods;
 
 namespace Solar.App.Formatting;

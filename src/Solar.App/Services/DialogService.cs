@@ -24,6 +24,9 @@ public interface IDialogService
     /// <summary>询问未保存的修改怎么处理。</summary>
     Task<SaveChangesChoice> ShowSaveChangesAsync(string title, string message);
 
+    /// <summary>单行文本输入框；用户取消时返回 null。</summary>
+    Task<string?> ShowInputAsync(string title, string message, string initialValue = "");
+
     /// <summary>
     /// 带一个勾选框的确认框。返回 (是否确认, 是否勾选)；
     /// 用户关掉对话框时返回 (false, false)。
@@ -62,6 +65,32 @@ public sealed class DialogService : IDialogService
             ContentDialogResult.Secondary => SaveChangesChoice.Discard,
             _ => SaveChangesChoice.Cancel,
         };
+    }
+
+    public async Task<string?> ShowInputAsync(string title, string message, string initialValue = "")
+    {
+        var input = new TextBox
+        {
+            Text = initialValue,
+            SelectionStart = initialValue.Length,
+            Margin = new Thickness(0, 12, 0, 0),
+        };
+
+        var content = new StackPanel();
+        content.Children.Add(new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap });
+        content.Children.Add(input);
+
+        var dialog = new ContentDialog
+        {
+            Title = title,
+            Content = content,
+            PrimaryButtonText = "确定",
+            CloseButtonText = "取消",
+            DefaultButton = ContentDialogButton.Primary,
+            XamlRoot = App.MainWindow?.Content?.XamlRoot,
+        };
+
+        return await ShowAsync(dialog) == ContentDialogResult.Primary ? input.Text : null;
     }
 
     public async Task<(bool Confirmed, bool Checked)> ShowConfirmWithCheckBoxAsync(

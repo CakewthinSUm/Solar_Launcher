@@ -1,4 +1,5 @@
 using Solar.Core.Java;
+using Solar.Core.Paths;
 using Xunit;
 
 namespace Solar.Core.Tests;
@@ -22,8 +23,13 @@ public class JavaDetectorTests
         Assert.Equal(0, JavaDetector.ParseMajor("not-a-version"));
     }
 
-    private static JavaDetector CreateDetector() =>
-        new(Microsoft.Extensions.Logging.Abstractions.NullLogger<JavaDetector>.Instance);
+    private static JavaDetector CreateDetector()
+    {
+        var app = new AppPaths(Path.Combine(Path.GetTempPath(), "solar-java-" + Guid.NewGuid().ToString("N")[..8]));
+        return new(
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<JavaDetector>.Instance,
+            new MinecraftPaths(app, new TestSettings()));
+    }
 
     private static JavaRuntime[] Runtimes() =>
     [

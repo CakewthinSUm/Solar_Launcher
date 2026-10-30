@@ -2,32 +2,32 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Navigation;
 using Solar.App.ViewModels;
-using Solar.Core.Instances;
+using Solar.Core.Versions;
 using Solar.Core.Models;
 
 namespace Solar.App.Views;
 
-public sealed partial class InstanceCreatePage : PageBase
+public sealed partial class VersionCreatePage : PageBase
 {
-    public InstanceCreatePage() : this(App.GetService<InstanceCreateViewModel>())
+    public VersionCreatePage() : this(App.GetService<VersionCreateViewModel>())
     {
     }
 
-    public InstanceCreatePage(InstanceCreateViewModel viewModel)
+    public VersionCreatePage(VersionCreateViewModel viewModel)
     {
         ViewModel = viewModel;
         DataContext = viewModel;
         InitializeComponent();
 
-        ViewModel.InstanceCreated += OnInstanceCreated;
+        ViewModel.VersionCreated += OnVersionCreated;
         ViewModel.BackRequested += OnBackRequested;
     }
 
-    public new InstanceCreateViewModel ViewModel { get; }
+    public new VersionCreateViewModel ViewModel { get; }
 
     /// <summary>
     /// 页面被 NavigationCacheMode 缓存复用，每次导航都要把新参数交给视图模型；
-    /// 参数可能是下载页传来的 <see cref="VersionSummary"/>，也可能为空（从实例页新建）。
+    /// 参数可能是下载页传来的 <see cref="VersionSummary"/>，也可能为空（从版本页新建）。
     /// </summary>
     protected override void OnNavigatedTo(NavigationEventArgs e)
     {
@@ -57,8 +57,8 @@ public sealed partial class InstanceCreatePage : PageBase
         }
     }
 
-    private void OnInstanceCreated(object? sender, GameInstance instance) =>
-        Frame.Navigate(typeof(InstancesPage));
+    private void OnVersionCreated(object? sender, GameVersion instance) =>
+        Frame.Navigate(typeof(VersionsPage));
 
     private void OnBackRequested(object? sender, EventArgs e)
     {

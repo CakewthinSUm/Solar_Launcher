@@ -1,4 +1,4 @@
-using Solar.Core.Instances;
+using Solar.Core.Versions;
 using Solar.Core.Java;
 using Solar.Core.Minecraft;
 using Solar.Core.Models;
@@ -16,7 +16,7 @@ public class JavaRequirementTests
         string? liteloader = null,
         int? javaMajor = null)
     {
-        var instance = new GameInstance
+        var instance = new GameVersion
         {
             MinecraftVersion = minecraftVersion,
             Loader = loader,

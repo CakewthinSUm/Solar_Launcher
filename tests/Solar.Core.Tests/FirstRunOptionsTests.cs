@@ -1,4 +1,4 @@
-using Solar.Core.Instances;
+using Solar.Core.Versions;
 using Solar.Core.Launch;
 using Solar.Core.Settings;
 using Xunit;
@@ -10,7 +10,7 @@ public class FirstRunOptionsTests
     private static string NewDirectory() =>
         Path.Combine(Path.GetTempPath(), "solar-options-" + Guid.NewGuid().ToString("N"));
 
-    private static GameInstance Instance(string mcVersion = "1.20.1") =>
+    private static GameVersion Instance(string mcVersion = "1.20.1") =>
         new() { MinecraftVersion = mcVersion };
 
     private static string ReadLang(string optionsPath) =>

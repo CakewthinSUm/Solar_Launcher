@@ -5,7 +5,7 @@ using Solar.Core.Addons;
 using Solar.Core.Assets;
 using Solar.Core.Content;
 using Solar.Core.Download;
-using Solar.Core.Instances;
+using Solar.Core.Versions;
 using Solar.Core.Java;
 using Solar.Core.Launch;
 using Solar.Core.Loaders;
@@ -28,8 +28,8 @@ public static class SolarServiceCollectionExtensions
 
         services.AddSingleton(paths);
         services.AddSingleton<ISettingsService, SettingsService>();
-        services.AddSingleton<IInstanceRepository, InstanceRepository>();
-        services.AddSingleton<InstanceGameDirectory>();
+        services.AddSingleton<MinecraftPaths>();
+        services.AddSingleton<IVersionRepository, VersionRepository>();
         services.AddSingleton<IContentManager, ContentManager>();
         services.AddSingleton<GameFileLocator>();
         services.AddSingleton<IVersionScanner, VersionScanner>();
@@ -43,7 +43,6 @@ public static class SolarServiceCollectionExtensions
         services.AddSingleton(new AuthOptions());
         services.AddSingleton<IMicrosoftAuthService, MicrosoftAuthService>();
 
-        services.AddSingleton<IAssetIndexService, AssetIndexService>();
         services.AddSingleton<IGameDownloader, GameDownloader>();
         services.AddSingleton<IGameLauncher, GameLauncher>();
         services.AddSingleton<LaunchContextFactory>();
@@ -95,12 +94,12 @@ public static class SolarServiceCollectionExtensions
         services.AddSingleton<IModFileDownloader, ModFileDownloader>();
         services.AddSingleton<IModInstaller, ModInstaller>();
 
-        // 整合包：解析 manifest、创建实例、下载全部文件
+        // 整合包：解析 manifest、创建版本文件夹、下载全部文件
         services.AddSingleton<IModpackService, ModpackService>();
     }
 
     /// <summary>
-    /// 创建实例时用到的附加组件（OptiFine / LiteLoader）与编排服务。
+    /// 创建版本时用到的附加组件（OptiFine / LiteLoader）与编排服务。
     /// <para>
     /// Fabric API 与 OptiFabric 不在这里单独注册客户端：它们复用
     /// <see cref="Mods.IModCatalogService"/>，和「管理 → Mods」共用同一套源与镜像降级。
@@ -108,7 +107,7 @@ public static class SolarServiceCollectionExtensions
     /// </summary>
     private static void AddAddonServices(IServiceCollection services)
     {
-        services.AddSingleton<IInstanceCreationService, InstanceCreationService>();
+        services.AddSingleton<IVersionCreationService, VersionCreationService>();
         services.AddSingleton<ILiteLoaderInstaller, LiteLoaderInstaller>();
         services.AddSingleton<IAddonCatalog, AddonCatalog>();
 

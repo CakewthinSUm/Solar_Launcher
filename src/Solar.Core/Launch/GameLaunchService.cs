@@ -2,12 +2,12 @@ using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Solar.Core.Accounts;
 using Solar.Core.Download;
-using Solar.Core.Instances;
 using Solar.Core.Java;
 using Solar.Core.Loaders;
 using Solar.Core.Minecraft;
 using Solar.Core.Paths;
 using Solar.Core.Settings;
+using Solar.Core.Versions;
 
 namespace Solar.Core.Launch;
 
@@ -35,21 +35,21 @@ public interface IGameLaunchService
 {
     /// <summary>完整流程：解析版本 → 选 Java → 补齐文件 → 启动进程。</summary>
     Task<Process> LaunchAsync(
-        GameInstance instance,
+        GameVersion instance,
         IProgress<DownloadProgress>? downloadProgress = null,
         IProgress<LaunchStageChanged>? stageProgress = null,
         CancellationToken ct = default);
 
     /// <summary>只补齐文件，不启动（用于"预下载"）。</summary>
     Task PrepareAsync(
-        GameInstance instance,
+        GameVersion instance,
         IProgress<DownloadProgress>? downloadProgress = null,
         IProgress<LaunchStageChanged>? stageProgress = null,
         CancellationToken ct = default);
 }
 
 public sealed class GameLaunchService(
-    AppPaths paths,
+    MinecraftPaths paths,
     ISettingsService settings,
     IVersionResolver resolver,
     IJavaDetector javaDetector,
@@ -59,8 +59,7 @@ public sealed class GameLaunchService(
     IAccountStore accountStore,
     IMicrosoftAuthService authService,
     ILoaderInstaller loaderInstaller,
-    IInstanceRepository instanceRepository,
-    InstanceGameDirectory gameDirectories,
+    IVersionRepository versionRepository,
     ILogger<GameLaunchService> logger) : IGameLaunchService
 {
     /// <summary>
@@ -70,7 +69,7 @@ public sealed class GameLaunchService(
     private static readonly TimeSpan GameWindowTimeout = TimeSpan.FromMinutes(5);
 
     public async Task<Process> LaunchAsync(
-        GameInstance instance,
+        GameVersion instance,
         IProgress<DownloadProgress>? downloadProgress = null,
         IProgress<LaunchStageChanged>? stageProgress = null,
         CancellationToken ct = default)
@@ -101,7 +100,8 @@ public sealed class GameLaunchService(
         await WaitForGameWindowAsync(launched, ct).ConfigureAwait(false);
 
         instance.LastPlayedAt = DateTimeOffset.Now;
-        logger.LogInformation("实例 {Instance} 已启动，pid={Pid}", instance.Name, launched.Process.Id);
+        await versionRepository.SaveSettingsAsync(instance, ct).ConfigureAwait(false);
+        logger.LogInformation("版本 {Version} 已启动，pid={Pid}", instance.Name, launched.Process.Id);
 
         return launched.Process;
     }
@@ -114,11 +114,11 @@ public sealed class GameLaunchService(
     /// 避免覆盖整合包自带 options.txt 里的选择；</item>
     /// <item>1.1–1.10 只认大写结尾的 <c>zh_CN</c> / <c>zh_TW</c>，小写会被游戏当成英文。</item>
     /// </list>
-    /// 另外，新建 options.txt 时顺手关掉无障碍引导——否则每个新实例第一次启动
+    /// 另外，新建 options.txt 时顺手关掉无障碍引导——否则每个新版本第一次启动
     /// 都会停在「Welcome to Minecraft!」那个界面上。
     /// </summary>
     internal static void EnsureFirstRunOptions(
-        GameInstance instance,
+        GameVersion instance,
         string gameDirectory,
         GameLanguage language)
     {
@@ -186,15 +186,15 @@ public sealed class GameLaunchService(
     /// 启动前预检，对齐 PCL 的 <c>McLaunchPrecheck</c>：
     /// 路径里的 <c>!</c> 和 <c>;</c> 会在命令行解析时被吞掉，必须提前拦住。
     /// </summary>
-    private void Precheck(GameInstance instance)
+    private void Precheck(GameVersion instance)
     {
         if (string.IsNullOrWhiteSpace(instance.MinecraftVersion))
         {
-            throw new InvalidOperationException($"实例「{instance.Name}」没有设置 Minecraft 版本。");
+            throw new InvalidOperationException($"版本「{instance.Name}」没有设置 Minecraft 版本。");
         }
 
-        var gameDirectory = gameDirectories.Resolve(instance);
-        var versionDirectory = Path.Combine(paths.Versions, instance.EffectiveVersionId);
+        var gameDirectory = paths.ResolveGameDirectory(instance.Id, instance.VersionIsolation);
+        var versionDirectory = paths.GetVersionDirectory(instance.Id);
 
         foreach (var path in new[] { gameDirectory, versionDirectory })
         {
@@ -340,7 +340,7 @@ public sealed class GameLaunchService(
 
     /// <summary>只补齐文件，不要求登录（未登录也能预下载）。</summary>
     public async Task PrepareAsync(
-        GameInstance instance,
+        GameVersion instance,
         IProgress<DownloadProgress>? downloadProgress = null,
         IProgress<LaunchStageChanged>? stageProgress = null,
         CancellationToken ct = default)
@@ -349,12 +349,12 @@ public sealed class GameLaunchService(
     }
 
     /// <summary>
-    /// 首次启动模组实例时按需安装加载器。
-    /// 放在启动流程里而不是创建实例时，是因为安装要下载几百 MB，
-    /// 建实例时同步等待体验很差。
+    /// 首次启动模组版本时按需安装加载器。
+    /// 放在启动流程里而不是创建版本时，是因为安装要下载几百 MB，
+    /// 建版本时同步等待体验很差。
     /// </summary>
     private async Task EnsureLoaderAsync(
-        GameInstance instance,
+        GameVersion instance,
         JavaRuntime java,
         IProgress<LaunchStageChanged>? stageProgress,
         CancellationToken ct)
@@ -367,7 +367,7 @@ public sealed class GameLaunchService(
         if (string.IsNullOrWhiteSpace(instance.LoaderVersion))
         {
             throw new InvalidOperationException(
-                $"实例「{instance.Name}」的 {instance.Loader} 版本未设置，无法安装加载器。");
+                $"版本「{instance.Name}」的 {instance.Loader} 版本未设置，无法安装加载器。");
         }
 
         stageProgress?.Report(new LaunchStageChanged(
@@ -385,23 +385,24 @@ public sealed class GameLaunchService(
                     // 让 UI 显示不确定进度即可
                     p.Total > 0 ? (double)p.Current / p.Total : 0)));
 
+        // 加载器直接装进该版本的文件夹：版本文件夹名就是版本 id，装完不需要再改路径
         var versionId = await installer.InstallAsync(
             instance.Loader,
             instance.MinecraftVersion,
             instance.LoaderVersion,
             java.Path,
             progress,
-            ct).ConfigureAwait(false);
+            ct,
+            targetVersionId: instance.Id).ConfigureAwait(false);
 
-        instance.VersionId = versionId;
         instance.LoaderInstalled = true;
-        await instanceRepository.SaveAsync(instance, ct).ConfigureAwait(false);
+        await versionRepository.SaveSettingsAsync(instance, ct).ConfigureAwait(false);
 
         logger.LogInformation("加载器安装完成: {VersionId}", versionId);
     }
 
     private async Task<(ResolvedVersion Version, JavaRuntime Java)> PrepareCoreAsync(
-        GameInstance instance,
+        GameVersion instance,
         IProgress<DownloadProgress>? downloadProgress,
         IProgress<LaunchStageChanged>? stageProgress,
         CancellationToken ct)
@@ -414,7 +415,7 @@ public sealed class GameLaunchService(
         await EnsureLoaderAsync(instance, java, stageProgress, ct).ConfigureAwait(false);
 
         stageProgress?.Report(new LaunchStageChanged(LaunchStage.ResolvingVersion, "正在解析版本…"));
-        var version = await resolver.ResolveAsync(instance.EffectiveVersionId, ct).ConfigureAwait(false);
+        var version = await resolver.ResolveAsync(instance.Id, ct).ConfigureAwait(false);
 
         // 版本解析出来后才能知道它要求的 Java 范围（含模组加载器与 OptiFine 的约束）
         var requirement = JavaRequirements.For(instance, version);
@@ -430,11 +431,11 @@ public sealed class GameLaunchService(
     /// 版本要求的 Java 范围；为 null 时（版本尚未解析）先取最新的 Java 用于安装加载器。
     /// </param>
     private async Task<JavaRuntime> SelectJavaAsync(
-        GameInstance instance,
+        GameVersion instance,
         JavaRequirement? requirement,
         CancellationToken ct)
     {
-        // 实例级覆盖优先，其次全局设置
+        // 版本级覆盖优先，其次全局设置
         var explicitPath = instance.JavaPath ?? settings.Current.JavaPath;
         if (!string.IsNullOrWhiteSpace(explicitPath) && File.Exists(explicitPath))
         {

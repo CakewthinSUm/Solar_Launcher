@@ -1,4 +1,4 @@
-using Solar.Core.Instances;
+using Solar.Core.Paths;
 
 namespace Solar.Core.Content;
 
@@ -30,17 +30,16 @@ public interface IContentManager
 }
 
 /// <summary>
-/// 内容管理：直接读写共享游戏目录（设置里的 .minecraft）下的 mods / resourcepacks / shaderpacks。
+/// 内容管理：直接读写 MC 文件夹根下的 mods / resourcepacks / shaderpacks。
 /// <para>
-/// 暂不区分实例与版本隔离：隔离实例自己的 <c>SolarInstances/&lt;id&gt;/.minecraft</c>、
-/// 以及扫描导入时“版本夹即目录”的覆盖路径都不参与，页面始终管理共享的那一份。
+/// 暂不按版本管理：页面始终管理共享的那一份（未开启隔离的版本使用它）。
 /// 不维护额外索引，文件系统就是唯一事实来源，用户手动往里放东西也能看到。
 /// </para>
 /// </summary>
-public sealed class ContentManager(InstanceGameDirectory gameDirectories) : IContentManager
+public sealed class ContentManager(MinecraftPaths paths) : IContentManager
 {
     public string GetContentDirectory(ContentKind kind) =>
-        Path.Combine(gameDirectories.Shared, ContentFolders.GetFolderName(kind));
+        Path.Combine(paths.MinecraftRoot, ContentFolders.GetFolderName(kind));
 
     public IReadOnlyList<ContentPack> List(ContentKind kind)
     {

@@ -12,7 +12,7 @@ namespace Solar.Core.Download;
 /// 把已解析的版本转换成下载引擎认识的 <see cref="GameFile"/> 列表。
 /// 这里只负责"要下什么、下到哪"，并发与校验交给 CmlLib 的安装器。
 /// </summary>
-public sealed class GameFileBuilder(AppPaths paths, GameFileLocator? locator = null)
+public sealed class GameFileBuilder(MinecraftPaths paths, GameFileLocator? locator = null)
 {
     private const string ResourcesHost = "https://resources.download.minecraft.net";
 
@@ -44,7 +44,7 @@ public sealed class GameFileBuilder(AppPaths paths, GameFileLocator? locator = n
         }
 
         var target = locator?.FindVersionJar(version.Id)
-                     ?? Path.Combine(paths.Versions, version.Id, version.Id + ".jar");
+                     ?? paths.GetVersionJarPath(version.Id);
 
         return new GameFile("client.jar")
         {
@@ -76,7 +76,7 @@ public sealed class GameFileBuilder(AppPaths paths, GameFileLocator? locator = n
     /// <summary>
     /// 构建库文件下载项。natives 会额外生成"下载后解压"的任务。
     /// </summary>
-    /// <param name="nativesDirectory">解压目标：实例的 <c>natives</c> 目录。</param>
+    /// <param name="nativesDirectory">解压目标：版本的 <c>natives</c> 目录。</param>
     public IEnumerable<GameFile> BuildLibraries(
         ResolvedVersion version,
         RuleContext context,
@@ -97,7 +97,6 @@ public sealed class GameFileBuilder(AppPaths paths, GameFileLocator? locator = n
             {
                 var (relativePath, url) = download;
 
-                // 已有的一份（SolarShared 或接管过来的游戏目录）优先，省掉重复下载
                 var target = locator?.ResolveLibrary(relativePath)
                              ?? Path.Combine(paths.Libraries, relativePath);
 
@@ -141,12 +140,6 @@ public sealed class GameFileBuilder(AppPaths paths, GameFileLocator? locator = n
     {
         var objectsRoot = Path.Combine(paths.Assets, "objects");
 
-        // 接管过来的游戏目录里通常已经有一整套资源（官方启动器 / PCL 下的）。
-        // 同一份资源按哈希定位，直接链接过来就不必重新下载几百 MB。
-        var externalObjects = locator is null
-            ? null
-            : Path.Combine(locator.ExternalAssets, "objects");
-
         foreach (var (name, obj) in index.Objects)
         {
             if (obj.Hash.Length < 2)
@@ -157,11 +150,6 @@ public sealed class GameFileBuilder(AppPaths paths, GameFileLocator? locator = n
             var prefix = obj.Hash[..2];
             var target = Path.Combine(objectsRoot, prefix, obj.Hash);
 
-            if (externalObjects is not null && !File.Exists(target))
-            {
-                LinkExternalObject(Path.Combine(externalObjects, prefix, obj.Hash), target, obj.Size);
-            }
-
             // 资源不跟着版本走：游戏的 --assetsDir 只有一个目录，
             // 这里必须落在 Solar 自己的 assets 下，否则游戏会去空目录里找资源。
             yield return new GameFile(name)
@@ -171,34 +159,6 @@ public sealed class GameFileBuilder(AppPaths paths, GameFileLocator? locator = n
                 Hash = obj.Hash,
                 Size = obj.Size,
             };
-        }
-    }
-
-    /// <summary>
-    /// 把外部资源目录里已有的对象链接进 Solar 的 assets。
-    /// 优先硬链接（同卷瞬间完成、不占额外空间），跨卷或失败时退回复制；
-    /// 两种都失败就保持缺失，交给下载器补齐。
-    /// </summary>
-    private static void LinkExternalObject(string source, string target, long expectedSize)
-    {
-        try
-        {
-            var info = new FileInfo(source);
-            if (!info.Exists || (expectedSize > 0 && info.Length != expectedSize))
-            {
-                return;
-            }
-
-            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
-
-            if (!HardLink.TryCreate(target, source))
-            {
-                File.Copy(source, target, overwrite: false);
-            }
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            // 链接不了就让它照常下载，不影响正确性
         }
     }
 
@@ -232,7 +192,7 @@ public sealed class GameFileBuilder(AppPaths paths, GameFileLocator? locator = n
 }
 
 /// <summary>
-/// 下载完成后把原生库解压到实例的 <c>natives</c> 目录。
+/// 下载完成后把原生库解压到版本的 <c>natives</c> 目录。
 /// 由下载引擎在文件就绪后调用。
 /// </summary>
 public sealed class NativeExtractTask(

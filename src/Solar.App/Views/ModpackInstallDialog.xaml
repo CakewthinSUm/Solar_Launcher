@@ -24,9 +24,9 @@
         </StackPanel>
 
         <TextBox
-            Header="实例名"
-            PlaceholderText="新实例的名字"
-            Text="{x:Bind ViewModel.InstanceName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+            Header="版本名"
+            PlaceholderText="新版本的名字"
+            Text="{x:Bind ViewModel.VersionName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
         <InfoBar
             IsClosable="False"

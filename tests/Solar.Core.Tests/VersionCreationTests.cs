@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using Solar.Core.Addons;
 using Solar.Core.Download;
-using Solar.Core.Instances;
+using Solar.Core.Versions;
 using Solar.Core.Java;
 using Solar.Core.Loaders;
 using Solar.Core.Minecraft;
@@ -12,51 +12,58 @@ using Xunit;
 namespace Solar.Core.Tests;
 
 /// <summary>
-/// 创建实例的编排：用假的下载器与安装器验证步骤顺序、进度上报，
+/// 创建版本的编排：用假的下载器与安装器验证步骤顺序、进度上报，
 /// 以及「失败也保留记录」这条约定。
 /// </summary>
-public sealed class InstanceCreationTests : IDisposable
+public sealed class VersionCreationTests : IDisposable
 {
     private readonly string _root = Path.Combine(Path.GetTempPath(), "solar-create-" + Guid.NewGuid().ToString("N")[..8]);
     private readonly AppPaths _paths;
-    private readonly InstanceRepository _repository;
+    private readonly FakeSettings _settings = new();
+    private readonly MinecraftPaths _mcPaths;
+    private readonly VersionRepository _repository;
     private readonly FakeLoaderInstaller _loaderInstaller = new();
     private readonly FakeDownloader _downloader = new();
 
-    public InstanceCreationTests()
+    public VersionCreationTests()
     {
         _paths = new AppPaths(_root);
         _paths.EnsureCreated();
-        _repository = new InstanceRepository(_paths);
+        _mcPaths = new MinecraftPaths(_paths, _settings);
+        _mcPaths.EnsureCreated();
+
+        var scanner = new VersionScanner(_mcPaths, NullLogger<VersionScanner>.Instance);
+        _repository = new VersionRepository(
+            _mcPaths, scanner, _settings, NullLogger<VersionRepository>.Instance);
     }
 
-    private InstanceCreationService CreateService() => new(
-        _paths,
+    private VersionCreationService CreateService() => new(
+        _mcPaths,
         _repository,
-        new FakeResolver(),
+        new FakeResolver(_mcPaths),
         _downloader,
         _loaderInstaller,
         new FakeOptiFine(),
         new FakeLiteLoaderInstaller(),
-        new FakeModInstaller(_paths),
-        new InstanceGameDirectory(_paths, new FakeSettings()),
+        new FakeModInstaller(_mcPaths),
         new FakeJavaDetector(),
         new HttpClient(new FakeHandler()),
-        NullLogger<InstanceCreationService>.Instance);
+        NullLogger<VersionCreationService>.Instance);
 
     [Fact]
-    public async Task VanillaInstanceIsSavedWithoutLoader()
+    public async Task VanillaVersionIsSavedWithoutLoader()
     {
-        var progress = new List<InstanceCreateProgress>();
+        var progress = new List<VersionCreateProgress>();
 
         var instance = await CreateService().CreateAsync(
-            new InstanceCreateRequest("原版实例", "1.21.4", new ComponentSelection(), false),
-            new Progress<InstanceCreateProgress>(progress.Add));
+            new VersionCreateRequest("原版版本", "1.21.4", new ComponentSelection(), false),
+            new Progress<VersionCreateProgress>(progress.Add));
 
-        Assert.Equal("原版实例", instance.Name);
+        Assert.Equal("原版版本", instance.Name);
+        Assert.Equal("原版版本", instance.Id);
+        Assert.Equal("1.21.4", instance.MinecraftVersion);
         Assert.Equal(ModLoader.Vanilla, instance.Loader);
         Assert.True(instance.LoaderInstalled);
-        Assert.Equal("1.21.4", instance.EffectiveVersionId);
         Assert.False(instance.VersionIsolation);
 
         var saved = await _repository.GetAsync(instance.Id);
@@ -66,16 +73,16 @@ public sealed class InstanceCreationTests : IDisposable
         Assert.Equal(0, _loaderInstaller.Calls);
 
         // 阶段要覆盖准备与下载，界面上的进度条才有东西可显示
-        Assert.Contains(progress, p => p.Stage == InstanceCreateStage.Preparing);
-        Assert.Contains(progress, p => p.Stage == InstanceCreateStage.DownloadingGame);
+        Assert.Contains(progress, p => p.Stage == VersionCreateStage.Preparing);
+        Assert.Contains(progress, p => p.Stage == VersionCreateStage.DownloadingGame);
     }
 
     [Fact]
-    public async Task LoaderInstanceInstallsLoaderBeforeDownloading()
+    public async Task LoaderVersionInstallsLoaderBeforeDownloading()
     {
         var instance = await CreateService().CreateAsync(
-            new InstanceCreateRequest(
-                "Fabric 实例",
+            new VersionCreateRequest(
+                "Fabric 版本",
                 "1.21.4",
                 new ComponentSelection { Loader = ModLoader.Fabric, LoaderVersion = "0.16.9" },
                 true));
@@ -83,19 +90,19 @@ public sealed class InstanceCreationTests : IDisposable
         Assert.Equal(ModLoader.Fabric, instance.Loader);
         Assert.Equal("0.16.9", instance.LoaderVersion);
         Assert.True(instance.LoaderInstalled);
-        Assert.Equal("fabric-loader-0.16.9-1.21.4", instance.VersionId);
+        Assert.Equal("Fabric 版本", instance.Id);
         Assert.True(instance.VersionIsolation);
 
-        // 加载器安装会传真实实例 Id，natives 不该落到 installer-temp
-        Assert.Equal(instance.Id, _loaderInstaller.ScratchInstanceId);
-        Assert.DoesNotContain("installer-temp", _downloader.InstanceIds);
+        // 自定义文件夹名直接作为加载器的目标版本 id
+        Assert.Equal(instance.Id, _loaderInstaller.TargetVersionId);
+        Assert.DoesNotContain("installer-temp", _downloader.VersionIds);
     }
 
     [Fact]
     public async Task FabricApiIsDownloadedIntoIsolatedModsFolder()
     {
         var instance = await CreateService().CreateAsync(
-            new InstanceCreateRequest(
+            new VersionCreateRequest(
                 "带 API",
                 "1.21.4",
                 new ComponentSelection
@@ -111,20 +118,20 @@ public sealed class InstanceCreationTests : IDisposable
 
         Assert.Contains("fabric-api.jar", instance.CompanionMods);
 
-        var modsDirectory = Path.Combine(_paths.Versions, instance.EffectiveVersionId, "mods");
+        var modsDirectory = Path.Combine(_mcPaths.Versions, instance.Id, "mods");
         Assert.True(Directory.Exists(modsDirectory));
         Assert.True(File.Exists(Path.Combine(modsDirectory, "fabric-api.jar")));
     }
 
     [Fact]
-    public async Task FailureKeepsInstanceRecordForFirstLaunchRetry()
+    public async Task FailureKeepsVersionRecordForRetry()
     {
         _downloader.Throw = new InvalidOperationException("网络断了");
 
         var service = CreateService();
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => service.CreateAsync(
-            new InstanceCreateRequest(
+            new VersionCreateRequest(
                 "半成品",
                 "1.21.4",
                 new ComponentSelection { Loader = ModLoader.Fabric, LoaderVersion = "0.16.9" },
@@ -140,7 +147,7 @@ public sealed class InstanceCreationTests : IDisposable
     public async Task MissingLoaderVersionIsRejected()
     {
         await Assert.ThrowsAsync<InvalidOperationException>(() => CreateService().CreateAsync(
-            new InstanceCreateRequest(
+            new VersionCreateRequest(
                 "没有版本",
                 "1.21.4",
                 new ComponentSelection { Loader = ModLoader.Forge, LoaderVersion = null },
@@ -151,7 +158,7 @@ public sealed class InstanceCreationTests : IDisposable
     public async Task OptiFineWithLoaderGoesToModsInsteadOfProfile()
     {
         var instance = await CreateService().CreateAsync(
-            new InstanceCreateRequest(
+            new VersionCreateRequest(
                 "Forge + OptiFine",
                 "1.20.1",
                 new ComponentSelection
@@ -162,8 +169,8 @@ public sealed class InstanceCreationTests : IDisposable
                 },
                 VersionIsolation: true));
 
-        // 有主加载器时不生成 OptiFine profile，版本 Id 仍是加载器的
-        Assert.Equal("1.20.1-forge-47.3.0", instance.VersionId);
+        // 有主加载器时不生成 OptiFine profile，版本 Id 仍是创建时指定的名字
+        Assert.Equal("Forge + OptiFine", instance.Id);
         Assert.Equal("1.20.1_HD_U_I6", instance.OptiFineVersion);
         Assert.Contains("OptiFine_1.20.1_HD_U_I6.jar", instance.CompanionMods);
     }
@@ -171,7 +178,7 @@ public sealed class InstanceCreationTests : IDisposable
     [Fact]
     public void DisplayLoaderIncludesAddons()
     {
-        var instance = new GameInstance
+        var instance = new GameVersion
         {
             Loader = ModLoader.Fabric,
             LoaderVersion = "0.16.9",
@@ -180,10 +187,10 @@ public sealed class InstanceCreationTests : IDisposable
 
         Assert.Equal("Fabric 0.16.9 · OptiFine 1.20.1_HD_U_I6", instance.DisplayLoader);
 
-        var optifineOnly = new GameInstance { OptiFineVersion = "1.12.2_HD_U_G5" };
+        var optifineOnly = new GameVersion { OptiFineVersion = "1.12.2_HD_U_G5" };
         Assert.Equal("OptiFine 1.12.2_HD_U_G5", optifineOnly.DisplayLoader);
 
-        var vanilla = new GameInstance();
+        var vanilla = new GameVersion();
         Assert.Equal("原版", vanilla.DisplayLoader);
     }
 
@@ -205,7 +212,7 @@ public sealed class InstanceCreationTests : IDisposable
     private sealed class FakeLoaderInstaller : ILoaderInstaller
     {
         public int Calls { get; private set; }
-        public string? ScratchInstanceId { get; private set; }
+        public string? TargetVersionId { get; private set; }
 
         public Task<string> InstallAsync(
             ModLoader loader,
@@ -214,11 +221,16 @@ public sealed class InstanceCreationTests : IDisposable
             string javaPath,
             IProgress<LoaderInstallProgress>? progress = null,
             CancellationToken ct = default,
-            string? scratchInstanceId = null)
+            string? targetVersionId = null)
         {
             Calls++;
-            ScratchInstanceId = scratchInstanceId;
+            TargetVersionId = targetVersionId;
             progress?.Report(new LoaderInstallProgress("正在下载加载器库", 1, 2));
+
+            if (!string.IsNullOrWhiteSpace(targetVersionId))
+            {
+                return Task.FromResult(targetVersionId);
+            }
 
             var id = loader switch
             {
@@ -235,17 +247,17 @@ public sealed class InstanceCreationTests : IDisposable
     private sealed class FakeDownloader : IGameDownloader
     {
         public int Calls { get; private set; }
-        public List<string> InstanceIds { get; } = new();
+        public List<string> VersionIds { get; } = new();
         public Exception? Throw { get; set; }
 
         public Task DownloadAsync(
-            GameInstance instance,
+            GameVersion instance,
             ResolvedVersion version,
             IProgress<DownloadProgress>? progress = null,
             CancellationToken ct = default)
         {
             Calls++;
-            InstanceIds.Add(instance.Id);
+            VersionIds.Add(instance.Id);
 
             if (Throw is not null)
             {
@@ -257,10 +269,21 @@ public sealed class InstanceCreationTests : IDisposable
         }
     }
 
-    private sealed class FakeResolver : IVersionResolver
+    private sealed class FakeResolver(MinecraftPaths paths) : IVersionResolver
     {
-        public Task<ResolvedVersion> ResolveAsync(string versionId, CancellationToken ct = default) =>
-            Task.FromResult(new ResolvedVersion
+        public Task<ResolvedVersion> ResolveAsync(string versionId, CancellationToken ct = default)
+        {
+            // 真实解析器会把版本 JSON 落盘；版本列表靠它识别版本
+            Directory.CreateDirectory(paths.GetVersionDirectory(versionId));
+            var jsonPath = paths.GetVersionJsonPath(versionId);
+            if (!File.Exists(jsonPath))
+            {
+                File.WriteAllText(
+                    jsonPath,
+                    $$"""{"id":"{{versionId}}","mainClass":"net.minecraft.client.main.Main"}""");
+            }
+
+            return Task.FromResult(new ResolvedVersion
             {
                 Detail = new Solar.Core.Models.VersionDetail
                 {
@@ -269,6 +292,7 @@ public sealed class InstanceCreationTests : IDisposable
                 },
                 Chain = [],
             });
+        }
 
         public Task<Solar.Core.Models.VersionDetail> DownloadVersionJsonAsync(
             Solar.Core.Models.VersionSummary summary, CancellationToken ct = default) =>
@@ -307,30 +331,29 @@ public sealed class InstanceCreationTests : IDisposable
     /// 附加 Mod 现在走 <see cref="Solar.Core.Mods.IModInstaller"/>。这里照它的落点规则
     /// （实例实际使用的游戏目录下的 mods/）把文件写出去，让隔离相关的断言仍然有效。
     /// </summary>
-    private sealed class FakeModInstaller(AppPaths paths) : Solar.Core.Mods.IModInstaller
+    private sealed class FakeModInstaller(MinecraftPaths paths) : Solar.Core.Mods.IModInstaller
     {
-        private readonly InstanceGameDirectory _gameDirectories =
-            new(paths, new FakeSettings());
-
         public string GetContentDirectory(
-            GameInstance? instance,
+            GameVersion? instance,
             Solar.Core.Mods.ModProjectType type,
             string? world = null) =>
             Path.Combine(
-                instance is null ? _gameDirectories.Shared : _gameDirectories.Resolve(instance),
+                instance is null
+                    ? paths.MinecraftRoot
+                    : paths.ResolveGameDirectory(instance.Id, instance.VersionIsolation),
                 type.ContentFolder() ?? "mods");
 
         public bool IsInstalled(
-            GameInstance? instance,
+            GameVersion? instance,
             Solar.Core.Mods.ModProjectType type,
             Solar.Core.Mods.ModFile file,
             string? world = null) =>
             File.Exists(Path.Combine(GetContentDirectory(instance, type, world), file.FileName));
 
-        public IReadOnlyList<string> GetWorlds(GameInstance? instance) => [];
+        public IReadOnlyList<string> GetWorlds(GameVersion? instance) => [];
 
         public Task<Solar.Core.Mods.ModInstallResult> InstallAsync(
-            GameInstance? instance,
+            GameVersion? instance,
             Solar.Core.Mods.ModProjectType type,
             Solar.Core.Mods.ModInstallPlan plan,
             string? world = null,

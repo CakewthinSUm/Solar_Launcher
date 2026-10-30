@@ -22,12 +22,12 @@ public sealed partial class DownloadPage : PageBase
 
     private void CloseFilter_Click(object sender, RoutedEventArgs e) => FilterButton.Flyout?.Hide();
 
-    /// <summary>点版本进入创建实例页，带上完整的版本摘要供那边显示类型与发布时间。</summary>
+    /// <summary>点版本进入创建版本页，带上完整的版本摘要供那边显示类型与发布时间。</summary>
     private void Version_Click(object sender, ItemClickEventArgs e)
     {
         if (e.ClickedItem is VersionSummary version)
         {
-            Frame.Navigate(typeof(InstanceCreatePage), version);
+            Frame.Navigate(typeof(VersionCreatePage), version);
         }
     }
 }

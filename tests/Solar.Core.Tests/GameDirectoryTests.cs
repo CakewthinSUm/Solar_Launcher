@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using Solar.Core.Accounts;
-using Solar.Core.Instances;
+using Solar.Core.Versions;
 using Solar.Core.Launch;
 using Solar.Core.Memory;
 using Solar.Core.Minecraft;
@@ -11,7 +11,7 @@ using Xunit;
 
 namespace Solar.Core.Tests;
 
-/// <summary>游戏目录（.minecraft）来自全局设置，所有实例共用一份。</summary>
+/// <summary>游戏目录（.minecraft）来自全局设置，未隔离的版本共用一份。</summary>
 public sealed class GameDirectoryTests : IDisposable
 {
     private readonly string _root = Path.Combine(Path.GetTempPath(), "solar-test-" + Guid.NewGuid().ToString("N")[..8]);
@@ -62,13 +62,13 @@ public sealed class GameDirectoryTests : IDisposable
         var version = CreateVersion();
         var account = new AccountSession("Steve", "uuid", "0", "", "msa");
 
-        var first = factory.Create(new GameInstance { Id = "inst-a" }, version, "java.exe", account);
-        var second = factory.Create(new GameInstance { Id = "inst-b" }, version, "java.exe", account);
+        var first = factory.Create(new GameVersion { Id = "inst-a" }, version, "java.exe", account);
+        var second = factory.Create(new GameVersion { Id = "inst-b" }, version, "java.exe", account);
 
         Assert.Equal(first.GameDirectory, second.GameDirectory);
         Assert.Equal(Path.Combine(_root, "shared-mc"), first.GameDirectory);
 
-        // natives 仍需按实例隔离，不同版本的原生库不能混用
+        // natives 仍需按版本隔离，不同版本的原生库不能混用
         Assert.NotEqual(first.NativesDirectory, second.NativesDirectory);
     }
 
@@ -82,17 +82,17 @@ public sealed class GameDirectoryTests : IDisposable
         var account = new AccountSession("Steve", "uuid", "0", "", "msa");
 
         var isolated = factory.Create(
-            new GameInstance { Id = "inst-a", MinecraftVersion = "1.21.4", VersionIsolation = true },
+            new GameVersion { Id = "1.21.4", MinecraftVersion = "1.21.4", VersionIsolation = true },
             version, "java.exe", account);
         var shared = factory.Create(
-            new GameInstance { Id = "inst-b", MinecraftVersion = "1.21.4" }, version, "java.exe", account);
+            new GameVersion { Id = "inst-b", MinecraftVersion = "1.21.4" }, version, "java.exe", account);
 
-        Assert.Equal(Path.Combine(_root, "SolarShared", "versions", "1.21.4"), isolated.GameDirectory);
+        Assert.Equal(Path.Combine(_root, "shared-mc", "versions", "1.21.4"), isolated.GameDirectory);
         Assert.NotEqual(isolated.GameDirectory, shared.GameDirectory);
 
-        // PCL 语义：同版本的实例共用同一个版本文件夹
+        // PCL 语义：同一个版本只有一个版本文件夹
         var otherIsolated = factory.Create(
-            new GameInstance { Id = "inst-c", MinecraftVersion = "1.21.4", VersionIsolation = true },
+            new GameVersion { Id = "1.21.4", MinecraftVersion = "1.21.4", VersionIsolation = true },
             version, "java.exe", account);
         Assert.Equal(isolated.GameDirectory, otherIsolated.GameDirectory);
     }
@@ -106,7 +106,7 @@ public sealed class GameDirectoryTests : IDisposable
         settings.Current.MaxMemoryMb = 6144;
 
         var context = CreateFactory(settings).Create(
-            new GameInstance { Id = "inst" },
+            new GameVersion { Id = "inst" },
             CreateVersion(),
             "java.exe",
             new AccountSession("Steve", "uuid", "0", "", "msa"));
@@ -122,7 +122,7 @@ public sealed class GameDirectoryTests : IDisposable
         var factory = CreateFactory(settings);
 
         var context = factory.Create(
-            new GameInstance { Id = "inst" },
+            new GameVersion { Id = "inst" },
             CreateVersion(),
             "java.exe",
             new AccountSession("Steve", "uuid", "0", "", "msa"));
@@ -132,14 +132,14 @@ public sealed class GameDirectoryTests : IDisposable
 
     private LaunchContextFactory CreateFactory(FakeSettings settings)
     {
-        var directories = new InstanceGameDirectory(_paths, settings);
+        var directories = new MinecraftPaths(_paths, settings);
         var memory = new MemoryAllocationService(
             settings,
             directories,
             new FakeMemoryInfo(16384, 12288),
             NullLogger<MemoryAllocationService>.Instance);
 
-        return new(_paths, settings, directories, new GameFileLocator(_paths, directories), memory);
+        return new(directories, settings, new GameFileLocator(directories), memory);
     }
 
     private static ResolvedVersion CreateVersion() => new()

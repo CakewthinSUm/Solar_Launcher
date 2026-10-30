@@ -23,7 +23,7 @@ public interface IJavaDetector
     JavaRuntime? Select(IReadOnlyList<JavaRuntime> runtimes, JavaRequirement requirement);
 }
 
-public sealed partial class JavaDetector(ILogger<JavaDetector> logger) : IJavaDetector
+public sealed partial class JavaDetector(ILogger<JavaDetector> logger, MinecraftPaths paths) : IJavaDetector
 {
     [GeneratedRegex(@"version ""(?<version>[^""]+)""", RegexOptions.IgnoreCase)]
     private static partial Regex VersionPattern();
@@ -89,9 +89,10 @@ public sealed partial class JavaDetector(ILogger<JavaDetector> logger) : IJavaDe
                ?? candidates.OrderBy(r => r.MajorVersion).First();
     }
 
-    private static IEnumerable<string> GetSearchRoots()
+    private IEnumerable<string> GetSearchRoots()
     {
-        yield return System.IO.Path.Combine(AppContext.BaseDirectory, "SolarShared", "runtime");
+        // 自动下载的 Java 运行时在 MC 文件夹的 runtime/ 下
+        yield return paths.Runtimes;
 
         foreach (var programFiles in new[]
                  {

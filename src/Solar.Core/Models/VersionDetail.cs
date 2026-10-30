@@ -119,7 +119,7 @@ public sealed class Library
     /// <item>Fabric/Quilt 格式：只有 <c>url</c>（仓库根地址）与 maven 坐标，
     /// 路径要按 <c>group/artifact/version/artifact-version.jar</c> 推导。</item>
     /// </list>
-    /// 第二种如果按第一种处理，库会被整个跳过——Fabric 实例因此无法启动。
+    /// 第二种如果按第一种处理，库会被整个跳过——Fabric 版本因此无法启动。
     /// </summary>
     public (string RelativePath, string Url)? ResolveDownload()
     {

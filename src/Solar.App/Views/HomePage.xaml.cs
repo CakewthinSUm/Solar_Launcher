@@ -25,8 +25,8 @@ public sealed partial class HomePage : PageBase
 
         // 展开/收起时按当前高度裁剪，避免文字溢出到卡片外面
         _warningClip = new RectangleGeometry();
-        NoInstanceWarning.Clip = _warningClip;
-        NoInstanceWarning.SizeChanged += (_, _) => UpdateWarningClip();
+        NoVersionWarning.Clip = _warningClip;
+        NoVersionWarning.SizeChanged += (_, _) => UpdateWarningClip();
 
         viewModel.PropertyChanged += OnViewModelPropertyChanged;
     }
@@ -35,23 +35,23 @@ public sealed partial class HomePage : PageBase
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName != nameof(HomeViewModel.IsNoInstanceWarningOpen))
+        if (e.PropertyName != nameof(HomeViewModel.IsNoVersionWarningOpen))
         {
             return;
         }
 
-        if (ViewModel.IsNoInstanceWarningOpen)
+        if (ViewModel.IsNoVersionWarningOpen)
         {
-            ShowNoInstanceWarning();
+            ShowNoVersionWarning();
         }
         else
         {
-            HideNoInstanceWarning();
+            HideNoVersionWarning();
         }
     }
 
     /// <summary>从 0 高度展开到内容高度，让「准备启动」卡片平滑长高。</summary>
-    private void ShowNoInstanceWarning()
+    private void ShowNoVersionWarning()
     {
         if (_warningVisible)
         {
@@ -62,21 +62,21 @@ public sealed partial class HomePage : PageBase
         StopWarningAnimation();
 
         // 先量出自然高度，再立刻压回 0；同一轮布局里完成，不会闪一下完整高度
-        NoInstanceWarning.IsOpen = true;
-        NoInstanceWarning.Height = double.NaN;
-        NoInstanceWarning.Opacity = 1;
-        NoInstanceWarning.UpdateLayout();
+        NoVersionWarning.IsOpen = true;
+        NoVersionWarning.Height = double.NaN;
+        NoVersionWarning.Opacity = 1;
+        NoVersionWarning.UpdateLayout();
 
-        var targetHeight = Math.Max(NoInstanceWarning.ActualHeight, NoInstanceWarning.DesiredSize.Height);
+        var targetHeight = Math.Max(NoVersionWarning.ActualHeight, NoVersionWarning.DesiredSize.Height);
         if (!AnimationsEnabled() || targetHeight <= 0)
         {
-            NoInstanceWarning.Height = double.NaN;
+            NoVersionWarning.Height = double.NaN;
             UpdateWarningClip();
             return;
         }
 
-        NoInstanceWarning.Height = 0;
-        NoInstanceWarning.Opacity = 0;
+        NoVersionWarning.Height = 0;
+        NoVersionWarning.Opacity = 0;
         UpdateWarningClip();
 
         AnimateWarning(
@@ -88,14 +88,14 @@ public sealed partial class HomePage : PageBase
             easing: EasingMode.EaseOut,
             onCompleted: () =>
             {
-                NoInstanceWarning.Height = double.NaN;
-                NoInstanceWarning.Opacity = 1;
+                NoVersionWarning.Height = double.NaN;
+                NoVersionWarning.Opacity = 1;
                 UpdateWarningClip();
             });
     }
 
     /// <summary>收起到 0 高度后再关闭，卡片跟着平滑缩回去。</summary>
-    private void HideNoInstanceWarning()
+    private void HideNoVersionWarning()
     {
         if (!_warningVisible)
         {
@@ -105,7 +105,7 @@ public sealed partial class HomePage : PageBase
         _warningVisible = false;
         StopWarningAnimation();
 
-        var startHeight = NoInstanceWarning.ActualHeight;
+        var startHeight = NoVersionWarning.ActualHeight;
         if (!AnimationsEnabled() || startHeight <= 0)
         {
             ApplyWarningClosed();
@@ -115,7 +115,7 @@ public sealed partial class HomePage : PageBase
         AnimateWarning(
             fromHeight: startHeight,
             toHeight: 0,
-            fromOpacity: NoInstanceWarning.Opacity,
+            fromOpacity: NoVersionWarning.Opacity,
             toOpacity: 0,
             duration: TimeSpan.FromMilliseconds(150),
             easing: EasingMode.EaseIn,
@@ -148,9 +148,9 @@ public sealed partial class HomePage : PageBase
             EasingFunction = new CubicEase { EasingMode = easing },
         };
 
-        Storyboard.SetTarget(heightAnimation, NoInstanceWarning);
+        Storyboard.SetTarget(heightAnimation, NoVersionWarning);
         Storyboard.SetTargetProperty(heightAnimation, "Height");
-        Storyboard.SetTarget(opacityAnimation, NoInstanceWarning);
+        Storyboard.SetTarget(opacityAnimation, NoVersionWarning);
         Storyboard.SetTargetProperty(opacityAnimation, "Opacity");
 
         var storyboard = new Storyboard();
@@ -172,9 +172,9 @@ public sealed partial class HomePage : PageBase
 
     private void ApplyWarningClosed()
     {
-        NoInstanceWarning.IsOpen = false;
-        NoInstanceWarning.Height = double.NaN;
-        NoInstanceWarning.Opacity = 1;
+        NoVersionWarning.IsOpen = false;
+        NoVersionWarning.Height = double.NaN;
+        NoVersionWarning.Opacity = 1;
         UpdateWarningClip();
     }
 
@@ -194,8 +194,8 @@ public sealed partial class HomePage : PageBase
             _warningClip.Rect = new Windows.Foundation.Rect(
                 0,
                 0,
-                NoInstanceWarning.ActualWidth,
-                NoInstanceWarning.ActualHeight);
+                NoVersionWarning.ActualWidth,
+                NoVersionWarning.ActualHeight);
         }
     }
 

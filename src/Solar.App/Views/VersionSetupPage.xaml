@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <views:PageBase
-    x:Class="Solar.App.Views.InstanceSetupPage"
+    x:Class="Solar.App.Views.VersionSetupPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -18,14 +18,14 @@
                 <Button
                     HorizontalAlignment="Left"
                     Click="Back_Click"
-                    Content="← 返回实例列表" />
+                    Content="← 返回版本列表" />
                 <TextBlock
                     Style="{StaticResource TitleTextBlockStyle}"
-                    Text="{x:Bind ViewModel.InstanceName, Mode=OneWay}" />
+                    Text="{x:Bind ViewModel.VersionName, Mode=OneWay}" />
                 <TextBlock
                     Style="{StaticResource BodyTextBlockStyle}"
                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                    Text="{x:Bind ViewModel.InstanceSummary, Mode=OneWay}" />
+                    Text="{x:Bind ViewModel.VersionSummary, Mode=OneWay}" />
             </StackPanel>
 
             <InfoBar
@@ -64,7 +64,7 @@
                         <TextBlock
                             Style="{StaticResource CaptionTextBlockStyle}"
                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                            Text="切换隔离不会搬动已有文件；开启后游戏目录为该版本的版本文件夹，同一版本的其他实例会共用它。"
+                            Text="切换隔离不会搬动已有文件；开启后游戏目录就是该版本的文件夹。"
                             TextWrapping="Wrap" />
                     </StackPanel>
                 </Border>

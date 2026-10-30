@@ -33,6 +33,6 @@ public sealed class ModVersionItemViewModel(ModVersion version, bool compatible)
 
     public bool HasDependencies => RequiredDependencyCount > 0;
 
-    /// <summary>是否适配当前实例的版本与加载器。关掉「只看兼容」后仍要能一眼看出区别。</summary>
+    /// <summary>是否适配当前游戏版本与加载器。关掉「只看兼容」后仍要能一眼看出区别。</summary>
     public bool Compatible { get; } = compatible;
 }

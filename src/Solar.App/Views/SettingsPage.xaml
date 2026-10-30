@@ -53,7 +53,7 @@
                             <TextBlock
                                 Style="{StaticResource CaptionTextBlockStyle}"
                                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                Text="根据物理内存、当前可用内存和实例的模组数量自动计算；每次启动都会重新估算，后台程序多时会相应少给一些。"
+                                Text="根据物理内存、当前可用内存和版本的模组数量自动计算；每次启动都会重新估算，后台程序多时会相应少给一些。"
                                 TextWrapping="Wrap" />
                             <TextBlock
                                 Style="{StaticResource CaptionTextBlockStyle}"
@@ -147,21 +147,21 @@
                     </StackPanel>
                 </Border>
 
-                <!-- 新建实例的版本隔离默认值 -->
+                <!-- 新建版本的隔离默认值 -->
                 <Border Style="{StaticResource SolarCardStyle}">
                     <StackPanel Spacing="8">
                         <StackPanel Spacing="2">
-                            <TextBlock Text="新建实例的版本隔离" />
+                            <TextBlock Text="新建版本的隔离默认值" />
                             <TextBlock
                                 Style="{StaticResource CaptionTextBlockStyle}"
                                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                Text="开启隔离的实例以该版本的版本文件夹作为游戏目录，存档与模组和共享目录分开；同一版本的其他实例会共用它。非正式版指快照、预发布与远古版本。"
+                                Text="开启隔离的版本以该版本的文件夹作为游戏目录，存档与模组和共享目录分开。非正式版指快照、预发布与远古版本。"
                                 TextWrapping="Wrap" />
                         </StackPanel>
 
                         <ComboBox
                             MinWidth="240"
-                            SelectedIndex="{x:Bind ViewModel.NewInstanceIsolationIndex, Mode=TwoWay}">
+                            SelectedIndex="{x:Bind ViewModel.DefaultIsolationIndex, Mode=TwoWay}">
                             <ComboBoxItem Content="关闭版本隔离" />
                             <ComboBoxItem Content="隔离可安装 Mod 的版本" />
                             <ComboBoxItem Content="隔离非正式版" />
@@ -193,15 +193,15 @@
                     </StackPanel>
                 </Border>
 
-                <!-- 游戏目录：未开启版本隔离的实例共用的 .minecraft -->
+                <!-- MC 文件夹：版本、库、资源与 Java 运行时都放在它下面 -->
                 <Border Style="{StaticResource SolarCardStyle}">
                     <StackPanel Spacing="8">
                         <StackPanel Spacing="2">
-                            <TextBlock Text="游戏目录（.minecraft）" />
+                            <TextBlock Text="MC 文件夹（.minecraft）" />
                             <TextBlock
                                 Style="{StaticResource CaptionTextBlockStyle}"
                                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                Text="未开启版本隔离的实例共用的存档、模组与配置目录；开启隔离的实例改用各自版本的版本文件夹。可直接指向官方启动器的 .minecraft 以复用已有内容；留空则使用程序目录下的 .minecraft。"
+                                Text="版本、库、资源与 Java 运行时都放在这里；开启隔离的版本以自己的版本文件夹作为游戏目录。可直接指向官方启动器的 .minecraft 以复用已有内容；留空则使用程序目录下的 .minecraft。"
                                 TextWrapping="Wrap" />
                         </StackPanel>
 

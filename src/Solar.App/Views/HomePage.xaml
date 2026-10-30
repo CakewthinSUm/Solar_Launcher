@@ -21,10 +21,10 @@
                     <TextBlock
                         Style="{StaticResource BodyTextBlockStyle}"
                         Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                        Text="选择实例并开始游戏" />
+                        Text="选择版本并开始游戏" />
                 </StackPanel>
 
-                <!-- 准备启动：选择要运行的实例 -->
+                <!-- 准备启动：选择要运行的版本 -->
                 <Border Style="{StaticResource SolarCardStyle}" Padding="24">
                     <StackPanel Spacing="12">
                         <!-- 标题行：刷新按钮放在卡片右上角，用图标而不是文字 -->
@@ -54,20 +54,20 @@
                         </Grid>
 
                         <ComboBox
-                            Header="游戏实例"
+                            Header="游戏版本"
                             HorizontalAlignment="Stretch"
                             DisplayMemberPath="Name"
                             IsEnabled="{x:Bind ViewModel.IsLaunchCardOpen, Mode=OneWay, Converter={StaticResource InvertBool}}"
-                            ItemsSource="{x:Bind ViewModel.Instances, Mode=OneWay}"
-                            PlaceholderText="还没有实例"
-                            SelectedItem="{x:Bind ViewModel.SelectedInstance, Mode=TwoWay}" />
+                            ItemsSource="{x:Bind ViewModel.Versions, Mode=OneWay}"
+                            PlaceholderText="还没有版本"
+                            SelectedItem="{x:Bind ViewModel.SelectedVersion, Mode=TwoWay}" />
 
                         <TextBlock
                             Style="{StaticResource CaptionTextBlockStyle}"
                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                            Text="{x:Bind ViewModel.SelectedInstanceSummary, Mode=OneWay}" />
+                            Text="{x:Bind ViewModel.SelectedVersionSummary, Mode=OneWay}" />
 
-                        <!-- 版本隔离：与实例设置里的同名开关是同一个值，切换即保存 -->
+                        <!-- 版本隔离：与版本设置里的同名开关是同一个值，切换即保存 -->
                         <Grid ColumnSpacing="12">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
@@ -97,9 +97,9 @@
 
                         <!-- 开合动画在 code-behind 里做：从 0 高度展开，卡片不会突然跳高 -->
                         <InfoBar
-                            x:Name="NoInstanceWarning"
+                            x:Name="NoVersionWarning"
                             IsClosable="False"
-                            Message="还没有可启动的实例，请先到「管理」创建一个"
+                            Message="还没有可启动的版本，请先到「管理」创建一个"
                             Severity="Warning" />
 
                         <InfoBar
@@ -128,8 +128,8 @@
                             <TextBlock
                                 Style="{StaticResource CaptionTextBlockStyle}"
                                 Foreground="{ThemeResource TextFillColorSecondaryBrush}">
-                                <Run Text="实例数量 " />
-                                <Run Text="{x:Bind ViewModel.Instances.Count, Mode=OneWay}" />
+                                <Run Text="版本数量 " />
+                                <Run Text="{x:Bind ViewModel.Versions.Count, Mode=OneWay}" />
                             </TextBlock>
                         </StackPanel>
                     </Border>

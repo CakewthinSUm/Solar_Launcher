@@ -25,7 +25,7 @@ public sealed record DownloadSectionInfo(DownloadSection Section, string Key, st
     public static IReadOnlyList<DownloadSectionInfo> All { get; } =
     [
         new(DownloadSection.Minecraft, "minecraft", "Minecraft", "安装游戏本体与版本"),
-        new(DownloadSection.Mod, "mod", "Mod", "为实例添加模组"),
+        new(DownloadSection.Mod, "mod", "Mod", "为版本添加模组"),
         new(DownloadSection.Shaders, "shaders", "光影", "安装光影包"),
         new(DownloadSection.Modpacks, "modpacks", "整合包", "一键安装整合包"),
         new(DownloadSection.ResourcePacks, "resourcepacks", "资源包", "替换游戏贴图与音效"),

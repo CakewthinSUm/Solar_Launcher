@@ -8,7 +8,7 @@ using Solar.App.Formatting;
 using Solar.App.Services;
 using Solar.Core.Accounts;
 using Solar.Core.Download;
-using Solar.Core.Instances;
+using Solar.Core.Versions;
 using Solar.Core.Java;
 using Solar.Core.Launch;
 using Solar.Core.Settings;
@@ -20,8 +20,7 @@ public sealed partial class HomeViewModel : ViewModelBase
     /// <summary>下载与加载器会上报得很频繁，界面最多每 80ms 刷新一次。</summary>
     private const int UiSyncIntervalMs = 80;
 
-    private readonly IInstanceRepository _instances;
-    private readonly IVersionScanner _scanner;
+    private readonly IVersionRepository _versions;
     private readonly IJavaDetector _javaDetector;
     private readonly IGameLaunchService _launchService;
     private readonly IAccountStore _accounts;
@@ -36,12 +35,12 @@ public sealed partial class HomeViewModel : ViewModelBase
     private long _lastUiSyncTimestamp;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(SelectedInstanceSummary))]
+    [NotifyPropertyChangedFor(nameof(SelectedVersionSummary))]
     [NotifyPropertyChangedFor(nameof(CanChangeIsolation))]
     [NotifyPropertyChangedFor(nameof(IsolationHint))]
-    private GameInstance? _selectedInstance;
+    private GameVersion? _SelectedVersion;
 
-    /// <summary>所选实例的版本隔离开关，与实例记录双向同步，改动立即落盘。</summary>
+    /// <summary>所选版本的版本隔离开关，与版本记录双向同步，改动立即落盘。</summary>
     [ObservableProperty]
     private bool _versionIsolation;
 
@@ -50,7 +49,7 @@ public sealed partial class HomeViewModel : ViewModelBase
     [NotifyPropertyChangedFor(nameof(CanChangeIsolation))]
     private bool _isSavingIsolation;
 
-    /// <summary>程序正在把选中实例的值写进开关，这一次变化不算用户操作。</summary>
+    /// <summary>程序正在把选中版本的值写进开关，这一次变化不算用户操作。</summary>
     private bool _syncingIsolation;
 
     [ObservableProperty]
@@ -73,9 +72,9 @@ public sealed partial class HomeViewModel : ViewModelBase
     [ObservableProperty]
     private string _launchHeadline = "";
 
-    /// <summary>启动时快照的实例描述，避免导航回来时 RefreshAsync 改了选择导致卡片标题变化。</summary>
+    /// <summary>启动时快照的版本描述，避免导航回来时 RefreshAsync 改了选择导致卡片标题变化。</summary>
     [ObservableProperty]
-    private string _launchingInstanceName = "";
+    private string _LaunchingVersionName = "";
 
     [ObservableProperty]
     private string _launchStageMessage = "";
@@ -103,8 +102,7 @@ public sealed partial class HomeViewModel : ViewModelBase
     private string _accountSummary = "未登录";
 
     public HomeViewModel(
-        IInstanceRepository instances,
-        IVersionScanner scanner,
+        IVersionRepository versions,
         IJavaDetector javaDetector,
         IGameLaunchService launchService,
         IAccountStore accounts,
@@ -113,8 +111,7 @@ public sealed partial class HomeViewModel : ViewModelBase
         TaskbarProgressService taskbar,
         ILogger<HomeViewModel> logger)
     {
-        _instances = instances;
-        _scanner = scanner;
+        _versions = versions;
         _javaDetector = javaDetector;
         _launchService = launchService;
         _accounts = accounts;
@@ -127,11 +124,11 @@ public sealed partial class HomeViewModel : ViewModelBase
     /// <summary>没有登录账户时启动必定失败，提前在界面上标出来。</summary>
     public bool IsSignedIn => !string.IsNullOrEmpty(_accounts.ActiveAccountId);
 
-    /// <summary>点了启动但一个实例都没有时，在卡片里给出警告。</summary>
+    /// <summary>点了启动但一个版本都没有时，在卡片里给出警告。</summary>
     [ObservableProperty]
-    private bool _isNoInstanceWarningOpen;
+    private bool _IsNoVersionWarningOpen;
 
-    public ObservableCollection<GameInstance> Instances { get; } = new();
+    public ObservableCollection<GameVersion> Versions { get; } = new();
 
     /// <summary>步骤条数据源；每次启动重建一次，进度事件只改条目的状态。</summary>
     public ObservableCollection<LaunchStageItem> LaunchStages { get; } = new();
@@ -148,27 +145,27 @@ public sealed partial class HomeViewModel : ViewModelBase
 
     public bool IsLaunchCanceled => LaunchResult == LaunchOutcome.Canceled;
 
-    public string SelectedInstanceSummary => SelectedInstance is { } instance
+    public string SelectedVersionSummary => SelectedVersion is { } instance
         ? $"{instance.MinecraftVersion} · {instance.DisplayLoader}"
-        : "先到“管理”创建一个实例";
+        : "先到“管理”创建一个版本";
 
-    /// <summary>主页能否直接切换隔离：要有选中实例，且不在启动流程里。</summary>
+    /// <summary>主页能否直接切换隔离：要有选中版本，且不在启动流程里。</summary>
     public bool CanChangeIsolation =>
-        SelectedInstance is not null && !IsLaunchCardOpen && !IsSavingIsolation;
+        SelectedVersion is not null && !IsLaunchCardOpen && !IsSavingIsolation;
 
-    /// <summary>开关下方的一行说明，解释当前实例实际用哪份游戏目录。</summary>
+    /// <summary>开关下方的一行说明，解释当前版本实际用哪份游戏目录。</summary>
     public string IsolationHint
     {
         get
         {
-            if (SelectedInstance is null)
+            if (SelectedVersion is null)
             {
                 return "";
             }
 
             return VersionIsolation
-                ? "游戏目录是该版本的版本文件夹；同一版本的其他实例会共用这里的存档与模组。"
-                : "与其它未开启隔离的实例共用存档、模组与配置。";
+                ? "游戏目录就是该版本的文件夹，存档与模组都在里面。"
+                : "与其它未开启隔离的版本共用存档、模组与配置。";
         }
     }
 
@@ -177,9 +174,9 @@ public sealed partial class HomeViewModel : ViewModelBase
         await RefreshAsync();
     }
 
-    partial void OnSelectedInstanceChanged(GameInstance? value)
+    partial void OnSelectedVersionChanged(GameVersion? value)
     {
-        // 选中实例变了，把它的隔离开关同步过来；这次写入不算用户操作
+        // 选中版本变了，把它的隔离开关同步过来；这次写入不算用户操作
         _syncingIsolation = true;
         VersionIsolation = value?.VersionIsolation ?? false;
         _syncingIsolation = false;
@@ -189,7 +186,7 @@ public sealed partial class HomeViewModel : ViewModelBase
     {
         OnPropertyChanged(nameof(IsolationHint));
 
-        if (_syncingIsolation || SelectedInstance is not { } instance || instance.VersionIsolation == value)
+        if (_syncingIsolation || SelectedVersion is not { } instance || instance.VersionIsolation == value)
         {
             return;
         }
@@ -199,16 +196,16 @@ public sealed partial class HomeViewModel : ViewModelBase
     }
 
     /// <summary>主页没有保存按钮，切换后立即写盘；失败时把开关拨回去。</summary>
-    private async Task PersistIsolationAsync(GameInstance instance, bool enabled)
+    private async Task PersistIsolationAsync(GameVersion instance, bool enabled)
     {
         try
         {
             IsSavingIsolation = true;
-            await _instances.SaveAsync(instance);
+            await _versions.SaveSettingsAsync(instance);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "保存实例 {Name} 的版本隔离设置失败", instance.Name);
+            _logger.LogError(ex, "保存版本 {Name} 的版本隔离设置失败", instance.Name);
 
             // 界面不能显示一个没生效的状态
             instance.VersionIsolation = !enabled;
@@ -232,37 +229,25 @@ public sealed partial class HomeViewModel : ViewModelBase
             IsBusy = true;
             ErrorMessage = null;
 
-            // 主页是打开后最先看到的页面，在这里导入游戏目录里的版本，
-            // 用户不必先去实例页也能直接启动已有版本。
-            // 失败不影响主页：扫描只是补充，读不到版本时照常显示已有实例。
-            try
+            var versions = await _versions.GetAllAsync();
+            Versions.Clear();
+            foreach (var instance in versions)
             {
-                await _scanner.ImportAsync();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "扫描游戏目录失败，跳过导入");
+                Versions.Add(instance);
             }
 
-            var instances = await _instances.GetAllAsync();
-            Instances.Clear();
-            foreach (var instance in instances)
-            {
-                Instances.Add(instance);
-            }
-
-            // 实例列表重载后，之前那次「没有实例」的警告不再适用
-            IsNoInstanceWarningOpen = false;
+            // 版本列表重载后，之前那次「没有版本」的警告不再适用
+            IsNoVersionWarningOpen = false;
 
             // 卡片打开期间（启动中、失败待重试）按 Id 重新绑定选中项，
-            // 既不改变用户选中的实例，也不会因为列表重建让 ComboBox 丢选中。
+            // 既不改变用户选中的版本，也不会因为列表重建让 ComboBox 丢选中。
             if (!IsLaunchCardOpen)
             {
-                SelectedInstance = Instances.FirstOrDefault();
+                SelectedVersion = Versions.FirstOrDefault();
             }
-            else if (SelectedInstance is { } selected)
+            else if (SelectedVersion is { } selected)
             {
-                SelectedInstance = Instances.FirstOrDefault(item => item.Id == selected.Id) ?? selected;
+                SelectedVersion = Versions.FirstOrDefault(item => item.Id == selected.Id) ?? selected;
             }
 
             var runtimes = await _javaDetector.DetectAsync();
@@ -295,9 +280,9 @@ public sealed partial class HomeViewModel : ViewModelBase
     [RelayCommand]
     private async Task LaunchAsync()
     {
-        if (SelectedInstance is not { } instance)
+        if (SelectedVersion is not { } instance)
         {
-            IsNoInstanceWarningOpen = true;
+            IsNoVersionWarningOpen = true;
             return;
         }
 
@@ -421,7 +406,7 @@ public sealed partial class HomeViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "启动实例 {Name} 失败", instance.Name);
+            _logger.LogError(ex, "启动版本 {Name} 失败", instance.Name);
             tracker.Fail(ex.Message);
             SyncLaunchState(force: true);
             // 错误直接显示在卡片里，不再弹模态框挡住进度详情
@@ -538,7 +523,7 @@ public sealed partial class HomeViewModel : ViewModelBase
         IsLaunchCardOpen = false;
     }
 
-    private void PrepareLaunchUi(GameInstance instance, LaunchProgressTracker tracker)
+    private void PrepareLaunchUi(GameVersion instance, LaunchProgressTracker tracker)
     {
         LaunchStages.Clear();
         for (var i = 0; i < tracker.Plan.Count; i++)
@@ -550,7 +535,7 @@ public sealed partial class HomeViewModel : ViewModelBase
         LaunchProgress = 0;
         LaunchPercentText = "0%";
         LaunchHeadline = "正在启动";
-        LaunchingInstanceName = $"{instance.Name} · {instance.MinecraftVersion} · {instance.DisplayLoader}";
+        LaunchingVersionName = $"{instance.Name} · {instance.MinecraftVersion} · {instance.DisplayLoader}";
         LaunchStageMessage = "正在准备启动…";
         LaunchDetail = "";
         LaunchStats = "";

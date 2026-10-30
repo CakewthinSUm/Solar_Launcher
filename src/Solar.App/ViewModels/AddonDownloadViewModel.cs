@@ -3,7 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
 using Solar.App.Formatting;
-using Solar.Core.Instances;
+using Solar.Core.Versions;
 using Solar.Core.Minecraft;
 using Solar.Core.Mods;
 
@@ -28,19 +28,19 @@ public sealed record AddonSectionInfo(
     public static IReadOnlyList<AddonSectionInfo> All { get; } =
     [
         new(DownloadSection.Mod, ModProjectType.Mod, "mod",
-            "Mod", "从 Modrinth 与 CurseForge 搜索，直接装进实例的 mods 目录",
+            "Mod", "从 Modrinth 与 CurseForge 搜索，直接装进版本的 mods 目录",
             "搜索 Mod（英文名或原名，例如 sodium）",
             "没有找到匹配的 Mod。搜索只认英文名或原名，试试更短的关键词。"),
         new(DownloadSection.Shaders, ModProjectType.Shader, "shaders",
-            "光影", "安装到实例的 shaderpacks 目录；需要 Iris 或 OptiFine 才能生效",
+            "光影", "安装到版本的 shaderpacks 目录；需要 Iris 或 OptiFine 才能生效",
             "搜索光影（英文名或原名，例如 complementary）",
             "没有找到匹配的光影。搜索只认英文名或原名，试试更短的关键词。"),
         new(DownloadSection.Modpacks, ModProjectType.Modpack, "modpacks",
-            "整合包", "一键安装整合包：自动创建独立实例，并把包里的文件全部下好",
+            "整合包", "一键安装整合包：自动创建独立版本，并把包里的文件全部下好",
             "搜索整合包（英文名或原名，例如 fabulously optimized）",
             "没有找到匹配的整合包。搜索只认英文名或原名，试试更短的关键词。"),
         new(DownloadSection.ResourcePacks, ModProjectType.ResourcePack, "resourcepacks",
-            "资源包", "安装到实例的 resourcepacks 目录，替换贴图、字体与音效",
+            "资源包", "安装到版本的 resourcepacks 目录，替换贴图、字体与音效",
             "搜索资源包（英文名或原名，例如 fresh animations）",
             "没有找到匹配的资源包。搜索只认英文名或原名，试试更短的关键词。"),
         new(DownloadSection.DataPacks, ModProjectType.DataPack, "datapacks",
@@ -90,14 +90,14 @@ public sealed partial class AddonCardViewModel(ModProject project) : ObservableO
 }
 
 /// <summary>从列表页进入详情页时携带的参数：先用列表里的项目信息把头部填满，再去拉正文。</summary>
-public sealed record AddonProjectRequest(ModProject Project, GameInstance? Instance);
+public sealed record AddonProjectRequest(ModProject Project, GameVersion? GameVersion);
 
 /// <summary>
 /// 「下载 → Mod / 光影 / 整合包 / 资源包 / 数据包」列表页。
 /// <para>
-/// 筛选条件来自选中的实例：它的游戏版本与加载器直接作为服务端过滤条件，
-/// 这样搜出来的每一条都能装。整合包例外——它会新建实例，所以按用户选的
-/// 游戏版本过滤，而不是绑定到已有实例。
+/// 筛选条件来自选中的版本：它的游戏版本与加载器直接作为服务端过滤条件，
+/// 这样搜出来的每一条都能装。整合包例外——它会新建版本，所以按用户选的
+/// 游戏版本过滤，而不是绑定到已有版本。
 /// </para>
 /// </summary>
 public sealed partial class AddonDownloadViewModel : ViewModelBase
@@ -108,7 +108,7 @@ public sealed partial class AddonDownloadViewModel : ViewModelBase
     /// <summary>搜索框的防抖间隔。打字时每敲一个字母就发请求，两个源都会限流。</summary>
     private static readonly TimeSpan DebounceDelay = TimeSpan.FromMilliseconds(350);
 
-    private readonly IInstanceRepository _repository;
+    private readonly IVersionRepository _repository;
     private readonly IModCatalogService _catalog;
     private readonly IVersionManifestService _manifestService;
     private readonly ILogger<AddonDownloadViewModel> _logger;
@@ -124,16 +124,16 @@ public sealed partial class AddonDownloadViewModel : ViewModelBase
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsModpack))]
-    [NotifyPropertyChangedFor(nameof(NeedsInstance))]
+    [NotifyPropertyChangedFor(nameof(NeedsVersion))]
     [NotifyPropertyChangedFor(nameof(SectionTitle))]
     [NotifyPropertyChangedFor(nameof(SectionDescription))]
     [NotifyPropertyChangedFor(nameof(SearchPlaceholder))]
     [NotifyPropertyChangedFor(nameof(EmptyHint))]
-    [NotifyPropertyChangedFor(nameof(ShowInstanceHint))]
+    [NotifyPropertyChangedFor(nameof(ShowVersionHint))]
     private AddonSectionInfo _section = AddonSectionInfo.All[0];
 
     [ObservableProperty]
-    private GameInstance? _selectedInstance;
+    private GameVersion? _SelectedVersion;
 
     [ObservableProperty]
     private string _selectedGameVersion = AllVersions;
@@ -173,7 +173,7 @@ public sealed partial class AddonDownloadViewModel : ViewModelBase
     private bool _hasResults;
 
     public AddonDownloadViewModel(
-        IInstanceRepository repository,
+        IVersionRepository repository,
         IModCatalogService catalog,
         IVersionManifestService manifestService,
         ILogger<AddonDownloadViewModel> logger)
@@ -184,17 +184,17 @@ public sealed partial class AddonDownloadViewModel : ViewModelBase
         _logger = logger;
     }
 
-    public ObservableCollection<GameInstance> Instances { get; } = new();
+    public ObservableCollection<GameVersion> Versions { get; } = new();
 
     /// <summary>整合包分区可选的目标游戏版本；第一个是「全部版本」。</summary>
     public ObservableCollection<string> GameVersions { get; } = new();
 
     public ObservableCollection<AddonCardViewModel> Results { get; } = new();
 
-    public bool IsModpack => Section.Type.CreatesInstance();
+    public bool IsModpack => Section.Type.CreatesVersion();
 
-    /// <summary>整合包不需要选实例；其余类型都要选一个安装目标。</summary>
-    public bool NeedsInstance => !IsModpack;
+    /// <summary>整合包不需要选版本；其余类型都要选一个安装目标。</summary>
+    public bool NeedsVersion => !IsModpack;
 
     public string SectionTitle => Section.Title;
 
@@ -204,12 +204,12 @@ public sealed partial class AddonDownloadViewModel : ViewModelBase
 
     public bool HasDegradedHint => !string.IsNullOrWhiteSpace(DegradedHint);
 
-    public bool HasNoInstances => Instances.Count == 0;
+    public bool HasNoVersions => Versions.Count == 0;
 
-    public bool ShowInstanceHint => NeedsInstance && HasNoInstances;
+    public bool ShowVersionHint => NeedsVersion && HasNoVersions;
 
-    public string EmptyHint => NeedsInstance && HasNoInstances
-        ? "还没有实例。先在「管理」创建一个，搜索才能按版本与加载器过滤。"
+    public string EmptyHint => NeedsVersion && HasNoVersions
+        ? "还没有版本。先在「管理」创建一个，搜索才能按版本与加载器过滤。"
         : Section.EmptyHint;
 
     /// <summary>
@@ -244,20 +244,20 @@ public sealed partial class AddonDownloadViewModel : ViewModelBase
             CanLoadMore = false;
 
             var all = await _repository.GetAllAsync();
-            var previousId = SelectedInstance?.Id;
+            var previousId = SelectedVersion?.Id;
 
-            Instances.Clear();
+            Versions.Clear();
             foreach (var instance in all)
             {
-                Instances.Add(instance);
+                Versions.Add(instance);
             }
 
-            OnPropertyChanged(nameof(HasNoInstances));
-            OnPropertyChanged(nameof(ShowInstanceHint));
+            OnPropertyChanged(nameof(HasNoVersions));
+            OnPropertyChanged(nameof(ShowVersionHint));
             OnPropertyChanged(nameof(EmptyHint));
 
-            // 列表在别的页面被改过（新建 / 删除实例），尽量选回原来那个
-            SelectedInstance = Instances.FirstOrDefault(i => i.Id == previousId) ?? Instances.FirstOrDefault();
+            // 列表在别的页面被改过（新建 / 删除版本），尽量选回原来那个
+            SelectedVersion = Versions.FirstOrDefault(i => i.Id == previousId) ?? Versions.FirstOrDefault();
 
             if (IsModpack)
             {
@@ -310,9 +310,9 @@ public sealed partial class AddonDownloadViewModel : ViewModelBase
         SelectedGameVersion = AllVersions;
     }
 
-    partial void OnSelectedInstanceChanged(GameInstance? value)
+    partial void OnSelectedVersionChanged(GameVersion? value)
     {
-        OnPropertyChanged(nameof(ShowInstanceHint));
+        OnPropertyChanged(nameof(ShowVersionHint));
         OnPropertyChanged(nameof(EmptyHint));
 
         if (!_suppressReload)
@@ -447,12 +447,12 @@ public sealed partial class AddonDownloadViewModel : ViewModelBase
         Type = Section.Type,
         Text = SearchText.Trim(),
 
-        // 整合包按用户选的目标版本过滤；其余类型跟着目标实例走
+        // 整合包按用户选的目标版本过滤；其余类型跟着目标版本走
         GameVersion = IsModpack
             ? (string.Equals(SelectedGameVersion, AllVersions, StringComparison.Ordinal) ? null : SelectedGameVersion)
-            : SelectedInstance?.MinecraftVersion,
+            : SelectedVersion?.MinecraftVersion,
 
-        Loader = Section.Type.UsesLoader() ? SelectedInstance?.Loader : null,
+        Loader = Section.Type.UsesLoader() ? SelectedVersion?.Loader : null,
         Sort = SortIndex switch
         {
             1 => ModSort.Downloads,

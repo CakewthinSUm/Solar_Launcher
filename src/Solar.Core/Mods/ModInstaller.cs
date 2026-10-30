@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Solar.Core.Download;
-using Solar.Core.Instances;
+using Solar.Core.Paths;
+using Solar.Core.Versions;
 
 namespace Solar.Core.Mods;
 
@@ -10,22 +11,21 @@ public interface IModInstaller
     /// 某类内容的落点：
     /// <c>mods</c> / <c>resourcepacks</c> / <c>shaderpacks</c> / <c>saves/&lt;world&gt;/datapacks</c>。
     /// <para>
-    /// <paramref name="instance"/> 为 <c>null</c> 时落在共享游戏目录（设置里的 .minecraft），
-    /// 下载页统一用这种方式；传实例时落在该实例实际使用的游戏目录，创建实例装附加 Mod 时用。
-    /// 整合包没有固定目录（它自己就是一个实例），调用会抛异常。
+    /// <paramref name="instance"/> 为 <c>null</c> 时落在共享游戏目录（MC 文件夹根），
+    /// 下载页统一用这种方式；传版本时落在该版本实际使用的游戏目录，创建版本装附加 Mod 时用。
     /// </para>
     /// </summary>
-    string GetContentDirectory(GameInstance? instance, ModProjectType type, string? world = null);
+    string GetContentDirectory(GameVersion? instance, ModProjectType type, string? world = null);
 
-    /// <summary>某个文件是否已经装好（按文件名判断）；实例为 <c>null</c> 时查共享目录。</summary>
-    bool IsInstalled(GameInstance? instance, ModProjectType type, ModFile file, string? world = null);
+    /// <summary>某个文件是否已经装好（按文件名判断）；版本为 <c>null</c> 时查共享目录。</summary>
+    bool IsInstalled(GameVersion? instance, ModProjectType type, ModFile file, string? world = null);
 
-    /// <summary>存档列表（<c>saves</c> 下带 <c>level.dat</c> 的目录）；实例为 <c>null</c> 时读共享目录。</summary>
-    IReadOnlyList<string> GetWorlds(GameInstance? instance);
+    /// <summary>存档列表（<c>saves</c> 下带 <c>level.dat</c> 的目录）；版本为 <c>null</c> 时读共享目录。</summary>
+    IReadOnlyList<string> GetWorlds(GameVersion? instance);
 
     /// <summary>安装清单。已存在的文件按 <paramref name="overwrite"/> 决定覆盖还是跳过。</summary>
     Task<ModInstallResult> InstallAsync(
-        GameInstance? instance,
+        GameVersion? instance,
         ModProjectType type,
         ModInstallPlan plan,
         string? world = null,
@@ -38,24 +38,25 @@ public interface IModInstaller
 /// 把下载好的内容放进游戏目录。
 /// <para>
 /// 四个约束：
-/// 一是不传实例时写到共享游戏目录（设置里的 .minecraft），与「管理」页保持一致；
-/// 传实例时写到该实例实际使用的游戏目录（<see cref="InstanceGameDirectory.Resolve"/>），
-/// 否则开了版本隔离的实例读不到创建时装的附加 Mod；
+/// 一是不传版本时写到共享游戏目录（MC 文件夹根），与「管理」页保持一致；
+/// 传版本时写到该版本实际使用的游戏目录，否则开了隔离的版本读不到创建时装的附加 Mod；
 /// 二是保留上游文件名，不做重命名——更新检测和社区排障都依赖原始文件名；
 /// 三是数据包只对具体存档生效，必须写进 <c>saves/&lt;world&gt;/datapacks</c>；
 /// 四是先下到 <c>.part</c> 再改名，中断时不会留下一个看起来正常的半截文件。
 /// </para>
 /// </summary>
 public sealed class ModInstaller(
-    InstanceGameDirectory gameDirectories,
+    MinecraftPaths paths,
     IModFileDownloader downloader,
     ILogger<ModInstaller> logger) : IModInstaller
 {
-    /// <summary>实例为空时用共享游戏目录；否则用实例实际使用的目录。</summary>
-    private string ResolveRoot(GameInstance? instance) =>
-        instance is null ? gameDirectories.Shared : gameDirectories.Resolve(instance);
+    /// <summary>版本为空时用共享游戏目录；否则用版本实际使用的目录。</summary>
+    private string ResolveRoot(GameVersion? instance) =>
+        instance is null
+            ? paths.MinecraftRoot
+            : paths.ResolveGameDirectory(instance.Id, instance.VersionIsolation);
 
-    public string GetContentDirectory(GameInstance? instance, ModProjectType type, string? world = null)
+    public string GetContentDirectory(GameVersion? instance, ModProjectType type, string? world = null)
     {
         var root = ResolveRoot(instance);
 
@@ -78,12 +79,12 @@ public sealed class ModInstaller(
 
         var folder = type.ContentFolder()
                      ?? throw new InvalidOperationException(
-                         $"{type.DisplayName()} 没有可安装到的目录；整合包需要创建新实例。");
+                         $"{type.DisplayName()} 没有可安装到的目录；整合包需要创建新版本。");
 
         return Path.Combine(root, folder);
     }
 
-    public bool IsInstalled(GameInstance? instance, ModProjectType type, ModFile file, string? world = null)
+    public bool IsInstalled(GameVersion? instance, ModProjectType type, ModFile file, string? world = null)
     {
         if (type == ModProjectType.DataPack && string.IsNullOrWhiteSpace(world))
         {
@@ -93,7 +94,7 @@ public sealed class ModInstaller(
         return File.Exists(Path.Combine(GetContentDirectory(instance, type, world), file.FileName));
     }
 
-    public IReadOnlyList<string> GetWorlds(GameInstance? instance)
+    public IReadOnlyList<string> GetWorlds(GameVersion? instance)
     {
         var saves = Path.Combine(ResolveRoot(instance), "saves");
         if (!Directory.Exists(saves))
@@ -127,7 +128,7 @@ public sealed class ModInstaller(
     }
 
     public async Task<ModInstallResult> InstallAsync(
-        GameInstance? instance,
+        GameVersion? instance,
         ModProjectType type,
         ModInstallPlan plan,
         string? world = null,

@@ -6,7 +6,7 @@
 
 **一个用 WinUI 3 写的现代 Minecraft 启动器**
 
-原生 Windows 11 界面 · 便携免安装 · 实例隔离 · 微软正版登录
+原生 Windows 11 界面 · 便携免安装 · 版本隔离 · 微软正版登录
 
 [English](README.md) · **简体中文**
 
@@ -25,44 +25,44 @@
 
 ## ✨ 功能
 
-### 🎮 实例管理
-每个实例可以选不同版本、不同加载器，互不干扰。游戏目录里已有的版本可以**一键扫描导入**，不必重新下载。
+### 🎮 版本管理
+每个版本可独立选择游戏版本与加载器，互不干扰。MC 文件夹里已有的版本会**自动列出**，不必重新下载。
 
 从下载页点一个版本就能直接进入创建流程，把加载器、OptiFine、Fabric API 这些组件一次装好。
 
-| 实例列表 | 创建实例 |
+| 版本列表 | 创建版本 |
 | :---: | :---: |
-| ![实例](docs/images/instances.png) | ![创建实例](docs/images/instance-create.png) |
+| ![版本](docs/images/instances.png) | ![创建版本](docs/images/instance-create.png) |
 
 ### 📦 版本隔离
-对齐 PCL：开启隔离后，游戏目录就是该版本的**版本文件夹**（`SolarShared/versions/<版本id>`，
-导入了官方启动器目录时则是那份 `.minecraft/versions/<版本id>`），存档、模组与配置都放在里面。
-可以同时放一个 Fabric 实例和一个 Forge 实例而互不冲突。
+对齐 PCL：一个版本文件夹就是一个版本，开启隔离后它同时就是**游戏目录**
+（`.minecraft/versions/<版本id>`），存档、模组与配置都放在里面。
+可以同时放一个 Fabric 版本和一个 Forge 版本而互不冲突。
 
-同一版本的多个实例会共用这个版本文件夹——PCL 里同版本也只有一份。
-切换隔离只改一个开关，不会搬动已有文件；开启时可以选择把共享目录的
+切换隔离只改一个开关，不会搬动已有文件；开启时可以选择把 MC 文件夹根下的
 `mods` / `config` / `saves` / `resourcepacks` 复制一份过去，目标已存在的文件不会覆盖。
 
-`assets` 与 `libraries` 始终共享，不受隔离影响。
+`assets` 与 `libraries` 始终共享，不受隔离影响。版本设置写在
+`versions/<id>/.solar/version.json`，跟随版本文件夹一起搬移。
 
-![实例设置](docs/images/instance-settings.png)
+![版本设置](docs/images/instance-settings.png)
 
 ### 🚀 启动与进度
 点启动后，启动按钮展开为底部的进度卡片：步骤条按「解析版本 → 补装依赖 → 安装加载器 → 启动游戏」
 逐项推进，下载阶段显示当前文件、已完成数量与总体进度。失败原因直接写在卡片里，
-可以重试或取消，不再弹窗挡住细节。一个实例都没有时点启动，卡片会提示先创建实例。
+可以重试或取消，不再弹窗挡住细节。一个版本都没有时点启动，卡片会提示先创建版本。
 
 下载与启动进度同步显示在任务栏进度条上，进入启动阶段时闪烁任务栏提醒。
 游戏窗口真正出现后，启动器按「设置 → 游戏启动后」保持不动（默认）、最小化或关闭；
 如果游戏进程提前退出，启动器保持可见并显示错误。
 
 ### ⚙️ 设置
-设置页集中管理游戏目录、新建实例的隔离默认值、Java 路径、下载源与「游戏启动后」行为。
+设置页集中管理游戏目录、新建版本的隔离默认值、Java 路径、下载源与「游戏启动后」行为。
 有未保存的修改时离开页面会询问「保存 / 不保存 / 取消」，底部「重置」可把所有项恢复默认值，
 保存后生效。
 
 ### ⬇️ 下载
-版本列表来自 Mojang 官方清单，支持按版本号搜索，按版本类型（正式版 / 快照 / 预发布版 / 远古 Beta / Alpha）与发布年份筛选，选中即可创建实例。
+版本列表来自 Mojang 官方清单，支持按版本号搜索，按版本类型（正式版 / 快照 / 预发布版 / 远古 Beta / Alpha）与发布年份筛选，选中即可创建版本。
 
 ![下载](docs/images/download.png)
 
@@ -70,15 +70,15 @@
 
 | 分区 | 搜索过滤 | 安装落点 |
 | --- | --- | --- |
-| **Mod** | 实例的游戏版本 + 加载器 | 实例的 `mods/`，安装时把必选前置一起装好 |
-| **光影** | 实例的游戏版本 | 实例的 `shaderpacks/` |
-| **整合包** | 用户选的游戏版本 | **新建一个隔离实例**，把整包文件全部下好 |
-| **资源包** | 实例的游戏版本 | 实例的 `resourcepacks/` |
-| **数据包** | 实例的游戏版本 | 选定存档的 `saves/<存档>/datapacks/` |
+| **Mod** | 该版本的游戏版本 + 加载器 | 该版本的 `mods/`，安装时把必选前置一起装好 |
+| **光影** | 该版本的游戏版本 | 该版本的 `shaderpacks/` |
+| **整合包** | 用户选的游戏版本 | **新建一个隔离版本**，把整包文件全部下好 |
+| **资源包** | 该版本的游戏版本 | 该版本的 `resourcepacks/` |
+| **数据包** | 该版本的游戏版本 | 选定存档的 `saves/<存档>/datapacks/` |
 
-顶部选定的实例同时决定版本与加载器筛选，搜出来的每一条都能直接装。
-没选实例也能浏览，只是安装按钮会提示先创建实例。整合包是例外——它自带
-Minecraft 版本与加载器，安装时创建一个独立实例，游戏本体与加载器在首次启动时补装。
+顶部选定的版本同时决定版本与加载器筛选，搜出来的每一条都能直接装。
+没选版本也能浏览，只是安装按钮会提示先创建版本。整合包是例外——它自带
+Minecraft 版本与加载器，安装时创建一个隔离的版本文件夹，游戏本体与加载器当场装好。
 
 点进详情能看到正文、截图与全部历史版本。数据包在安装对话框里还要选一个存档；
 没有存档时会明确提示先在游戏里创建世界。
@@ -102,14 +102,14 @@ Forge / NeoForge 的 installer 不是简单解压：它要跑若干 processor（
 `{KEY}` 引用数据表、`[group:artifact:version@ext]` 内联 maven 坐标、`'literal'` 单引号字面量，
 全部在 `LoaderInstaller` 里处理。
 
-安装时机是**首次启动该实例时**，不是创建实例时 —— installer 要下载几百 MB，建实例时同步等待体验很差。
+加载器在**创建版本时**就装好；只有中途失败或取消留下的版本，才会在首次启动时补装。
 
 ### 🗂️ 内容管理
-「管理」下直接读写实例实际使用的游戏目录：
+「管理」下直接读写 MC 文件夹根下的内容目录（暂不按版本区分，按版本管理留作后续）：
 
 | 子项 | 内容 |
 | --- | --- |
-| **实例** | 创建 / 删除实例，进入单个实例的设置 |
+| **版本** | 创建 / 重命名 / 删除版本，进入单个版本的设置 |
 | **Mods** | `mods` 目录里的 jar |
 | **资源包** | `resourcepacks` 目录里的 zip 或解压后的文件夹 |
 | **光影** | `shaderpacks` 目录里的 zip 或解压后的文件夹 |
@@ -120,7 +120,7 @@ Forge / NeoForge 的 installer 不是简单解压：它要跑若干 processor（
 ![Mods](docs/images/mods.png)
 
 ### 🧠 内存分配
-**自动模式**根据物理内存、当前可用内存和实例的模组数量计算堆上限，每次启动重新估算，
+**自动模式**根据物理内存、当前可用内存和该版本的模组数量计算堆上限，每次启动重新估算，
 后台程序多时自动少给一些。也可以切到**手动模式**用滑条指定。
 
 ### 🔐 微软正版登录
@@ -172,7 +172,7 @@ Forge / NeoForge 的 installer 不是简单解压：它要跑若干 processor（
 | 核心 | .NET 8 类库 `Solar.Core`，与 UI 完全解耦 |
 | 下载 | CmlLib.Core `ParallelGameInstaller`（只用下载部分） |
 | 内容下载 | Modrinth / CurseForge（经 MCIM 镜像）；Mod / 光影 / 整合包 / 资源包 / 数据包 |
-| 整合包 | 解析 `.mrpack` / CurseForge manifest，创建隔离实例并下载整包 |
+| 整合包 | 解析 `.mrpack` / CurseForge manifest，创建隔离版本并下载整包 |
 | Markdown | 详情正文只用到极简解析器（标题 / 粗体 / 列表 / 链接） |
 | 登录 | CmlLib.Core.Auth.Microsoft（OAuth 设备码 + MSAL.NET） |
 | 测试 | xUnit（`tests/Solar.Core.Tests`），390 个测试 |
@@ -185,8 +185,8 @@ src/
     Json/                统一 JSON 选项、原子写入、参数数组转换器
     Models/              Mojang 版本 JSON 模型、rules 求值
     Minecraft/           版本清单下载与缓存、版本 JSON 解析与 inheritsFrom 合并
-    Instances/           游戏实例模型、持久化、版本扫描、创建流程
-    Content/             实例游戏目录里的 Mods / 资源包 / 光影 读写
+    Versions/            版本模型、仓库、扫描与创建流程
+    Content/             版本游戏目录里的 Mods / 资源包 / 光影 读写
     Mods/                在线内容目录（Modrinth / CurseForge）、依赖解析、文件下载与安装
     Modpacks/            整合包解析（mrpack / CurseForge manifest）与整包安装
     Loaders/             Fabric / Quilt / Forge / NeoForge 安装
@@ -240,24 +240,23 @@ dotnet run --project src/Solar.App
 数据分两处存放：
 
 ```
-%APPDATA%\SolarLauncher\   配置、账户、日志，以及版本清单与 Mod 缓存
-                           （settings.json / accounts.json / msa-accounts.json / instances.json / logs）
-<exe 所在目录>\
-SolarShared/               共享资源：versions / libraries / assets / runtime
-                           versions/<id>/ 同时是隔离实例的游戏目录（存档、模组、配置写在里面）
-SolarInstances/            每个实例一个目录：natives、instance.json
-                           （整合包实例的游戏目录 .minecraft/ 也在这里，因为它的加载器
-                             要到首次启动才安装）
-.minecraft/                共享游戏目录：存档、模组、配置（默认位置，可在设置中改）
+%APPDATA%\SolarLauncher\   启动器自己的配置、账户、日志与缓存
+                           （settings.json / accounts.json / logs / 版本清单与 Mod 缓存）
+<exe 所在目录>\.minecraft\  MC 文件夹（设置里可改，也可指向官方启动器的目录）
+├── versions\<id>\         版本文件夹；开启隔离时它就是游戏目录
+│   ├── <id>.json / <id>.jar
+│   └── .solar\            该版本的设置与原生库
+│       ├── version.json
+│       └── natives\
+├── libraries\             共享库
+├── assets\                共享资源
+└── runtime\               自动下载的 Java 运行时
 ```
 
-旧版本写在 exe 旁边的 `SolarData/` 会在首次启动时自动搬到 `%APPDATA%\SolarLauncher`，
-登录状态不会丢；目标目录已有数据时不会覆盖。
-
-共享游戏目录（`.minecraft`）供未开启隔离的实例使用，因此换实例不会丢存档。
-把它指向官方启动器的 `.minecraft` 就能直接复用已有的模组与存档。
-开启隔离的实例改用各自版本的版本文件夹；同一版本的实例共用同一个。
-不同版本的 natives 始终按实例隔离在 `SolarInstances/<id>/natives`。
+与 PCL 一致：一个版本文件夹就是一个版本，没有额外的实例记录或索引文件。
+版本设置写在 `versions\<id>\.solar\version.json`，跟着版本文件夹一起搬移。
+未开启隔离的版本使用 MC 文件夹根作为游戏目录；开启后使用自己的版本文件夹。
+把 MC 文件夹指向官方启动器的 `.minecraft` 就能直接复用已有的模组与存档。
 
 ---
 
@@ -291,7 +290,7 @@ SolarInstances/            每个实例一个目录：natives、instance.json
 ### 0.1.1-beta
 
 - 启动按钮展开为底部进度卡片：分阶段步骤条、当前文件与总体进度、取消与失败重试
-- 无实例时点启动，提示移入卡片并带展开 / 收起动画
+- 无版本时点启动，提示移入卡片并带展开 / 收起动画
 - 下载与启动进度同步到任务栏，进入启动阶段时闪烁提醒
 - 设置新增「游戏启动后」：保持不动 / 最小化 / 关闭启动器，等游戏窗口真正出现后执行
 - 离开设置页时提示保存未保存的修改，底部新增「重置」
@@ -355,7 +354,7 @@ dotnet run --project tools/Solar.ModProbe -- modpack curseforge 396246 1.21.4
 ## 🗺️ 当前进度
 
 - [x] 项目骨架、DI、MVVM、导航
-- [x] 实例创建 / 删除 / 列表，持久化到磁盘
+- [x] 版本创建 / 删除 / 列表，持久化到磁盘
 - [x] 版本清单拉取与本地缓存（可在设置中换成国内镜像）
 - [x] 版本 JSON 下载、`inheritsFrom` 合并、rules 平台求值
 - [x] Java 自动探测与版本匹配
@@ -363,26 +362,26 @@ dotnet run --project tools/Solar.ModProbe -- modpack curseforge 396246 1.21.4
 - [x] 启动参数拼装与游戏进程启动
 - [x] 启动进度卡片（分阶段步骤条、下载详情、取消与失败重试）
 - [x] 任务栏下载进度与完成闪烁
-- [x] 下载镜像（BMCLAPI）与实例级 Java / 内存覆盖
+- [x] 下载镜像（BMCLAPI）与按版本覆盖 Java / 内存
 - [x] 微软正版登录（设备码流程、多账户、令牌静默刷新）
 - [x] 模组加载器安装（Fabric / Quilt / Forge / NeoForge）
 - [x] OptiFine / LiteLoader / Fabric API / OptiFabric 附加组件
-- [x] 实例级版本隔离（独立游戏目录，可把共享内容复制过来）
+- [x] 版本隔离（版本文件夹作为游戏目录，可把共享内容复制过来）
 - [x] 「管理」下的 Mods / 资源包 / 光影 列表、导入、删除
 - [x] 内存分配：自动按物理内存 / 可用内存 / 模组数量计算，或手动用滑条指定
 - [x] 游戏目录版本扫描与一键导入
 - [x] 下载页选版本 → 一次装完加载器与附加组件
 - [x] 在线内容数据层（Modrinth + CurseForge 双源、跨源去重、依赖解析、SHA1 校验安装）
 - [x] 内容下载界面（Mod / 光影 / 整合包 / 资源包 / 数据包 共用搜索、详情与安装对话框）
-- [x] 光影与资源包在线下载（按实例的游戏版本过滤，装进对应目录）
+- [x] 光影与资源包在线下载（按版本的游戏版本过滤，装进对应目录）
 - [x] 数据包在线下载（按存档安装到 `saves/<存档>/datapacks/`）
-- [x] 整合包在线下载与安装（解析 `.mrpack` / CurseForge manifest，新建隔离实例，下载全部文件并解压 overrides）
+- [x] 整合包在线下载与安装（解析 `.mrpack` / CurseForge manifest，新建隔离版本，下载全部文件并解压 overrides）
 - [x] 下载页版本筛选（版本类型 + 发布年份）
 - [x] 启动后窗口行为（保持 / 最小化 / 关闭），设置页未保存提示与重置
 - [ ] 已装内容的管理与更新检查（按 SHA1 反查项目、启用/禁用、更新）
 - [ ] 启动器自更新（检查 GitHub Releases，下载并应用更新）
 - [ ] 网络诊断（下载源测速）
-- [ ] 实例导出为整合包
+- [ ] 版本导出为整合包
 
 ### 内容下载设计
 
@@ -392,7 +391,7 @@ dotnet run --project tools/Solar.ModProbe -- modpack curseforge 396246 1.21.4
 | 类型 | Modrinth `project_type` | CurseForge `classId` | 安装落点 |
 | --- | --- | --- | --- |
 | Mod | `mod` | 6 | `mods/` |
-| 整合包 | `modpack` | 4471 | 新建隔离实例 |
+| 整合包 | `modpack` | 4471 | 新建隔离版本 |
 | 资源包 | `resourcepack` | 12 | `resourcepacks/` |
 | 光影 | `shader` | 6552 | `shaderpacks/` |
 | 数据包 | `datapack` | 6945 | `saves/<存档>/datapacks/` |
@@ -403,7 +402,7 @@ dotnet run --project tools/Solar.ModProbe -- modpack curseforge 396246 1.21.4
 | 降级 | 两源并行，任一不可用仍返回另一边的结果，并在结果里标出失败的源 |
 | 去重 | 同类型 + 同名 + 加载器有交集 + 更新时差 ≤7 天 视为同一项目，保留 CurseForge 那条 |
 | 依赖 | 只有 Mod 递归展开必选前置（深度上限 5，带环检测），可选前置只展示 |
-| 安装 | 写入实例实际使用的目录，保留上游文件名，SHA1 校验后原子落盘 |
+| 安装 | 写入版本实际使用的目录，保留上游文件名，SHA1 校验后原子落盘 |
 
 两个类型特有的坑：
 
@@ -412,7 +411,7 @@ dotnet run --project tools/Solar.ModProbe -- modpack curseforge 396246 1.21.4
 - **光影 / 资源包 / 整合包**不参与加载器筛选。把 `categories:fabric` 或
   `modLoaderType` 带上去会直接搜空。
 
-整合包在 `Solar.Core/Modpacks/`。安装时先下载整包、解析 manifest，再新建一个隔离实例：
+整合包在 `Solar.Core/Modpacks/`。安装时先下载整包、解析 manifest，再新建一个隔离版本：
 
 | 格式 | 解析方式 |
 | --- | --- |
@@ -420,8 +419,8 @@ dotnet run --project tools/Solar.ModProbe -- modpack curseforge 396246 1.21.4
 | CurseForge | 读 `manifest.json`，逐条用 `projectID/fileID` 查下载地址（镜像免 Key） |
 
 文件按 manifest 里的相对路径下载并做 SHA1 校验；`overrides/` 与 `client-overrides/`
-解压进实例目录（两者都有时客户端专用版本覆盖前者）。路径会做 zip-slip 校验，
-拒绝 `../`、绝对路径与盘符。游戏本体与加载器**不在安装时下载**——实例首次启动
+解压进版本目录（两者都有时客户端专用版本覆盖前者）。路径会做 zip-slip 校验，
+拒绝 `../`、绝对路径与盘符。游戏本体与加载器**不在安装时下载**——版本首次启动
 会走 `GameLaunchService` 的补装流程，避免一次操作里同时跑两套下载器。
 
 与 PCL 的取舍：**不做**中文词表搜索（只支持英文/原名）；版本列表用服务端的
@@ -430,9 +429,9 @@ CurseForge 整合包的文件统一放进 `mods/`（manifest 不带目标目录�
 详见 [docs/mod-download-design.md](docs/mod-download-design.md) 与
 [docs/addon-download-design.md](docs/addon-download-design.md)。
 
-界面在「下载 → Mod / 光影 / 整合包 / 资源包 / 数据包」：顶部选目标实例
+界面在「下载 → Mod / 光影 / 整合包 / 资源包 / 数据包」：顶部选目标版本
 （整合包改为选游戏版本），搜索后点一行进详情，选版本点安装。数据包在对话框里
-选择存档；整合包在对话框里给实例起名并显示将下载的文件数/体积。
+选择存档；整合包在对话框里给版本起名并显示将下载的文件数/体积。
 内容源（官方 / 镜像 / CurseForge Key）在「设置 → 下载源」里改，换源会自动清掉旧缓存。
 
 ---

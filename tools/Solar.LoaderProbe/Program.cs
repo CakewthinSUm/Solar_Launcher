@@ -2,7 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Solar.Core;
 using Solar.Core.Addons;
-using Solar.Core.Instances;
+using Solar.Core.Versions;
 using Solar.Core.Java;
 using Solar.Core.Loaders;
 using Solar.Core.Minecraft;
@@ -102,11 +102,11 @@ try
     Console.WriteLine();
     Console.WriteLine($"安装完成，版本 Id: {versionId}");
 
-    var versionJson = Path.Combine(root, "SolarShared", "versions", versionId, versionId + ".json");
+    var versionJson = Path.Combine(root, ".minecraft", "versions", versionId, versionId + ".json");
     Console.WriteLine($"版本 JSON: {(File.Exists(versionJson) ? "存在" : "缺失")}");
 
     // 检查 processor 产出的客户端 artifact
-    var librariesRoot = Path.Combine(root, "SolarShared", "libraries");
+    var librariesRoot = Path.Combine(root, ".minecraft", "libraries");
     var clientJars = Directory.Exists(librariesRoot)
         ? Directory.GetFiles(librariesRoot, "*.jar", SearchOption.AllDirectories)
             .Where(f => f.Contains("client", StringComparison.OrdinalIgnoreCase))
@@ -161,11 +161,10 @@ static async Task<int> ProbeOptiFineAsync(IServiceProvider provider, string mcVe
     var javaDetector = provider.GetRequiredService<IJavaDetector>();
 
     var vanilla = await resolver.ResolveAsync(mcVersion);
-    var scratch = new GameInstance { Id = "probe-optifine", MinecraftVersion = mcVersion };
+    var scratch = new GameVersion { Id = "probe-optifine", MinecraftVersion = mcVersion };
     await downloader.DownloadAsync(scratch, vanilla);
 
-    var paths = provider.GetRequiredService<AppPaths>();
-    var locator = new GameFileLocator(paths, provider.GetRequiredService<InstanceGameDirectory>());
+    var locator = new GameFileLocator(provider.GetRequiredService<MinecraftPaths>());
     var javaPath = (await javaDetector.DetectAsync()).FirstOrDefault()?.Path
                    ?? throw new InvalidOperationException("没有 Java。");
 

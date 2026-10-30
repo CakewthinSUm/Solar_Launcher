@@ -4,6 +4,7 @@ using Solar.Core.Loaders;
 using Solar.Core.Minecraft;
 using Solar.Core.Models;
 using Solar.Core.Paths;
+using Solar.Core.Versions;
 
 namespace Solar.Core.Addons;
 
@@ -25,7 +26,7 @@ public interface ILiteLoaderInstaller
 }
 
 public sealed class LiteLoaderInstaller(
-    AppPaths paths,
+    MinecraftPaths paths,
     IVersionResolver resolver,
     IGameDownloader downloader) : ILiteLoaderInstaller
 {
@@ -38,7 +39,7 @@ public sealed class LiteLoaderInstaller(
         progress?.Report(new LoaderInstallProgress("正在准备 LiteLoader", 0, 1));
 
         var versionId = $"{minecraftVersion}-LiteLoader";
-        var versionDirectory = Path.Combine(paths.Versions, versionId);
+        var versionDirectory = paths.GetVersionDirectory(versionId);
         Directory.CreateDirectory(versionDirectory);
 
         var detail = BuildProfile(build, minecraftVersion, versionId);
@@ -51,7 +52,7 @@ public sealed class LiteLoaderInstaller(
 
         progress?.Report(new LoaderInstallProgress("正在下载 LiteLoader 库", 0, 1));
         var resolved = await resolver.ResolveAsync(versionId, ct).ConfigureAwait(false);
-        var instance = new Instances.GameInstance { Id = "installer-temp", MinecraftVersion = minecraftVersion };
+        var instance = new GameVersion { Id = minecraftVersion, MinecraftVersion = minecraftVersion };
         await downloader.DownloadAsync(instance, resolved, null, ct).ConfigureAwait(false);
 
         return versionId;

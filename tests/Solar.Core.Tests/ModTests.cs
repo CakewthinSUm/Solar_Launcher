@@ -1,4 +1,4 @@
-using Solar.Core.Instances;
+using Solar.Core.Versions;
 using Solar.Core.Mods;
 using Solar.Core.Paths;
 using Solar.Core.Settings;

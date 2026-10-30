@@ -1,5 +1,5 @@
 using Microsoft.Extensions.Logging;
-using Solar.Core.Instances;
+using Solar.Core.Versions;
 using Solar.Core.Mods;
 
 namespace Solar.Core.Addons;
@@ -25,7 +25,7 @@ public interface IAddonCatalog
 /// <para>
 /// 两者都在 Modrinth 上，直接复用 <see cref="IModCatalogService"/>：
 /// 这样它们和「管理 → Mods」走同一套源、镜像降级与缓存，
-/// 不会出现“创建实例能下、模组页下不了”这种两套逻辑各自演化的问题。
+/// 不会出现“创建版本能下、模组页下不了”这种两套逻辑各自演化的问题。
 /// </para>
 /// </summary>
 public sealed class AddonCatalog(

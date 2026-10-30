@@ -1,5 +1,5 @@
-using Solar.Core.Instances;
 using Solar.Core.Minecraft;
+using Solar.Core.Versions;
 
 namespace Solar.Core.Java;
 
@@ -25,10 +25,10 @@ public sealed record JavaRequirement(int MinMajor, int? MaxMajor = null, string?
     };
 }
 
-/// <summary>从实例与已解析的版本推导 Java 要求。</summary>
+/// <summary>从版本与已解析的版本推导 Java 要求。</summary>
 public static class JavaRequirements
 {
-    public static JavaRequirement For(GameInstance instance, ResolvedVersion version)
+    public static JavaRequirement For(GameVersion instance, ResolvedVersion version)
     {
         var min = 8;
         int? max = null;
@@ -123,7 +123,7 @@ public static class JavaRequirements
         return new JavaRequirement(min, max, version.Detail.JavaVersion?.Component);
     }
 
-    private static void ApplyForge(GameInstance instance, MinecraftVersion? mc, ref int min, ref int? max)
+    private static void ApplyForge(GameVersion instance, MinecraftVersion? mc, ref int min, ref int? max)
     {
         if (mc is not { Major: 1 })
         {

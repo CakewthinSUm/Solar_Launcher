@@ -4,11 +4,11 @@ using CmlLib.Core.Files;
 using CmlLib.Core.Installers;
 using Microsoft.Extensions.Logging;
 using Solar.Core.Assets;
-using Solar.Core.Instances;
 using Solar.Core.Minecraft;
 using Solar.Core.Models;
 using Solar.Core.Paths;
 using Solar.Core.Settings;
+using Solar.Core.Versions;
 
 namespace Solar.Core.Download;
 
@@ -24,21 +24,21 @@ public interface IGameDownloader
 {
     /// <summary>把版本运行所需的全部文件（本体、库、natives、资源、日志配置）下载到本地。</summary>
     Task DownloadAsync(
-        GameInstance instance,
+        GameVersion instance,
         ResolvedVersion version,
         IProgress<DownloadProgress>? progress = null,
         CancellationToken ct = default);
 }
 
 public sealed class GameDownloader(
-    AppPaths paths,
+    MinecraftPaths paths,
     ISettingsService settings,
     IAssetIndexService assetIndexService,
     GameFileLocator fileLocator,
     ILogger<GameDownloader> logger) : IGameDownloader
 {
     public async Task DownloadAsync(
-        GameInstance instance,
+        GameVersion instance,
         ResolvedVersion version,
         IProgress<DownloadProgress>? progress = null,
         CancellationToken ct = default)

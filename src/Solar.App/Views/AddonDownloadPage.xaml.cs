@@ -19,12 +19,12 @@ public sealed partial class AddonDownloadPage : PageBase
 
     public new AddonDownloadViewModel ViewModel { get; }
 
-    /// <summary>点一行进入详情页，带上列表里的项目信息与当前实例。</summary>
+    /// <summary>点一行进入详情页，带上列表里的项目信息与当前版本。</summary>
     private void Addon_Click(object sender, ItemClickEventArgs e)
     {
         if (e.ClickedItem is AddonCardViewModel card)
         {
-            Frame.Navigate(typeof(AddonProjectPage), new AddonProjectRequest(card.Project, ViewModel.SelectedInstance));
+            Frame.Navigate(typeof(AddonProjectPage), new AddonProjectRequest(card.Project, ViewModel.SelectedVersion));
         }
     }
 

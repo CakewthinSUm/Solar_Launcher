@@ -43,7 +43,7 @@ public sealed class GameLauncher(AppPaths paths, ILogger<GameLauncher> logger) :
             startInfo.ArgumentList.Add(argument);
         }
 
-        var logPath = Path.Combine(paths.Logs, $"game-{context.Instance.Id}-{DateTimeOffset.Now:yyyyMMdd-HHmmss}.log");
+        var logPath = Path.Combine(paths.Logs, $"game-{context.Game.Id}-{DateTimeOffset.Now:yyyyMMdd-HHmmss}.log");
         logger.LogInformation("启动游戏，日志: {LogPath}", logPath);
 
         var process = new Process { StartInfo = startInfo, EnableRaisingEvents = true };

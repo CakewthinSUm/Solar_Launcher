@@ -17,6 +17,9 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $outRoot = Join-Path $root "publish"
 
+# MSBuild/NuGet 只接受数字开头的版本号；dev 这类标签只用于产物命名
+$publishVersion = if ($Version -match '^\d+(\.\d+){1,3}') { $Version } else { "0.0.0-$Version" }
+
 foreach ($rid in $Runtime) {
     if ($SingleFile) {
         $assetName = "SolarLauncher-$Version-$rid-singlefile"
@@ -37,14 +40,14 @@ foreach ($rid in $Runtime) {
             -p:EnableCompressionInSingleFile=true `
             -p:DisableTransitiveFrameworkReferences=true `
             -p:SingleFileAssemblyName=$assetName `
-            -p:Version=$Version `
+            -p:Version=$publishVersion `
             -p:InformationalVersion=$Version `
             -o $out `
             --nologo
         if ($LASTEXITCODE -ne 0) { throw "dotnet publish 失败 ($rid)" }
 
         # 便携版会把运行数据写在 exe 旁边，发布包里不该带上本地开发产生的数据
-        foreach ($junk in 'SolarData', 'SolarShared', 'SolarInstances', '.minecraft') {
+        foreach ($junk in 'SolarData', '.minecraft') {
             $path = Join-Path $out $junk
             if (Test-Path $path) { Remove-Item $path -Recurse -Force }
         }
@@ -70,14 +73,14 @@ foreach ($rid in $Runtime) {
         -c $Configuration `
         -r $rid `
         --self-contained false `
-        -p:Version=$Version `
+        -p:Version=$publishVersion `
         -p:InformationalVersion=$Version `
         -o $out `
         --nologo
     if ($LASTEXITCODE -ne 0) { throw "dotnet publish 失败 ($rid)" }
 
     # 便携版会把运行数据写在 exe 旁边，发布包里不该带上本地开发产生的数据
-    foreach ($junk in 'SolarData', 'SolarShared', 'SolarInstances', '.minecraft') {
+    foreach ($junk in 'SolarData', '.minecraft') {
         $path = Join-Path $out $junk
         if (Test-Path $path) { Remove-Item $path -Recurse -Force }
     }

@@ -6,7 +6,7 @@
 
 **A modern Minecraft launcher built with WinUI 3**
 
-Native Windows 11 UI · Portable, no install · Instance isolation · Microsoft account login
+Native Windows 11 UI · Portable, no install · Version isolation · Microsoft account login
 
 **English** · [简体中文](README_zh-cn.md)
 
@@ -25,34 +25,34 @@ Native Windows 11 UI · Portable, no install · Instance isolation · Microsoft 
 
 ## ✨ Features
 
-### 🎮 Instance management
-Each instance can use a different Minecraft version and mod loader, independently. Existing versions in your game directory can be **imported with a single scan** — no re-download required.
+### 🎮 Version management
+Each version can use its own Minecraft version and mod loader, independently. Versions already in your MC folder are **listed automatically** — no import step and no re-download.
 
 Pick a version on the Download page to jump straight into creation and install the loader, OptiFine, Fabric API, and other components in one go.
 
-| Instance list | Create instance |
+| Version list | Create version |
 | :---: | :---: |
-| ![Instances](docs/images/instances.png) | ![Create instance](docs/images/instance-create.png) |
+| ![Versions](docs/images/instances.png) | ![Create version](docs/images/instance-create.png) |
 
 ### 📦 Version isolation
-Matches PCL: with isolation on, the game directory **is the version folder** (`SolarShared/versions/<version-id>`, or `.minecraft/versions/<version-id>` when you point the launcher at an official installation). Saves, mods, and configs live there, so a Fabric instance and a Forge instance can coexist without conflicts.
+Matches PCL: one version folder is one version. With isolation on, that folder **is the game directory** (`.minecraft/versions/<version-id>`). Saves, mods, and configs live there, so a Fabric version and a Forge version can coexist without conflicts.
 
-Multiple instances of the same version share that version folder — PCL keeps one folder per version too. Toggling isolation only flips a switch; existing files are not moved. When enabling it, you can copy `mods` / `config` / `saves` / `resourcepacks` from the shared directory; existing files are never overwritten.
+Toggling isolation only flips a switch; existing files are not moved. When enabling it, you can copy `mods` / `config` / `saves` / `resourcepacks` from the MC folder root; existing files are never overwritten.
 
-`assets` and `libraries` are always shared and unaffected by isolation.
+`assets` and `libraries` are always shared and unaffected by isolation. Version settings live in `versions/<id>/.solar/version.json` and travel with the version folder.
 
 ![Instance settings](docs/images/instance-settings.png)
 
 ### 🚀 Launch and progress
-When you hit Launch, the button expands into a progress card at the bottom: the step list advances through "Resolve version → Install missing files → Install loader → Launch game", and the download stage shows the current file, completed count, and overall progress. Failures are shown directly in the card with retry or cancel — no modal dialog hiding the details. If you have no instances, the card tells you to create one first.
+When you hit Launch, the button expands into a progress card at the bottom: the step list advances through "Resolve version → Install missing files → Install loader → Launch game", and the download stage shows the current file, completed count, and overall progress. Failures are shown directly in the card with retry or cancel — no modal dialog hiding the details. If you have no versions, the card tells you to create one first.
 
 Download and launch progress are mirrored in the taskbar progress bar, and the taskbar flashes when the game starts. Once the game window actually appears, the launcher follows Settings → After game launch: do nothing (default), minimize, or close. If the game process exits early, the launcher stays visible and shows the error.
 
 ### ⚙️ Settings
-The Settings page manages the game directory, the default isolation for new instances, the Java path, download sources, and the after-launch behavior. If you leave with unsaved changes, it asks Save / Don't save / Cancel; Reset at the bottom restores all defaults (applied after saving).
+The Settings page manages the MC folder, the default isolation for new versions, the Java path, download sources, and the after-launch behavior. If you leave with unsaved changes, it asks Save / Don't save / Cancel; Reset at the bottom restores all defaults (applied after saving).
 
 ### ⬇️ Downloads
-The version list comes from Mojang's official manifest. Search by version string and filter by release type (release / snapshot / pre-release / old beta / old alpha) and release year; select one to create an instance.
+The version list comes from Mojang's official manifest. Search by version string and filter by release type (release / snapshot / pre-release / old beta / old alpha) and release year; select one to create a version.
 
 ![Downloads](docs/images/download.png)
 
@@ -60,13 +60,13 @@ The other five tabs under Downloads search Modrinth and CurseForge and share the
 
 | Tab | Search filter | Install location |
 | --- | --- | --- |
-| **Mod** | Instance game version + loader | Instance `mods/`, required dependencies installed too |
-| **Shaders** | Instance game version | Instance `shaderpacks/` |
-| **Modpacks** | User-selected game version | **Creates a new isolated instance** and downloads the whole pack |
-| **Resource packs** | Instance game version | Instance `resourcepacks/` |
-| **Data packs** | Instance game version | `saves/<world>/datapacks/` of the selected world |
+| **Mod** | Version's game version + loader | Version `mods/`, required dependencies installed too |
+| **Shaders** | Version's game version | Version `shaderpacks/` |
+| **Modpacks** | User-selected game version | **Creates a new isolated version folder** and downloads the whole pack |
+| **Resource packs** | Version's game version | Version `resourcepacks/` |
+| **Data packs** | Version's game version | `saves/<world>/datapacks/` of the selected world |
 
-The instance selected at the top determines both version and loader filters, so every result can be installed directly. You can browse without selecting an instance; the install button will just prompt you to create one. Modpacks are the exception — they carry their own Minecraft version and loader, create a separate instance on install, and install the game and loader on first launch.
+The version selected at the top determines both game version and loader filters, so every result can be installed directly. You can browse without selecting a version; the install button will just prompt you to create one. Modpacks are the exception — they carry their own Minecraft version and loader, create a separate version folder on install, and install the game and loader immediately.
 
 The detail page shows the description, screenshots, and all historical versions. Data packs also require choosing a world in the install dialog; if there are no worlds, it tells you to create one in-game first.
 
@@ -166,8 +166,8 @@ src/
     Json/                Shared JSON options, atomic writes, argument array converter
     Models/              Mojang version JSON models, rules evaluation
     Minecraft/           Version manifest download and cache, version JSON parsing and inheritsFrom merging
-    Instances/           Game instance model, persistence, version scanning, creation flow
-    Content/             Mods / resource packs / shaders in the instance game directory
+    Versions/            Version model, repository, scanning and creation flow
+    Content/             Mods / resource packs / shaders in the shared MC folder
     Mods/                Online content catalog (Modrinth / CurseForge), dependency resolution, file download and install
     Modpacks/            Modpack parsing (mrpack / CurseForge manifest) and full-pack install
     Loaders/             Fabric / Quilt / Forge / NeoForge installation
@@ -221,25 +221,24 @@ dotnet run --project src/Solar.App
 Data lives in two places:
 
 ```
-%APPDATA%\SolarLauncher\   Settings, accounts, logs, version manifest and mod caches
-                           (settings.json / accounts.json / msa-accounts.json / instances.json / logs)
-<exe directory>\
-SolarShared/               Shared resources: versions / libraries / assets / runtime
-                           versions/<id>/ is also the game directory of isolated instances
-                           (saves, mods and configs land there)
-SolarInstances/            One directory per instance: natives, instance.json
-                           (modpack instances also keep their game directory, .minecraft/,
-                            here because their loader is installed on first launch)
-.minecraft/                Shared game directory: saves, mods, configs (default; configurable in Settings)
+%APPDATA%\SolarLauncher\   Launcher settings, accounts, logs and caches
+                           (settings.json / accounts.json / logs / manifest & mod caches)
+<exe directory>\.minecraft\  MC folder (configurable; can point at the official launcher's)
+├── versions\<id>\         Version folder; the game directory when isolation is on
+│   ├── <id>.json / <id>.jar
+│   └── .solar\            Settings and natives for this version
+│       ├── version.json
+│       └── natives\
+├── libraries\             Shared libraries
+├── assets\                Shared assets
+└── runtime\               Auto-downloaded Java runtimes
 ```
 
-A legacy `SolarData/` next to the exe is moved to `%APPDATA%\SolarLauncher` on first launch,
-so the login survives the upgrade; existing data at the destination is never overwritten.
-
-The shared game directory (`.minecraft`) is used by instances without isolation, so switching instances never loses saves.
-Point it at the official launcher's `.minecraft` to reuse existing mods and saves.
-Isolated instances use their version folder instead; instances of the same version share it.
-Natives for different versions are always isolated per instance under `SolarInstances/<id>/natives`.
+As in PCL, one version folder is one version: there is no extra instance record or index file.
+Version settings live in `versions\<id>\.solar\version.json` and travel with the folder.
+Versions without isolation use the MC folder root as their game directory; isolated versions
+use their own version folder. Point the MC folder at the official launcher's `.minecraft`
+to reuse existing mods and saves.
 
 ---
 
@@ -337,7 +336,7 @@ Add `SOLAR_PROBE_VERBOSE=1` when debugging network issues to see why each source
 ## 🗺️ Roadmap
 
 - [x] Project skeleton, DI, MVVM, navigation
-- [x] Instance create / delete / list, persisted to disk
+- [x] Version create / rename / delete / list, stored in the MC folder
 - [x] Version manifest fetch and local cache (switchable to a China mirror in Settings)
 - [x] Version JSON download, `inheritsFrom` merging, platform rules evaluation
 - [x] Automatic Java detection and version matching
@@ -345,26 +344,26 @@ Add `SOLAR_PROBE_VERBOSE=1` when debugging network issues to see why each source
 - [x] Launch argument assembly and game process launch
 - [x] Launch progress card (staged steps, download details, cancel and retry)
 - [x] Taskbar download progress and completion flash
-- [x] Download mirror (BMCLAPI) and per-instance Java / memory overrides
+- [x] Download mirror (BMCLAPI) and per-version Java / memory overrides
 - [x] Microsoft account login (device code flow, multiple accounts, silent token refresh)
 - [x] Mod loader installation (Fabric / Quilt / Forge / NeoForge)
 - [x] OptiFine / LiteLoader / Fabric API / OptiFabric add-ons
-- [x] Per-instance version isolation (separate game directory, optional copy of shared content)
+- [x] Per-version isolation (version folder as game directory, optional copy of shared content)
 - [x] Mods / resource packs / shaders list, import, and delete under "Manage"
 - [x] Memory allocation: automatic from physical / available memory and mod count, or manual slider
 - [x] Game directory version scan and one-click import
 - [x] Pick a version on the Download page → install loader and add-ons in one go
 - [x] Online content data layer (Modrinth + CurseForge, cross-source dedup, dependency resolution, SHA1-verified install)
 - [x] Content download UI (mods / shaders / modpacks / resource packs / data packs share search, details, and install dialog)
-- [x] Online shader and resource pack downloads (filtered by instance game version, installed into the right directory)
+- [x] Online shader and resource pack downloads (filtered by game version, installed into the right directory)
 - [x] Online data pack downloads (installed into `saves/<world>/datapacks/`)
-- [x] Online modpack download and install (parse `.mrpack` / CurseForge manifest, create an isolated instance, download all files and extract overrides)
+- [x] Online modpack download and install (parse `.mrpack` / CurseForge manifest, create an isolated version folder, download all files and extract overrides)
 - [x] Download page version filters (release type + release year)
 - [x] After-launch window behavior (keep / minimize / close), Settings unsaved-changes prompt and reset
 - [ ] Installed content management and update checks (reverse-lookup by SHA1, enable/disable, update)
 - [ ] Launcher self-update (check GitHub Releases, download and apply)
 - [ ] Network diagnostics (download source speed test)
-- [ ] Export an instance as a modpack
+- [ ] Export a version as a modpack
 
 ### Content download design
 
@@ -385,7 +384,7 @@ The data layer lives in `Solar.Core/Mods/` and unifies both sources behind one m
 | Fallback | Both sources queried in parallel; if one fails, results from the other are still returned and the failed source is marked |
 | Dedup | Same type + same name + overlapping loaders + update time within 7 days = same project; keep the CurseForge entry |
 | Dependencies | Only mods recursively expand required dependencies (depth limit 5, cycle detection); optional dependencies are shown only |
-| Install | Writes to the instance's actual directory, keeps upstream file names, SHA1-verified atomic write |
+| Install | Writes to the version's game directory, keeps upstream file names, SHA1-verified atomic write |
 
 Two type-specific gotchas:
 
@@ -394,7 +393,7 @@ Two type-specific gotchas:
 - **Shaders / resource packs / modpacks** do not participate in loader filtering. Passing `categories:fabric` or
   `modLoaderType` returns nothing.
 
-Modpacks live in `Solar.Core/Modpacks/`. Installation downloads the pack, parses the manifest, then creates a new isolated instance:
+Modpacks live in `Solar.Core/Modpacks/`. Installation downloads the pack, parses the manifest, then creates a new isolated version folder:
 
 | Format | Parsing |
 | --- | --- |
@@ -402,9 +401,9 @@ Modpacks live in `Solar.Core/Modpacks/`. Installation downloads the pack, parses
 | CurseForge | Read `manifest.json`, look up each `projectID/fileID` download URL (the mirror needs no key) |
 
 Files are downloaded by the relative paths in the manifest with SHA1 verification; `overrides/` and `client-overrides/`
-are extracted into the instance directory (client overrides win when both exist). Paths are zip-slip checked,
-rejecting `../`, absolute paths, and drive letters. The game itself and the loader are **not downloaded during install** —
-the instance's first launch runs the `GameLaunchService` catch-up flow, avoiding two downloaders in one operation.
+are extracted into the version folder (client overrides win when both exist). Paths are zip-slip checked,
+rejecting `../`, absolute paths, and drive letters. The game and loader are installed **during install**, so the
+version appears in the list immediately and the first launch needs no catch-up step.
 
 Trade-offs versus PCL: **no** Chinese keyword search (English/original names only); version lists filter server-side by
 `gameVersion` + `modLoaderType` instead of fetching everything; required mod dependencies are installed together;
@@ -412,9 +411,9 @@ CurseForge modpack files all go into `mods/` (the manifest has no target directo
 See [docs/mod-download-design.md](docs/mod-download-design.md) and
 [docs/addon-download-design.md](docs/addon-download-design.md).
 
-The UI lives under Downloads → Mods / Shaders / Modpacks / Resource packs / Data packs: pick a target instance
+The UI lives under Downloads → Mods / Shaders / Modpacks / Resource packs / Data packs: pick a target version
 at the top (modpacks pick a game version instead), search, click a row for details, choose a version and install.
-Data packs choose a world in the dialog; modpacks ask for an instance name and show the file count / size to download.
+Data packs choose a world in the dialog; modpacks ask for a version name and show the file count / size to download.
 Content sources (official / mirror / CurseForge key) are configured in Settings → Download sources; changing them clears the old cache.
 
 ---

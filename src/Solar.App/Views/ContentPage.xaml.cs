@@ -26,7 +26,7 @@ public sealed partial class ContentPage : PageBase
 
     public new ContentViewModel ViewModel { get; }
 
-    /// <summary>分区栏跟着导航参数走：从实例页或栏上切过来时，把选中项拨到当前分区。</summary>
+    /// <summary>分区栏跟着导航参数走：从版本页或栏上切过来时，把选中项拨到当前分区。</summary>
     protected override void OnNavigatedTo(NavigationEventArgs e)
     {
         base.OnNavigatedTo(e);
@@ -34,14 +34,14 @@ public sealed partial class ContentPage : PageBase
     }
 
     /// <summary>
-    /// 分区栏切到实例：回到实例列表；其余分区仍是这一页，换个参数即可。
+    /// 分区栏切到版本：回到版本列表；其余分区仍是这一页，换个参数即可。
     /// 分区切换不播页面动画——它更像页内 tab，用入场动画整页飞进来会显得很跳。
     /// </summary>
     private void SectionBar_SectionSelected(object? sender, string key)
     {
-        if (key == "instances")
+        if (key == "Versions")
         {
-            Frame.Navigate(typeof(InstancesPage), null, new SuppressNavigationTransitionInfo());
+            Frame.Navigate(typeof(VersionsPage), null, new SuppressNavigationTransitionInfo());
             return;
         }
 

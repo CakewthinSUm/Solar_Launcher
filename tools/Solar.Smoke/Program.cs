@@ -1,7 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Solar.Core;
-using Solar.Core.Instances;
+using Solar.Core.Versions;
 using Solar.Core.Java;
 using Solar.Core.Launch;
 using Solar.Core.Minecraft;
@@ -23,7 +23,7 @@ services.AddSolarCore(root);
 
 using var provider = services.BuildServiceProvider();
 
-var repository = provider.GetRequiredService<IInstanceRepository>();
+var repository = provider.GetRequiredService<IVersionRepository>();
 var launcher = provider.GetRequiredService<IGameLaunchService>();
 var javaDetector = provider.GetRequiredService<IJavaDetector>();
 
@@ -36,7 +36,7 @@ if (runtimes.Count == 0)
 }
 
 // 固定实例 ID，重复运行会复用同一个实例目录（natives、日志、存档都在里面）
-var instance = await repository.GetAsync("smoke") ?? new GameInstance
+var instance = await repository.GetAsync("smoke") ?? new GameVersion
 {
     Id = "smoke",
     Name = "冒烟测试",
@@ -44,13 +44,10 @@ var instance = await repository.GetAsync("smoke") ?? new GameInstance
 };
 
 instance.MinecraftVersion = versionId;
-// 冒烟测试用独立游戏目录，不污染真实 .minecraft。
-// 新布局下隔离开启会把游戏目录指到版本文件夹（SolarShared/versions），
-// 这里用覆盖路径钉在实例目录里，保持“测试数据只留在实例目录”的原意。
+// 冒烟测试用独立根目录，隔离开启后游戏目录就是版本文件夹，
+// 测试数据只留在 <root>/.minecraft/versions/smoke 下。
 instance.VersionIsolation = true;
-instance.GameDirectoryOverride = provider.GetRequiredService<Solar.Core.Paths.AppPaths>()
-    .GetInstanceMinecraftDirectory("smoke");
-await repository.SaveAsync(instance);
+await repository.SaveSettingsAsync(instance);
 
 var lastReport = DateTimeOffset.MinValue;
 

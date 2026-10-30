@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <views:PageBase
-    x:Class="Solar.App.Views.InstanceCreatePage"
+    x:Class="Solar.App.Views.VersionCreatePage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -22,7 +22,7 @@
                         HorizontalAlignment="Left"
                         Command="{x:Bind ViewModel.BackCommand}"
                         Content="← 返回" />
-                    <TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="创建实例" />
+                    <TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="创建版本" />
                     <TextBlock
                         Style="{StaticResource BodyTextBlockStyle}"
                         Foreground="{ThemeResource TextFillColorSecondaryBrush}"
@@ -47,9 +47,9 @@
 
                             <TextBox
                                 Grid.Column="1"
-                                Header="实例名称"
+                                Header="版本名称"
                                 PlaceholderText="留空则按所选组件自动命名"
-                                Text="{x:Bind ViewModel.InstanceName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                Text="{x:Bind ViewModel.VersionName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                         </Grid>
 
                         <TextBlock

@@ -38,7 +38,7 @@ public sealed partial class MainWindow : Window
 
     /// <summary>
     /// 最小窗口尺寸（逻辑像素）。取 800×600：再窄侧栏会退到只剩图标，
-    /// 页面里的表单和卡片（实例页的四列表单、设置页的说明文字）就挤不下了。
+    /// 页面里的表单和卡片（版本页的四列表单、设置页的说明文字）就挤不下了。
     /// </summary>
     private const int MinimumLogicalWidth = 800;
     private const int MinimumLogicalHeight = 600;
@@ -203,7 +203,7 @@ public sealed partial class MainWindow : Window
     /// 页面切到上次停留的子分区，选中项等父项展开后再补上。
     /// <para>
     /// 「管理」是可选中项，第一次点击由 <see cref="NavView_SelectionChanged"/> 导航；
-    /// 这里再处理一次，是为了让已经在管理里（例如停在 Mods）时再点一次能回到实例列表。
+    /// 这里再处理一次，是为了让已经在管理里（例如停在 Mods）时再点一次能回到版本列表。
     /// </para>
     /// </summary>
     private void NavView_ItemInvoked(NavigationView sender, NavigationViewItemInvokedEventArgs args)
@@ -221,7 +221,7 @@ public sealed partial class MainWindow : Window
                 break;
 
             case "manage":
-                NavigateTo(typeof(InstancesPage), null);
+                NavigateTo(typeof(VersionsPage), null);
                 break;
         }
     }
@@ -270,10 +270,10 @@ public sealed partial class MainWindow : Window
                     NavigateToDownloadSection(selected);
                     break;
 
-                // 「管理」是单个入口：点开就是实例列表，
+                // 「管理」是单个入口：点开就是版本列表，
                 // Mods / 资源包 / 光影 由页面顶部的分区栏切换，不再占用侧边栏。
                 case "manage":
-                    NavigateTo(typeof(InstancesPage), null);
+                    NavigateTo(typeof(VersionsPage), null);
                     break;
 
                 default:

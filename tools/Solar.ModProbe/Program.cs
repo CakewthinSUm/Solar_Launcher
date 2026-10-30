@@ -1,7 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Solar.Core;
-using Solar.Core.Instances;
+using Solar.Core.Versions;
 using Solar.Core.Modpacks;
 using Solar.Core.Mods;
 
@@ -176,7 +176,7 @@ async Task<int> InstallAsync(ModSource source, string projectId, string? loaderN
     var installer = provider.GetRequiredService<IModInstaller>();
 
     // 用临时目录当“共享游戏目录”，避免污染真实数据
-    var instance = new GameInstance
+    var instance = new GameVersion
     {
         Id = "probe",
         Name = "probe",
