@@ -3,8 +3,12 @@ using System.Text.RegularExpressions;
 namespace Solar.Core.Versions;
 
 /// <summary>
-/// 版本隔离的建议值判定，对齐 PCL 的逻辑。
-/// 扫描与创建页共用：给定全局档位和版本特征，回答"该不该隔离"。
+/// 新建版本时版本隔离的默认值判定，对齐 PCL 的逻辑：
+/// 给定全局档位和版本特征，回答"该不该隔离"。
+/// <para>
+/// 只用于创建页给出建议值；已存在的版本以 <c>.solar/version.json</c> 为准，
+/// 没有设置文件时按未隔离处理（见 <see cref="VersionRepository"/>）。
+/// </para>
 /// </summary>
 public static partial class VersionIsolationPolicy
 {

@@ -3,7 +3,6 @@ using System.Text.Json.Nodes;
 using Microsoft.Extensions.Logging;
 using Solar.Core.Json;
 using Solar.Core.Paths;
-using Solar.Core.Settings;
 
 namespace Solar.Core.Versions;
 
@@ -31,7 +30,6 @@ public interface IVersionRepository
 public sealed class VersionRepository(
     MinecraftPaths paths,
     IVersionScanner scanner,
-    ISettingsService settings,
     ILogger<VersionRepository> logger) : IVersionRepository
 {
     public Task<IReadOnlyList<GameVersion>> GetAllAsync(CancellationToken ct = default)
@@ -188,57 +186,13 @@ public sealed class VersionRepository(
         }
         else
         {
-            version.Settings.VersionIsolation = DefaultIsolation(scanned);
+            // 没有 .solar/version.json 的版本一律按不隔离处理：
+            // .solar 只在用户第一次修改该版本设置（或启动器写入运行记录）时生成，
+            // 没有它就意味着这个版本从来没被单独设置过，和 PCL 一样共用游戏目录。
+            version.Settings.VersionIsolation = false;
         }
 
         version.Settings.CompanionMods ??= [];
         return version;
-    }
-
-    /// <summary>
-    /// 没有设置文件时的默认隔离值，对齐 PCL 的自动检测：
-    /// 版本夹里已有玩家内容（非空 mods/saves）时隔离，否则按全局档位与版本特征判定。
-    /// </summary>
-    private bool DefaultIsolation(ScannedVersion scanned)
-    {
-        var directory = scanned.Directory ?? paths.GetVersionDirectory(scanned.VersionId);
-        if (HasPlayerContent(directory))
-        {
-            return true;
-        }
-
-        var unstable = VersionIsolationPolicy.IsUnstable(scanned.Type, scanned.VersionId)
-                       || VersionIsolationPolicy.IsUnstable(scanned.Type, scanned.MinecraftVersion);
-
-        return VersionIsolationPolicy.ShouldIsolate(
-            settings.Current.DefaultIsolationScope,
-            modable: scanned.Loader != ModLoader.Vanilla,
-            unstable);
-    }
-
-    private static bool HasPlayerContent(string directory)
-    {
-        foreach (var name in (ReadOnlySpan<string>)["mods", "saves"])
-        {
-            var path = Path.Combine(directory, name);
-            if (!Directory.Exists(path))
-            {
-                continue;
-            }
-
-            try
-            {
-                if (Directory.EnumerateFileSystemEntries(path).Any())
-                {
-                    return true;
-                }
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-            {
-                // 目录被占用或没有权限时按"没有内容"处理
-            }
-        }
-
-        return false;
     }
 }

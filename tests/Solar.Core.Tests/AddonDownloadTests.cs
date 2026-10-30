@@ -428,7 +428,6 @@ public class ModpackInstallTests : IDisposable
         _repository = new VersionRepository(
             _mcPaths,
             new VersionScanner(_mcPaths, NullLogger<VersionScanner>.Instance),
-            settings,
             NullLogger<VersionRepository>.Instance);
 
         _service = new ModpackService(
