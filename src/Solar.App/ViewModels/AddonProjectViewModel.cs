@@ -111,7 +111,7 @@ public sealed partial class AddonProjectViewModel : ViewModelBase
     /// <summary>数据包必须有存档；其余类型只要有实例即可。</summary>
     private bool CanInstallToInstance =>
         _instance is not null
-        && (Type != ModProjectType.DataPack || _installer.GetWorlds(_instance).Count > 0);
+        && (Type != ModProjectType.DataPack || _installer.GetWorlds(null).Count > 0);
 
     /// <summary>没选实例时没有「兼容」这个概念，切换开关没有意义，直接禁用。</summary>
     public bool CanFilterVersions => _instance is not null && !IsModpack;
@@ -390,14 +390,10 @@ public sealed partial class AddonProjectViewModel : ViewModelBase
             warning = $"这个 Mod 标注的加载器是 {ModDisplay.Loaders(project.Loaders)}，"
                       + $"与实例的 {ModDisplay.LoaderName(_instance.Loader)} 不一致。";
         }
-        else if (project.ProjectType == ModProjectType.DataPack && _installer.GetWorlds(_instance).Count == 0)
+        else if (project.ProjectType == ModProjectType.DataPack && _installer.GetWorlds(null).Count == 0)
         {
-            warning = "这个实例还没有存档。数据包只能装进某个世界的 datapacks 目录，"
+            warning = "还没有存档。数据包只能装进某个世界的 datapacks 目录，"
                       + "请先在游戏里创建一个世界。";
-        }
-        else if (project.ProjectType == ModProjectType.Mod && !_instance.VersionIsolation)
-        {
-            warning = "实例没有开启版本隔离，Mod 会装进共享的游戏目录，影响所有未隔离的实例。";
         }
 
         CompatibilityWarning = warning;

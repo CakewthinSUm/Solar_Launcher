@@ -288,39 +288,48 @@ public class ContentInstallerTests : IDisposable
     };
 
     [Fact]
-    public void EachTypeMapsToItsOwnFolder()
+    public void EachTypeMapsToItsOwnFolderUnderSharedMinecraft()
     {
-        var instance = Instance();
-        var game = _directories.Resolve(instance);
+        var game = _directories.Shared;
 
         Assert.Equal(Path.Combine(game, "mods"),
-            _installer.GetContentDirectory(instance, ModProjectType.Mod));
+            _installer.GetContentDirectory(null, ModProjectType.Mod));
         Assert.Equal(Path.Combine(game, "resourcepacks"),
-            _installer.GetContentDirectory(instance, ModProjectType.ResourcePack));
+            _installer.GetContentDirectory(null, ModProjectType.ResourcePack));
         Assert.Equal(Path.Combine(game, "shaderpacks"),
-            _installer.GetContentDirectory(instance, ModProjectType.Shader));
+            _installer.GetContentDirectory(null, ModProjectType.Shader));
         Assert.Equal(Path.Combine(game, "saves", "World", "datapacks"),
-            _installer.GetContentDirectory(instance, ModProjectType.DataPack, "World"));
+            _installer.GetContentDirectory(null, ModProjectType.DataPack, "World"));
+    }
+
+    [Fact]
+    public void InstanceTargetStillUsesItsOwnGameDirectory()
+    {
+        // 创建实例时装附加 Mod 走这条：隔离实例必须写进自己的目录才读得到
+        var instance = Instance();
+
+        Assert.Equal(Path.Combine(_directories.Resolve(instance), "mods"),
+            _installer.GetContentDirectory(instance, ModProjectType.Mod));
     }
 
     [Fact]
     public void DataPackWithoutWorldIsAnError()
     {
         Assert.Throws<InvalidOperationException>(() =>
-            _installer.GetContentDirectory(Instance(), ModProjectType.DataPack));
+            _installer.GetContentDirectory(null, ModProjectType.DataPack));
     }
 
     [Fact]
     public void ModpackHasNoInstallDirectory()
     {
         Assert.Throws<InvalidOperationException>(() =>
-            _installer.GetContentDirectory(Instance(), ModProjectType.Modpack));
+            _installer.GetContentDirectory(null, ModProjectType.Modpack));
     }
 
     [Fact]
     public void WorldsAreDirectoriesWithLevelDatNewestFirst()
     {
-        var saves = Path.Combine(_directories.Resolve(Instance()), "saves");
+        var saves = Path.Combine(_directories.Shared, "saves");
         Directory.CreateDirectory(Path.Combine(saves, "Old World"));
         File.WriteAllText(Path.Combine(saves, "Old World", "level.dat"), "x");
         Directory.CreateDirectory(Path.Combine(saves, "New World"));
@@ -333,7 +342,7 @@ public class ContentInstallerTests : IDisposable
         Directory.SetLastWriteTimeUtc(Path.Combine(saves, "New World"), DateTime.UtcNow);
         Directory.SetLastWriteTimeUtc(Path.Combine(saves, "Old World"), DateTime.UtcNow.AddDays(-2));
 
-        var worlds = _installer.GetWorlds(Instance());
+        var worlds = _installer.GetWorlds(null);
 
         Assert.Equal(["New World", "Old World"], worlds);
     }
@@ -341,15 +350,14 @@ public class ContentInstallerTests : IDisposable
     [Fact]
     public void InstalledCheckForDataPackIsWorldSpecific()
     {
-        var instance = Instance();
         var file = new ModFile("pack.zip", "https://x/pack.zip", null, 1);
 
-        var directory = _installer.GetContentDirectory(instance, ModProjectType.DataPack, "World");
+        var directory = _installer.GetContentDirectory(null, ModProjectType.DataPack, "World");
         Directory.CreateDirectory(directory);
         File.WriteAllText(Path.Combine(directory, file.FileName), "x");
 
-        Assert.True(_installer.IsInstalled(instance, ModProjectType.DataPack, file, "World"));
-        Assert.False(_installer.IsInstalled(instance, ModProjectType.DataPack, file, "Other"));
+        Assert.True(_installer.IsInstalled(null, ModProjectType.DataPack, file, "World"));
+        Assert.False(_installer.IsInstalled(null, ModProjectType.DataPack, file, "Other"));
     }
 
     [Fact]

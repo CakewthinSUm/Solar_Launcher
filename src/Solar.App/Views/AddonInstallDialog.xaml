@@ -23,7 +23,7 @@
             SelectedItem="{x:Bind ViewModel.SelectedWorld, Mode=TwoWay}"
             Visibility="{x:Bind ViewModel.IsDataPack, Mode=OneWay, Converter={StaticResource VisibleWhenTrue}}" />
 
-        <!-- 目标目录：等宽显示，用户能一眼看出装到哪个实例 -->
+        <!-- 目标目录：等宽显示，用户能一眼看出文件会落到哪里 -->
         <StackPanel Spacing="2">
             <TextBlock Style="{StaticResource CaptionTextBlockStyle}" Text="目标目录" />
             <TextBlock

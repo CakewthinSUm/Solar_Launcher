@@ -12,7 +12,6 @@ public sealed class ContentManagerTests : IDisposable
     private readonly string _root = Path.Combine(Path.GetTempPath(), "solar-test-" + Guid.NewGuid().ToString("N")[..8]);
     private readonly AppPaths _paths;
     private readonly ContentManager _content;
-    private readonly GameInstance _instance = new() { Id = "inst", MinecraftVersion = "1.21.4" };
 
     public ContentManagerTests()
     {
@@ -24,18 +23,18 @@ public sealed class ContentManagerTests : IDisposable
     [Fact]
     public void MissingDirectoryListsNothing()
     {
-        Assert.Empty(_content.List(_instance, ContentKind.Mods));
+        Assert.Empty(_content.List(ContentKind.Mods));
     }
 
     [Fact]
     public void ListReturnsJarFilesForMods()
     {
-        var mods = _content.GetContentDirectory(_instance, ContentKind.Mods);
+        var mods = _content.GetContentDirectory(ContentKind.Mods);
         WriteFile(Path.Combine(mods, "sodium.jar"), "jar");
         WriteFile(Path.Combine(mods, "readme.txt"), "text");
         WriteFile(Path.Combine(mods, "config", "a.toml"), "toml");
 
-        var packs = _content.List(_instance, ContentKind.Mods);
+        var packs = _content.List(ContentKind.Mods);
 
         // 只认 jar；说明文件和子目录都不显示，避免列表被杂物塞满
         Assert.Equal(["sodium.jar"], packs.Select(p => p.Name));
@@ -44,12 +43,12 @@ public sealed class ContentManagerTests : IDisposable
     [Fact]
     public void ListAcceptsZipFilesAndFoldersForResourcePacks()
     {
-        var packsDir = _content.GetContentDirectory(_instance, ContentKind.ResourcePacks);
+        var packsDir = _content.GetContentDirectory(ContentKind.ResourcePacks);
         WriteFile(Path.Combine(packsDir, "faithful.zip"), "zip");
         WriteFile(Path.Combine(packsDir, "unzipped", "pack.mcmeta"), "meta");
         WriteFile(Path.Combine(packsDir, "notes.txt"), "text");
 
-        var packs = _content.List(_instance, ContentKind.ResourcePacks);
+        var packs = _content.List(ContentKind.ResourcePacks);
 
         Assert.Equal(["faithful.zip", "unzipped"], packs.Select(p => p.Name).OrderBy(n => n));
         Assert.Contains(packs, p => p.Name == "unzipped" && p.IsDirectory);
@@ -58,13 +57,26 @@ public sealed class ContentManagerTests : IDisposable
     [Fact]
     public void FoldersUseSeparateMetaText()
     {
-        var dir = _content.GetContentDirectory(_instance, ContentKind.ShaderPacks);
+        var dir = _content.GetContentDirectory(ContentKind.ShaderPacks);
         WriteFile(Path.Combine(dir, "bsl", "shaders", "block.properties"), "x");
 
-        var pack = Assert.Single(_content.List(_instance, ContentKind.ShaderPacks));
+        var pack = Assert.Single(_content.List(ContentKind.ShaderPacks));
 
         Assert.Equal("文件夹", pack.SizeText);
         Assert.StartsWith("文件夹 · ", pack.MetaText);
+    }
+
+    [Fact]
+    public void AlwaysUsesSharedMinecraftDirectory()
+    {
+        // 页面暂时不区分实例与版本隔离，三个分区都读共享 .minecraft
+        Assert.Equal(Path.Combine(_paths.DefaultMinecraft, "mods"), _content.GetContentDirectory(ContentKind.Mods));
+        Assert.Equal(
+            Path.Combine(_paths.DefaultMinecraft, "resourcepacks"),
+            _content.GetContentDirectory(ContentKind.ResourcePacks));
+        Assert.Equal(
+            Path.Combine(_paths.DefaultMinecraft, "shaderpacks"),
+            _content.GetContentDirectory(ContentKind.ShaderPacks));
     }
 
     [Fact]
@@ -73,22 +85,22 @@ public sealed class ContentManagerTests : IDisposable
         var source = Path.Combine(_root, "download", "sodium.jar");
         WriteFile(source, "jar");
 
-        await _content.ImportAsync(_instance, ContentKind.Mods, source, overwrite: false);
+        await _content.ImportAsync(ContentKind.Mods, source, overwrite: false);
 
-        Assert.Equal("jar", ReadFile(Path.Combine(_content.GetContentDirectory(_instance, ContentKind.Mods), "sodium.jar")));
+        Assert.Equal("jar", ReadFile(Path.Combine(_content.GetContentDirectory(ContentKind.Mods), "sodium.jar")));
         Assert.True(File.Exists(source));
     }
 
     [Fact]
     public async Task ImportWithoutOverwriteRejectsExistingName()
     {
-        var target = Path.Combine(_content.GetContentDirectory(_instance, ContentKind.Mods), "a.jar");
+        var target = Path.Combine(_content.GetContentDirectory(ContentKind.Mods), "a.jar");
         WriteFile(target, "old");
         var source = Path.Combine(_root, "download", "a.jar");
         WriteFile(source, "new");
 
         await Assert.ThrowsAsync<IOException>(
-            () => _content.ImportAsync(_instance, ContentKind.Mods, source, overwrite: false));
+            () => _content.ImportAsync(ContentKind.Mods, source, overwrite: false));
 
         Assert.Equal("old", ReadFile(target));
     }
@@ -96,12 +108,12 @@ public sealed class ContentManagerTests : IDisposable
     [Fact]
     public async Task ImportWithOverwriteReplacesExistingFile()
     {
-        var target = Path.Combine(_content.GetContentDirectory(_instance, ContentKind.Mods), "a.jar");
+        var target = Path.Combine(_content.GetContentDirectory(ContentKind.Mods), "a.jar");
         WriteFile(target, "old");
         var source = Path.Combine(_root, "download", "a.jar");
         WriteFile(source, "new");
 
-        await _content.ImportAsync(_instance, ContentKind.Mods, source, overwrite: true);
+        await _content.ImportAsync(ContentKind.Mods, source, overwrite: true);
 
         Assert.Equal("new", ReadFile(target));
     }
@@ -112,10 +124,10 @@ public sealed class ContentManagerTests : IDisposable
         var source = Path.Combine(_root, "download", "bsl");
         WriteFile(Path.Combine(source, "shaders", "composite.fsh"), "shader");
 
-        await _content.ImportAsync(_instance, ContentKind.ShaderPacks, source, overwrite: false);
+        await _content.ImportAsync(ContentKind.ShaderPacks, source, overwrite: false);
 
         var copied = Path.Combine(
-            _content.GetContentDirectory(_instance, ContentKind.ShaderPacks),
+            _content.GetContentDirectory(ContentKind.ShaderPacks),
             "bsl",
             "shaders",
             "composite.fsh");
@@ -132,7 +144,7 @@ public sealed class ContentManagerTests : IDisposable
         Assert.Contains("jar", error);
 
         await Assert.ThrowsAsync<InvalidOperationException>(
-            () => _content.ImportAsync(_instance, ContentKind.Mods, source, overwrite: false));
+            () => _content.ImportAsync(ContentKind.Mods, source, overwrite: false));
     }
 
     [Fact]
@@ -148,11 +160,11 @@ public sealed class ContentManagerTests : IDisposable
     [Fact]
     public void DeleteRemovesFile()
     {
-        var target = Path.Combine(_content.GetContentDirectory(_instance, ContentKind.Mods), "a.jar");
+        var target = Path.Combine(_content.GetContentDirectory(ContentKind.Mods), "a.jar");
         WriteFile(target, "jar");
-        var pack = Assert.Single(_content.List(_instance, ContentKind.Mods));
+        var pack = Assert.Single(_content.List(ContentKind.Mods));
 
-        _content.Delete(_instance, ContentKind.Mods, pack);
+        _content.Delete(ContentKind.Mods, pack);
 
         Assert.False(File.Exists(target));
     }
@@ -166,20 +178,8 @@ public sealed class ContentManagerTests : IDisposable
         var pack = new ContentPack("important.txt", outside, false, 4, DateTimeOffset.Now);
 
         Assert.Throws<InvalidOperationException>(
-            () => _content.Delete(_instance, ContentKind.Mods, pack));
+            () => _content.Delete(ContentKind.Mods, pack));
         Assert.True(File.Exists(outside));
-    }
-
-    [Fact]
-    public void IsolatedInstanceUsesItsOwnContentDirectory()
-    {
-        _instance.VersionIsolation = true;
-
-        var directory = _content.GetContentDirectory(_instance, ContentKind.Mods);
-
-        Assert.Equal(
-            Path.Combine(_paths.Versions, "1.21.4", "mods"),
-            directory);
     }
 
     private static void WriteFile(string path, string content)

@@ -32,36 +32,19 @@
                 TextWrapping="Wrap" />
         </StackPanel>
 
-        <!-- 实例选择与操作 -->
+        <!-- 操作 -->
         <Border Grid.Row="1" Style="{StaticResource SolarCardStyle}">
             <StackPanel Spacing="12">
-                <Grid ColumnSpacing="12">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-
-                    <ComboBox
-                        Grid.Column="0"
-                        Header="实例"
-                        HorizontalAlignment="Stretch"
-                        DisplayMemberPath="Name"
-                        IsEnabled="{x:Bind ViewModel.HasNoInstances, Mode=OneWay, Converter={StaticResource InvertBool}}"
-                        ItemsSource="{x:Bind ViewModel.Instances, Mode=OneWay}"
-                        PlaceholderText="还没有实例"
-                        SelectedItem="{x:Bind ViewModel.SelectedInstance, Mode=TwoWay}" />
-
+                <StackPanel
+                    HorizontalAlignment="Right"
+                    Orientation="Horizontal"
+                    Spacing="12">
                     <!--
                         导入分两种：文件（zip / jar）和文件夹（解压后的资源包、光影包都合法）。
                         合成一个下拉按钮，避免工具栏在 800px 的最小窗口宽度下挤成一排。
                     -->
                     <DropDownButton
-                        Grid.Column="1"
-                        VerticalAlignment="Bottom"
                         Content="导入"
-                        IsEnabled="{x:Bind ViewModel.HasSelectedInstance, Mode=OneWay}"
                         Style="{StaticResource AccentButtonStyle}">
                         <DropDownButton.Flyout>
                             <MenuFlyout>
@@ -72,19 +55,13 @@
                     </DropDownButton>
 
                     <Button
-                        Grid.Column="2"
-                        VerticalAlignment="Bottom"
                         Command="{x:Bind ViewModel.OpenFolderCommand}"
-                        Content="打开文件夹"
-                        IsEnabled="{x:Bind ViewModel.HasSelectedInstance, Mode=OneWay}" />
+                        Content="打开文件夹" />
 
                     <Button
-                        Grid.Column="3"
-                        VerticalAlignment="Bottom"
                         Command="{x:Bind ViewModel.LoadCommand}"
-                        Content="刷新"
-                        IsEnabled="{x:Bind ViewModel.HasSelectedInstance, Mode=OneWay}" />
-                </Grid>
+                        Content="刷新" />
+                </StackPanel>
 
                 <!-- 实际目录：用户可以照着这个路径手动放文件 -->
                 <TextBlock
@@ -162,18 +139,13 @@
                 </ListView.ItemTemplate>
             </ListView>
 
-            <!-- 空状态：没有实例 / 文件夹为空 -->
+            <!-- 空状态：文件夹为空 -->
             <StackPanel
                 Grid.Row="1"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Center"
                 Spacing="4"
                 Visibility="{x:Bind ViewModel.IsEmpty, Mode=OneWay, Converter={StaticResource VisibleWhenTrue}}">
-                <TextBlock
-                    HorizontalAlignment="Center"
-                    Style="{StaticResource BodyStrongTextBlockStyle}"
-                    Text="这里还是空的"
-                    Visibility="{x:Bind ViewModel.HasSelectedInstance, Mode=OneWay, Converter={StaticResource VisibleWhenTrue}}" />
                 <TextBlock
                     HorizontalAlignment="Center"
                     Style="{StaticResource CaptionTextBlockStyle}"
