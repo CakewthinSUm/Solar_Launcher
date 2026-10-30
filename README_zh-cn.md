@@ -43,7 +43,8 @@
 `mods` / `config` / `saves` / `resourcepacks` 复制一份过去，目标已存在的文件不会覆盖。
 
 `assets` 与 `libraries` 始终共享，不受隔离影响。版本设置写在
-`versions/<id>/.solar/version.json`，跟随版本文件夹一起搬移。
+`versions/<id>/.solar/version.json`，跟随版本文件夹一起搬移。没有这个文件的版本
+按**未隔离**处理；`.solar` 目录只在第一次修改版本设置时才生成。
 
 ![版本设置](docs/images/instance-settings.png)
 

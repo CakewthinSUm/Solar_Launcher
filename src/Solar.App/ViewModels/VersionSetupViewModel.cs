@@ -52,10 +52,13 @@ public sealed partial class VersionSetupViewModel : ViewModelBase
         _logger = logger;
     }
 
-    /// <summary>该版本实际会用的游戏目录（覆盖优先，其次是隔离目录，最后是共享目录）。</summary>
+    /// <summary>
+    /// 该版本实际会用的游戏目录。跟随开关当前的值而不是已保存的值，
+    /// 这样拨动开关时下方的路径立刻变化，不会看起来像开关没反应。
+    /// </summary>
     public string EffectiveGameDirectory => _instance is null
         ? ""
-        : _gameDirectories.ResolveGameDirectory(_instance.Id, _instance.VersionIsolation);
+        : _gameDirectories.ResolveGameDirectory(_instance.Id, VersionIsolation);
 
     public string IsolationHint => VersionIsolation
         ? "游戏目录就是该版本的文件夹，存档与模组都在里面。"

@@ -34,7 +34,7 @@ public sealed class VersionCreationTests : IDisposable
 
         var scanner = new VersionScanner(_mcPaths, NullLogger<VersionScanner>.Instance);
         _repository = new VersionRepository(
-            _mcPaths, scanner, _settings, NullLogger<VersionRepository>.Instance);
+            _mcPaths, scanner, NullLogger<VersionRepository>.Instance);
     }
 
     private VersionCreationService CreateService() => new(

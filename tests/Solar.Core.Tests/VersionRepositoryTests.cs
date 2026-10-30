@@ -24,7 +24,7 @@ public sealed class VersionRepositoryTests : IDisposable
 
         var scanner = new VersionScanner(_paths, NullLogger<VersionScanner>.Instance);
         _repository = new VersionRepository(
-            _paths, scanner, _settings, NullLogger<VersionRepository>.Instance);
+            _paths, scanner, NullLogger<VersionRepository>.Instance);
     }
 
     [Fact]
@@ -71,30 +71,56 @@ public sealed class VersionRepositoryTests : IDisposable
     }
 
     [Fact]
-    public async Task MissingSettingsUsesIsolationScope()
+    public async Task IsolationChangeIsPersistedUnderSolarFolder()
     {
         WriteVersion("1.21.4");
 
-        _settings.Current.DefaultIsolationScope = VersionIsolationScope.Off;
-        var off = await _repository.GetAsync("1.21.4");
-        Assert.False(off!.VersionIsolation);
+        var version = await _repository.GetAsync("1.21.4");
+        Assert.False(version!.VersionIsolation);
 
-        _settings.Current.DefaultIsolationScope = VersionIsolationScope.All;
-        var all = await _repository.GetAsync("1.21.4");
-        Assert.True(all!.VersionIsolation);
+        // 第一次修改设置时才生成 .solar 目录
+        Assert.False(Directory.Exists(_paths.GetVersionSettingsDirectory("1.21.4")));
+
+        version.VersionIsolation = true;
+        await _repository.SaveSettingsAsync(version);
+
+        Assert.True(File.Exists(_paths.GetVersionSettingsFile("1.21.4")));
+        Assert.True((await _repository.GetAsync("1.21.4"))!.VersionIsolation);
+        Assert.True((await _repository.GetAllAsync()).Single(v => v.Id == "1.21.4").VersionIsolation);
+
+        version.VersionIsolation = false;
+        await _repository.SaveSettingsAsync(version);
+
+        Assert.False((await _repository.GetAsync("1.21.4"))!.VersionIsolation);
+        Assert.False((await _repository.GetAllAsync()).Single(v => v.Id == "1.21.4").VersionIsolation);
     }
 
     [Fact]
-    public async Task PlayerContentForcesIsolationEvenWhenScopeIsOff()
+    public async Task MissingSettingsMeansNotIsolated()
+    {
+        WriteVersion("1.21.4");
+
+        // 没有 .solar/version.json 的版本一律不隔离，与全局默认档位无关
+        _settings.Current.DefaultIsolationScope = VersionIsolationScope.All;
+
+        var version = await _repository.GetAsync("1.21.4");
+        Assert.False(version!.VersionIsolation);
+
+        var all = await _repository.GetAllAsync();
+        Assert.False(all.Single(v => v.Id == "1.21.4").VersionIsolation);
+    }
+
+    [Fact]
+    public async Task PlayerContentWithoutSettingsStaysNotIsolated()
     {
         WriteVersion("1.21.4");
         Directory.CreateDirectory(Path.Combine(_paths.GetVersionDirectory("1.21.4"), "mods"));
         File.WriteAllText(Path.Combine(_paths.GetVersionDirectory("1.21.4"), "mods", "a.jar"), "");
 
-        _settings.Current.DefaultIsolationScope = VersionIsolationScope.Off;
+        _settings.Current.DefaultIsolationScope = VersionIsolationScope.All;
         var version = await _repository.GetAsync("1.21.4");
 
-        Assert.True(version!.VersionIsolation);
+        Assert.False(version!.VersionIsolation);
     }
 
     [Fact]
