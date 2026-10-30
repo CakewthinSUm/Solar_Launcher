@@ -1,4 +1,3 @@
-using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Navigation;
 using Solar.App.ViewModels;
 
@@ -24,13 +23,5 @@ public sealed partial class VersionSetupPage : PageBase
     {
         ViewModel.VersionId = e.Parameter as string;
         base.OnNavigatedTo(e);
-    }
-
-    private void Back_Click(object sender, RoutedEventArgs e)
-    {
-        if (Frame.CanGoBack)
-        {
-            Frame.GoBack();
-        }
     }
 }

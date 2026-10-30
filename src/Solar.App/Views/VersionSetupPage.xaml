@@ -13,12 +13,8 @@
             Padding="{StaticResource SolarPagePadding}"
             Spacing="{StaticResource SolarSectionSpacing}">
 
-            <!-- 返回与标题 -->
+            <!-- 标题 -->
             <StackPanel Spacing="4">
-                <Button
-                    HorizontalAlignment="Left"
-                    Click="Back_Click"
-                    Content="← 返回版本列表" />
                 <TextBlock
                     Style="{StaticResource TitleTextBlockStyle}"
                     Text="{x:Bind ViewModel.VersionName, Mode=OneWay}" />
