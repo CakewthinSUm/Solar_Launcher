@@ -1,4 +1,4 @@
-using System.Net.Http.Json;
+using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Solar.Core.Json;
 using Solar.Core.Models;
@@ -32,10 +32,18 @@ public sealed class AssetIndexService(
     {
         var path = GetIndexPath(reference.Id);
 
-        var cached = await JsonFile.ReadAsync<AssetIndex>(path, ct).ConfigureAwait(false);
-        if (cached is { Objects.Count: > 0 })
+        if (File.Exists(path))
         {
-            return cached;
+            var text = await File.ReadAllTextAsync(path, ct).ConfigureAwait(false);
+            var cached = TryParseCached(text, reference.Id);
+            if (cached is not null)
+            {
+                return cached;
+            }
+
+            logger.LogWarning(
+                "资源索引 {Id} 不是游戏可读的原生格式（旧版本写过 PascalCase），重新下载",
+                reference.Id);
         }
 
         if (string.IsNullOrEmpty(reference.Url))
@@ -44,7 +52,8 @@ public sealed class AssetIndexService(
         }
 
         logger.LogInformation("下载资源索引: {Id}", reference.Id);
-        var index = await http.GetFromJsonAsync<AssetIndex>(reference.Url, SolarJson.Options, ct).ConfigureAwait(false)
+        var json = await http.GetStringAsync(reference.Url, ct).ConfigureAwait(false);
+        var index = JsonSerializer.Deserialize<AssetIndex>(json, SolarJson.Options)
                     ?? throw new InvalidOperationException($"资源索引 {reference.Id} 内容无效。");
 
         if (index.Objects.Count == 0)
@@ -52,8 +61,32 @@ public sealed class AssetIndexService(
             throw new InvalidOperationException($"资源索引 {reference.Id} 不包含任何资源对象。");
         }
 
-        await JsonFile.WriteAsync(path, index, ct).ConfigureAwait(false);
+        // 原样保存：游戏按 camelCase 读这个文件，重新序列化会让它读到空索引
+        await JsonFile.WriteRawAsync(path, json, ct).ConfigureAwait(false);
         return index;
+    }
+
+    /// <summary>
+    /// 读取本地缓存的索引；不是 Mojang 原生格式时返回 null，让调用方重新下载。
+    /// 判断依据是字段名大小写：原生文件里一定有 <c>"objects"</c>。
+    /// </summary>
+    private AssetIndex? TryParseCached(string text, string indexId)
+    {
+        if (!text.Contains("\"objects\"", StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        try
+        {
+            var index = JsonSerializer.Deserialize<AssetIndex>(text, SolarJson.Options);
+            return index is { Objects.Count: > 0 } ? index : null;
+        }
+        catch (JsonException ex)
+        {
+            logger.LogWarning(ex, "资源索引 {Id} 解析失败，重新下载", indexId);
+            return null;
+        }
     }
 
     public void EnsureLegacyLayout(AssetIndex index, string indexId, bool virtualLayout, bool mapToResources)

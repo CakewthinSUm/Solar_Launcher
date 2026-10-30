@@ -42,8 +42,12 @@ public sealed class LiteLoaderInstaller(
         Directory.CreateDirectory(versionDirectory);
 
         var detail = BuildProfile(build, minecraftVersion, versionId);
+        // 版本 JSON 按 Mojang 原生格式写：launchwrapper 与外部工具按 camelCase 读
         await JsonFile.WriteAsync(
-            Path.Combine(versionDirectory, versionId + ".json"), detail, ct).ConfigureAwait(false);
+            Path.Combine(versionDirectory, versionId + ".json"),
+            detail,
+            ct,
+            SolarJson.MinecraftNative).ConfigureAwait(false);
 
         progress?.Report(new LoaderInstallProgress("正在下载 LiteLoader 库", 0, 1));
         var resolved = await resolver.ResolveAsync(versionId, ct).ConfigureAwait(false);

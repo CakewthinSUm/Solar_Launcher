@@ -22,6 +22,9 @@ public sealed class LaunchContext
     public GameFileLocator? FileLocator { get; init; }
 
     public required string JavaPath { get; init; }
+
+    /// <summary>所选 Java 的大版本；GC、编码参数要按版本区分。</summary>
+    public int JavaMajorVersion { get; init; } = 8;
     public required string PlayerName { get; init; }
     public required string Uuid { get; init; }
     public required string AccessToken { get; init; }
@@ -62,8 +65,7 @@ public sealed class ArgumentBuilder
     {
         var result = new List<string>();
 
-        // 内存与平台相关参数放在最前面，用户/版本参数可以覆盖它们
-        result.Add($"-Xmx{context.MaxMemoryMb}M");
+        // 平台与路径参数放最前，版本 JSON 里的同名参数会覆盖它们
         result.Add($"-Djava.library.path={context.NativesDirectory}");
         result.Add("-Dminecraft.launcher.brand=SolarLauncher");
         result.Add("-Dminecraft.launcher.version=0.1.0");
@@ -74,6 +76,16 @@ public sealed class ArgumentBuilder
         {
             result.AddRange(Expand(arguments.Jvm, context));
         }
+
+        // 版本 JSON 自带的 -Xmx 不一定合适，去掉后统一用启动器算出来的值
+        result.RemoveAll(IsMemoryArgument);
+        result.Add($"-Xmx{context.MaxMemoryMb}M");
+
+        AddGcArguments(result, context.JavaMajorVersion);
+        AddEncodingArguments(result, context.JavaMajorVersion);
+
+        // log4j 漏洞防御，与 PCL 一致
+        result.Add("-Dlog4j2.formatMsgNoLookups=true");
 
         if (!string.IsNullOrWhiteSpace(context.Settings.ExtraJvmArguments))
         {
@@ -89,8 +101,153 @@ public sealed class ArgumentBuilder
         result.Add(context.Version.Detail.MainClass
                    ?? throw new InvalidOperationException($"版本 {context.Version.Id} 缺少 MainClass。"));
 
+        // 重复的 -cp / -Djava.library.path 会让 JVM 取最后一个，
+        // 内容相同则去重，内容不同保留后者（与 PCL 的 JVM 参数策略一致）
+        return Deduplicate(result, isJvm: true);
+    }
+
+    private static bool IsMemoryArgument(string argument) =>
+        argument.StartsWith("-Xmx", StringComparison.Ordinal)
+        || argument.StartsWith("-Xms", StringComparison.Ordinal);
+
+    /// <summary>
+    /// GC 参数按 Java 版本选择，与 PCL 的默认策略一致：
+    /// Java 21+ 分代 ZGC，15–20 非分代 ZGC，更早用调优过的 G1GC。
+    /// 用户或版本已经指定 GC 时不覆盖。
+    /// </summary>
+    private static void AddGcArguments(List<string> args, int javaMajor)
+    {
+        var specified = args.Any(a =>
+            a.StartsWith("-XX:", StringComparison.Ordinal)
+            && (a.Contains("GC", StringComparison.Ordinal) || a.Contains("ZGenerational", StringComparison.Ordinal)));
+
+        if (specified)
+        {
+            return;
+        }
+
+        args.Add("-XX:+UnlockExperimentalVMOptions");
+
+        if (javaMajor >= 24)
+        {
+            args.Add("-XX:+UseCompactObjectHeaders");
+        }
+
+        if (javaMajor >= 21)
+        {
+            args.Add("-XX:+UseZGC");
+            if (javaMajor <= 22)
+            {
+                // Java 23 起分代 ZGC 默认开启，再加参数会报错
+                args.Add("-XX:+ZGenerational");
+            }
+        }
+        else if (javaMajor >= 15)
+        {
+            args.Add("-XX:+UseZGC");
+        }
+        else
+        {
+            args.Add("-XX:+UseG1GC");
+            args.Add("-XX:G1NewSizePercent=20");
+            args.Add("-XX:G1ReservePercent=20");
+            args.Add("-XX:G1HeapRegionSize=32M");
+            args.Add("-XX:MaxGCPauseMillis=50");
+            if (javaMajor <= 7)
+            {
+                args.Add("-XX:MaxPermSize=512m");
+            }
+        }
+    }
+
+    /// <summary>
+    /// 固定游戏标准输出的编码为 UTF-8：日志按 UTF-8 写盘，
+    /// 否则中文路径、中文模组日志会变成乱码（PCL 也是这么处理的）。
+    /// </summary>
+    private static void AddEncodingArguments(List<string> args, int javaMajor)
+    {
+        var stdout = javaMajor >= 19 ? "stdout.encoding" : "sun.stdout.encoding";
+        var stderr = javaMajor >= 19 ? "stderr.encoding" : "sun.stderr.encoding";
+
+        if (!args.Any(a => a.StartsWith($"-D{stdout}=", StringComparison.Ordinal)))
+        {
+            args.Add($"-D{stdout}=UTF-8");
+        }
+
+        if (!args.Any(a => a.StartsWith($"-D{stderr}=", StringComparison.Ordinal)))
+        {
+            args.Add($"-D{stderr}=UTF-8");
+        }
+    }
+
+    /// <summary>
+    /// 参数去重，规则与 PCL 的 <c>DeduplicateJavaArguments</c> 一致：
+    /// 单参数完全相同的只留一个；键值对在 JVM 参数里相同才去重，
+    /// 游戏参数里后者覆盖前者（重复的 --width / --uuid 会让游戏整体失效），
+    /// 但 --tweakClass 例外，OptiFine 需要保留多条。
+    /// </summary>
+    private static List<string> Deduplicate(List<string> args, bool isJvm)
+    {
+        var result = new List<string>();
+        var i = 0;
+
+        while (i < args.Count)
+        {
+            var key = args[i];
+
+            if (!IsKey(key) || i + 1 >= args.Count || IsKey(args[i + 1]) && !IsNegativeNumber(args[i + 1]))
+            {
+                i++;
+                if (!result.Contains(key))
+                {
+                    result.Add(key);
+                }
+
+                continue;
+            }
+
+            var value = args[i + 1];
+            i += 2;
+
+            var duplicate = false;
+            for (var j = 0; j + 1 < result.Count; j++)
+            {
+                if (result[j] != key)
+                {
+                    continue;
+                }
+
+                if (!isJvm && key != "--tweakClass")
+                {
+                    // 游戏参数：后出现的值覆盖先出现的
+                    result[j + 1] = value;
+                    duplicate = true;
+                    break;
+                }
+
+                // JVM 参数只在键和值都相同时去重；同名不同值保留两条，交给 JVM 取后者
+                if (result[j + 1] == value)
+                {
+                    duplicate = true;
+                    break;
+                }
+            }
+
+            if (!duplicate)
+            {
+                result.Add(key);
+                result.Add(value);
+            }
+        }
+
         return result;
     }
+
+    private static bool IsKey(string argument) => argument.StartsWith('-');
+
+    /// <summary><c>-50</c> 这类是参数值（如 <c>-xPos -50</c>），不是新的键。</summary>
+    private static bool IsNegativeNumber(string argument) =>
+        argument.Length > 1 && argument[1..].All(char.IsDigit);
 
     /// <summary>构建游戏参数（即 MainClass 之后的参数）。</summary>
     public IReadOnlyList<string> BuildGameArguments(LaunchContext context)
@@ -123,7 +280,8 @@ public sealed class ArgumentBuilder
             result.AddRange(SplitArguments(context.Settings.ExtraGameArguments));
         }
 
-        return result;
+        // 游戏参数里重复的键会让两条都失效（例如两个 --uuid），后者覆盖前者
+        return Deduplicate(result, isJvm: false);
     }
 
     /// <summary>把库列表拼成 classpath，只包含有实际文件的库。</summary>

@@ -17,6 +17,17 @@ public sealed class GameFileBuilder(AppPaths paths, GameFileLocator? locator = n
     private const string ResourcesHost = "https://resources.download.minecraft.net";
 
     /// <summary>
+    /// 本次启动会解压出来的 natives 文件名。
+    /// 下载完成后用它清掉 natives 目录里不属于当前版本的旧文件。
+    /// <para>
+    /// 必须用并发容器：解压任务在下载器的多个线程上并行执行，
+    /// 普通 HashSet 并发写入会丢条目，清理时就会把还在用的 dll 当垃圾删掉。
+    /// </para>
+    /// </summary>
+    public ConcurrentDictionary<string, byte> ExtractedNatives { get; } =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
     /// 游戏本体 jar，放在 <c>versions/&lt;id&gt;/&lt;id&gt;.jar</c>。
     /// <para>
     /// 接管过来的游戏目录里已经有这个 jar 时，直接把落点指向那份：
@@ -97,7 +108,7 @@ public sealed class GameFileBuilder(AppPaths paths, GameFileLocator? locator = n
                     Hash = library.Downloads?.Artifact?.Sha1 ?? library.Sha1,
                     Size = library.Downloads?.Artifact?.Size ?? library.Size,
                     UpdateTask = isNewStyleNative
-                        ? [new NativeExtractTask(nativesDirectory, library.Extract?.Exclude)]
+                        ? [new NativeExtractTask(nativesDirectory, library.Extract?.Exclude, ExtractedNatives)]
                         : [],
                 };
             }
@@ -118,7 +129,7 @@ public sealed class GameFileBuilder(AppPaths paths, GameFileLocator? locator = n
                         Url = nativeArtifact.Url,
                         Hash = nativeArtifact.Sha1,
                         Size = nativeArtifact.Size,
-                        UpdateTask = [new NativeExtractTask(nativesDirectory, library.Extract?.Exclude)],
+                        UpdateTask = [new NativeExtractTask(nativesDirectory, library.Extract?.Exclude, ExtractedNatives)],
                     };
                 }
             }
@@ -128,6 +139,14 @@ public sealed class GameFileBuilder(AppPaths paths, GameFileLocator? locator = n
     /// <summary>把 assets 索引里的每个对象变成下载项。</summary>
     public IEnumerable<GameFile> BuildAssets(AssetIndex index)
     {
+        var objectsRoot = Path.Combine(paths.Assets, "objects");
+
+        // 接管过来的游戏目录里通常已经有一整套资源（官方启动器 / PCL 下的）。
+        // 同一份资源按哈希定位，直接链接过来就不必重新下载几百 MB。
+        var externalObjects = locator is null
+            ? null
+            : Path.Combine(locator.ExternalAssets, "objects");
+
         foreach (var (name, obj) in index.Objects)
         {
             if (obj.Hash.Length < 2)
@@ -136,16 +155,50 @@ public sealed class GameFileBuilder(AppPaths paths, GameFileLocator? locator = n
             }
 
             var prefix = obj.Hash[..2];
+            var target = Path.Combine(objectsRoot, prefix, obj.Hash);
+
+            if (externalObjects is not null && !File.Exists(target))
+            {
+                LinkExternalObject(Path.Combine(externalObjects, prefix, obj.Hash), target, obj.Size);
+            }
 
             // 资源不跟着版本走：游戏的 --assetsDir 只有一个目录，
             // 这里必须落在 Solar 自己的 assets 下，否则游戏会去空目录里找资源。
             yield return new GameFile(name)
             {
-                Path = Path.Combine(paths.Assets, "objects", prefix, obj.Hash),
+                Path = target,
                 Url = $"{ResourcesHost}/{prefix}/{obj.Hash}",
                 Hash = obj.Hash,
                 Size = obj.Size,
             };
+        }
+    }
+
+    /// <summary>
+    /// 把外部资源目录里已有的对象链接进 Solar 的 assets。
+    /// 优先硬链接（同卷瞬间完成、不占额外空间），跨卷或失败时退回复制；
+    /// 两种都失败就保持缺失，交给下载器补齐。
+    /// </summary>
+    private static void LinkExternalObject(string source, string target, long expectedSize)
+    {
+        try
+        {
+            var info = new FileInfo(source);
+            if (!info.Exists || (expectedSize > 0 && info.Length != expectedSize))
+            {
+                return;
+            }
+
+            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+
+            if (!HardLink.TryCreate(target, source))
+            {
+                File.Copy(source, target, overwrite: false);
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // 链接不了就让它照常下载，不影响正确性
         }
     }
 
@@ -182,7 +235,10 @@ public sealed class GameFileBuilder(AppPaths paths, GameFileLocator? locator = n
 /// 下载完成后把原生库解压到实例的 <c>natives</c> 目录。
 /// 由下载引擎在文件就绪后调用。
 /// </summary>
-public sealed class NativeExtractTask(string nativesDirectory, IReadOnlyList<string>? exclude) : IUpdateTask
+public sealed class NativeExtractTask(
+    string nativesDirectory,
+    IReadOnlyList<string>? exclude,
+    ConcurrentDictionary<string, byte> extracted) : IUpdateTask
 {
     /// <summary>
     /// META-INF 是签名信息，对运行无用；老版本 JSON 的 extract.exclude 通常只列它，
@@ -203,45 +259,86 @@ public sealed class NativeExtractTask(string nativesDirectory, IReadOnlyList<str
             .Concat(exclude ?? [])
             .ToArray();
 
-        using var archive = ZipFile.OpenRead(file.Path);
-        foreach (var entry in archive.Entries)
+        try
         {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            // 目录项没有内容，跳过
-            if (string.IsNullOrEmpty(entry.Name))
+            using var archive = ZipFile.OpenRead(file.Path);
+            foreach (var entry in archive.Entries)
             {
-                continue;
-            }
+                cancellationToken.ThrowIfCancellationRequested();
 
-            if (excluded.Any(prefix => entry.FullName.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)))
-            {
-                continue;
-            }
+                // 与 PCL 一致：只解压 dll。Windows 上真正要加载的原生库就是它们，
+                // 其余（签名、说明文件）解压出来只会拖慢启动。
+                if (string.IsNullOrEmpty(entry.Name)
+                    || !entry.Name.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
 
-            var destination = Path.Combine(nativesDirectory, entry.Name);
+                if (excluded.Any(prefix => entry.FullName.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)))
+                {
+                    continue;
+                }
 
-            // 多个 natives jar 可能包含同名文件（glfw.dll 就同时出现在
-            // lwjgl-glfw 和 lwjgl 里），而解压任务在下载器里是并行执行的。
-            // 按目标路径加锁，避免两个线程同时写同一个文件。
-            lock (GetFileLock(destination))
-            {
-                ExtractSafely(entry, destination);
+                var destination = Path.Combine(nativesDirectory, entry.Name);
+
+                // 多个 natives jar 可能包含同名文件（glfw.dll 就同时出现在
+                // lwjgl-glfw 和 lwjgl 里），而解压任务在下载器里是并行执行的。
+                // 按目标路径加锁，避免两个线程同时写同一个文件。
+                lock (GetFileLock(destination))
+                {
+                    extracted.TryAdd(entry.Name, 0);
+
+                    // 已经是同一份文件就不再解压
+                    var info = new FileInfo(destination);
+                    if (info.Exists && info.Length == entry.Length)
+                    {
+                        continue;
+                    }
+
+                    if (!ExtractSafely(entry, destination))
+                    {
+                        return ValueTask.CompletedTask;
+                    }
+                }
             }
+        }
+        catch (InvalidDataException)
+        {
+            // 压缩包损坏：删掉它，下次启动会重新下载
+            TryDelete(file.Path);
         }
 
         return ValueTask.CompletedTask;
     }
 
-    private static void ExtractSafely(ZipArchiveEntry entry, string destination)
+    private static bool ExtractSafely(ZipArchiveEntry entry, string destination)
     {
         try
         {
             entry.ExtractToFile(destination, overwrite: true);
+            return true;
         }
         catch (IOException) when (File.Exists(destination))
         {
             // 另一个任务刚好写完同一个文件，内容一致，忽略即可
+            return true;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // 文件被占用（通常是有游戏正在运行）：跳过解压，不影响本次启动
+            return false;
+        }
+    }
+
+    private static void TryDelete(string path)
+    {
+        try
+        {
+            File.Delete(path);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // 删不掉就留着，下次启动还会再试
         }
     }
 

@@ -15,6 +15,27 @@ public sealed partial class MainWindow : Window
     [DllImport("user32.dll")]
     private static extern uint GetDpiForWindow(IntPtr hwnd);
 
+    private const int WmSetIcon = 0x0080;
+    private const int IconSmall = 0;
+    private const int IconBig = 1;
+    private const uint ImageIcon = 1;
+    private const uint LrLoadFromFile = 0x10;
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern IntPtr LoadImage(IntPtr hInstance, string name, uint type, int cx, int cy, uint load);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
+
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+    private static extern uint ExtractIconEx(string file, int index, out IntPtr large, out IntPtr small, uint count);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool DestroyIcon(IntPtr hIcon);
+
+    private IntPtr _smallIcon;
+    private IntPtr _bigIcon;
+
     /// <summary>
     /// 最小窗口尺寸（逻辑像素）。取 800×600：再窄侧栏会退到只剩图标，
     /// 页面里的表单和卡片（实例页的四列表单、设置页的说明文字）就挤不下了。
@@ -45,7 +66,7 @@ public sealed partial class MainWindow : Window
 
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(AppTitleBar);
-        AppWindow.SetIcon("Assets/AppIcon.ico");
+        ApplyWindowIcon();
         ResizeToLogicalSize(1180, 760);
         ApplyMinimumSize();
 
@@ -62,6 +83,60 @@ public sealed partial class MainWindow : Window
 
         // 首页与导航项同一次导航，避免启动时出现两次页面切换动画
         NavigateTo(typeof(HomePage), null);
+    }
+
+    /// <summary>
+    /// 设置窗口图标。
+    /// <para>
+    /// 单文件发布时程序从临时解压目录运行，相对路径 <c>Assets/AppIcon.ico</c> 不一定找得到，
+    /// 而且任务栏用的是小图标（16×16），只设大图标时任务栏仍会显示默认图标。
+    /// 这里两个尺寸都显式设置，找不到 ico 时回退到 exe 内嵌图标。
+    /// </para>
+    /// </summary>
+    private void ApplyWindowIcon()
+    {
+        var iconPath = new[]
+        {
+            Path.Combine(AppContext.BaseDirectory, "Assets", "AppIcon.ico"),
+            Path.Combine(Path.GetDirectoryName(Environment.ProcessPath) ?? "", "Assets", "AppIcon.ico"),
+        }.FirstOrDefault(File.Exists);
+
+        if (iconPath is not null)
+        {
+            _smallIcon = LoadImage(IntPtr.Zero, iconPath, ImageIcon, 16, 16, LrLoadFromFile);
+            _bigIcon = LoadImage(IntPtr.Zero, iconPath, ImageIcon, 32, 32, LrLoadFromFile);
+        }
+        else if (Environment.ProcessPath is { } exe
+                 && ExtractIconEx(exe, 0, out var large, out var small, 1) > 0)
+        {
+            _bigIcon = large;
+            _smallIcon = small;
+        }
+
+        var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+        if (_smallIcon != IntPtr.Zero)
+        {
+            SendMessage(hwnd, WmSetIcon, IconSmall, _smallIcon);
+        }
+
+        if (_bigIcon != IntPtr.Zero)
+        {
+            SendMessage(hwnd, WmSetIcon, IconBig, _bigIcon);
+        }
+
+        Closed += (_, _) =>
+        {
+            // 句柄用完要销毁，但必须等窗口关闭之后
+            if (_smallIcon != IntPtr.Zero)
+            {
+                DestroyIcon(_smallIcon);
+            }
+
+            if (_bigIcon != IntPtr.Zero)
+            {
+                DestroyIcon(_bigIcon);
+            }
+        };
     }
 
     /// <summary>AppWindow 使用物理像素，按当前 DPI 换算成逻辑尺寸，保证各缩放下观感一致。</summary>

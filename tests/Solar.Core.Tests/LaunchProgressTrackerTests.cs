@@ -40,8 +40,40 @@ public class LaunchProgressTrackerTests
                 LaunchStage.ResolvingVersion,
                 LaunchStage.Downloading,
                 LaunchStage.Starting,
+                LaunchStage.WaitingForWindow,
             },
             tracker.Plan.Select(item => item.Stage));
+    }
+
+    [Fact]
+    public void WindowWaitIsTheLastStage()
+    {
+        var tracker = new LaunchProgressTracker(Vanilla());
+
+        Assert.Equal(LaunchStage.WaitingForWindow, tracker.Plan[^1].Stage);
+        Assert.Equal("等待游戏窗口", tracker.Plan[^1].Title);
+    }
+
+    [Fact]
+    public void CrashWhileWaitingForWindowMarksThatStageFailed()
+    {
+        var tracker = new LaunchProgressTracker(Vanilla());
+
+        Report(tracker, LaunchStage.Authenticating);
+        Report(tracker, LaunchStage.DetectingJava);
+        Report(tracker, LaunchStage.ResolvingVersion);
+        Report(tracker, LaunchStage.Downloading);
+        Report(tracker, LaunchStage.Starting);
+        Report(tracker, LaunchStage.WaitingForWindow);
+        tracker.Fail("游戏进程已退出（退出码 1）");
+
+        Assert.Equal(LaunchOutcome.Failed, tracker.Outcome);
+        Assert.Equal(
+            LaunchStageState.Failed,
+            tracker.States[IndexOf(tracker, LaunchStage.WaitingForWindow)]);
+        Assert.Equal(
+            LaunchStageState.Done,
+            tracker.States[IndexOf(tracker, LaunchStage.Starting)]);
     }
 
     [Fact]
@@ -50,7 +82,7 @@ public class LaunchProgressTrackerTests
         var tracker = new LaunchProgressTracker(Modded(loaderInstalled: false));
 
         Assert.Contains(tracker.Plan, item => item.Stage == LaunchStage.InstallingLoader);
-        Assert.Equal(100d, tracker.TotalWeight);
+        Assert.Equal(105d, tracker.TotalWeight);
     }
 
     [Fact]
@@ -59,7 +91,7 @@ public class LaunchProgressTrackerTests
         var tracker = new LaunchProgressTracker(Modded(loaderInstalled: true));
 
         Assert.DoesNotContain(tracker.Plan, item => item.Stage == LaunchStage.InstallingLoader);
-        Assert.Equal(80d, tracker.TotalWeight);
+        Assert.Equal(85d, tracker.TotalWeight);
     }
 
     [Fact]
@@ -161,7 +193,7 @@ public class LaunchProgressTrackerTests
 
         // 25/100 字节优先于 1/100 文件数
         Assert.Equal(
-            (5 + 10 + 10 + 50 * 0.25) / 80,
+            (5 + 10 + 10 + 50 * 0.25) / 85,
             tracker.OverallRatio,
             precision: 6);
     }

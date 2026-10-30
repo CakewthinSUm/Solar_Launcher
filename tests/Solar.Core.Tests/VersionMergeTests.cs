@@ -56,6 +56,28 @@ public class VersionMergeTests
     }
 
     [Fact]
+    public void SameVersionKeepsPlatformVariantsOfSameArtifact()
+    {
+        // 1.12.2 的版本 JSON 同时列了 LWJGL 2 的 Windows 版和 macOS 版，
+        // 去重键不含版本号，后一条会把前一条覆盖掉，导致 Windows 上缺 LWJGL 2。
+        var detail = new VersionDetail
+        {
+            Id = "1.12.2",
+            Libraries =
+            [
+                new Library { Name = "org.lwjgl.lwjgl:lwjgl:2.9.4-nightly-20150209" },
+                new Library { Name = "org.lwjgl.lwjgl:lwjgl:2.9.2-nightly-20140822" },
+            ],
+        };
+
+        var merged = VersionResolver.Merge([detail]);
+
+        Assert.Equal(2, merged.Libraries.Count);
+        Assert.Contains(merged.Libraries, l => l.Name.Contains("2.9.4"));
+        Assert.Contains(merged.Libraries, l => l.Name.Contains("2.9.2"));
+    }
+
+    [Fact]
     public void ChildReplacesParentArtifactWithDifferentVersion()
     {
         // 原版 1.21.4 要 asm 9.6，Fabric 要 9.10.1。

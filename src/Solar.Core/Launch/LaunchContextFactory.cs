@@ -20,7 +20,8 @@ public sealed class LaunchContextFactory(
         ResolvedVersion version,
         string javaPath,
         AccountSession account,
-        string? logConfigPath = null)
+        string? logConfigPath = null,
+        int javaMajorVersion = 8)
     {
         // 游戏目录取决于实例的版本隔离开关：关闭时所有实例共用设置里的 .minecraft，
         // 开启时用实例自己的目录（存档、模组、配置互不影响）。
@@ -35,13 +36,14 @@ public sealed class LaunchContextFactory(
             Settings = settings.Current,
             FileLocator = fileLocator,
             JavaPath = javaPath,
+            JavaMajorVersion = javaMajorVersion,
             PlayerName = account.Username,
             Uuid = account.Uuid,
             AccessToken = account.AccessToken,
             Xuid = account.Xuid ?? "",
             UserType = account.UserType,
             GameDirectory = gameDirectory,
-            NativesDirectory = Path.Combine(paths.GetInstanceDirectory(instance.Id), "natives"),
+            NativesDirectory = paths.GetNativesDirectory(instance.Id),
             AssetsDirectory = paths.Assets,
             LogConfigPath = logConfigPath ?? "",
             Resolution = (854, 480),

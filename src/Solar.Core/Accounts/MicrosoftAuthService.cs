@@ -111,18 +111,26 @@ public sealed class MicrosoftAuthService(
     public async Task<AccountSession> AcquireSessionAsync(string accountId, CancellationToken ct = default)
     {
         EnsureConfigured();
-        var (handler, _) = await GetOrCreateAsync(ct).ConfigureAwait(false);
+        var (handler, msalApp) = await GetOrCreateAsync(ct).ConfigureAwait(false);
 
-        var account = FindCmlAccount(handler, accountId)
+        var stored = await store.GetAsync(accountId, ct).ConfigureAwait(false);
+        var account = FindCmlAccount(handler, accountId, stored)
                       ?? throw new AccountException(
                           AccountErrorKind.NotSignedIn,
                           "该账户的登录信息已失效，请重新登录。");
 
         try
         {
-            var session = await handler.AuthenticateSilently(account, ct).ConfigureAwait(false);
+            // 静默刷新必须走 MSAL：登录时 OAuth 令牌存在 MSAL 的缓存里，
+            // 而 JELoginHandler.AuthenticateSilently 用的是内置代码流，
+            // 那条链路的会话被标记为 NoStore，根本没有可用的刷新令牌。
+            var authenticator = handler.CreateAuthenticator(account, ct);
+            authenticator.AddMsalOAuth(msalApp, msal => msal.Silent());
+            authenticator.AddXboxAuthForJE(xbox => xbox.Basic());
+            authenticator.AddJEAuthenticator();
 
-            var stored = await store.GetAsync(accountId, ct).ConfigureAwait(false);
+            var session = await authenticator.ExecuteForLauncherAsync().ConfigureAwait(false);
+
             if (stored is not null)
             {
                 stored.LastAuthenticatedAt = DateTimeOffset.Now;
@@ -162,7 +170,8 @@ public sealed class MicrosoftAuthService(
     {
         var (handler, msalApp) = await GetOrCreateAsync(ct).ConfigureAwait(false);
 
-        var account = FindCmlAccount(handler, accountId);
+        var stored = await store.GetAsync(accountId, ct).ConfigureAwait(false);
+        var account = FindCmlAccount(handler, accountId, stored);
         if (account is not null)
         {
             try
@@ -204,6 +213,12 @@ public sealed class MicrosoftAuthService(
                 .WithAccountManager(Path.Combine(paths.Data, AccountFileName))
                 .Build();
 
+            // JsonXboxGameAccountManager 要等到第一次 GetAccounts() 才读盘，
+            // 而读盘会先清空内存里的账户列表。登录时先 NewAccount() 再保存，
+            // 保存过程中触发的这次读盘会把刚建的账户冲掉，msa-accounts.json 只剩 {}，
+            // 于是登录“成功”但下次启动找不到账户。先主动加载一次，进入已加载状态。
+            _handler.AccountManager.GetAccounts();
+
             _msalApp = await MsalClientHelper
                 .BuildApplicationWithCache(clientId)
                 .ConfigureAwait(false);
@@ -238,10 +253,41 @@ public sealed class MicrosoftAuthService(
         }
     }
 
-    private static IXboxGameAccount? FindCmlAccount(JELoginHandler handler, string accountId)
+    /// <summary>
+    /// 在 CmlLib 的账户管理器里找到对应账户。
+    /// <para>
+    /// 正常情况下 <see cref="JEGameAccount.Identifier"/> 就是 Minecraft 档案 UUID，
+    /// 与 <see cref="GameAccount.Id"/> 一致；旧版本写下的账户可能没有 UUID，
+    /// 这时按用户名兜底，最后只剩一个账户时直接用它——比让用户重新登录更友好。
+    /// </para>
+    /// </summary>
+    private static IXboxGameAccount? FindCmlAccount(
+        JELoginHandler handler,
+        string accountId,
+        GameAccount? stored)
     {
-        return handler.AccountManager.GetAccounts()
-            .FirstOrDefault(a => NormalizeId(a.Identifier) == NormalizeId(accountId));
+        var accounts = handler.AccountManager.GetAccounts();
+        var target = NormalizeId(accountId);
+
+        var match = accounts.FirstOrDefault(a => NormalizeId(a.Identifier) == target);
+        if (match is not null)
+        {
+            return match;
+        }
+
+        if (!string.IsNullOrEmpty(stored?.Username))
+        {
+            match = accounts.FirstOrDefault(a =>
+                a is JEGameAccount je
+                && string.Equals(je.Profile?.Username, stored.Username, StringComparison.OrdinalIgnoreCase));
+            if (match is not null)
+            {
+                return match;
+            }
+        }
+
+        // 找不到就当作已失效：宁可让用户重新登录，也不能拿别的账户去启动游戏
+        return null;
     }
 
     private static string? TryGetMicrosoftAccount(JELoginHandler handler)

@@ -1,4 +1,4 @@
-using System.Net.Http.Json;
+using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Solar.Core.Json;
 using Solar.Core.Models;
@@ -95,7 +95,13 @@ public sealed class VersionResolver(
         //
         // 按"父在前"的原始顺序输出，但子版本（chain[0]）声明的库要覆盖父版本的同名项，
         // 因此先收集父版本，遇到子版本时原地替换。
+        //
+        // 注意：只跨版本去重，同一版本里同名的库必须都保留。
+        // 1.12.2 的 JSON 同时列了 org.lwjgl.lwjgl:lwjgl 的 Windows 版（2.9.4）
+        // 和 macOS 版（2.9.2），后一条会覆盖前一条，Windows 版被规则过滤掉后
+        // classpath 里就没有 LWJGL 2 了，游戏直接 NoClassDefFoundError。
         var libraries = new List<Library>();
+        var levelOf = new List<int>();
         var indexByKey = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
         for (var i = chain.Count - 1; i >= 0; i--)
@@ -104,16 +110,25 @@ public sealed class VersionResolver(
             {
                 var key = GetArtifactKey(library.Name);
 
-                if (indexByKey.TryGetValue(key, out var existing))
+                if (indexByKey.TryGetValue(key, out var existing) && levelOf[existing] != i)
                 {
-                    // 越往后处理越具体，直接覆盖即可：
-                    // 父版本先收集，子版本后到，天然实现"子覆盖父"
+                    // 已有条目来自父版本：子版本覆盖它
                     libraries[existing] = library;
+                    levelOf[existing] = i;
+                    continue;
+                }
+
+                if (indexByKey.ContainsKey(key))
+                {
+                    // 同一版本内的同名库是不同平台的变体，全部保留，交给规则筛选
+                    libraries.Add(library);
+                    levelOf.Add(i);
                     continue;
                 }
 
                 indexByKey[key] = libraries.Count;
                 libraries.Add(library);
+                levelOf.Add(i);
             }
         }
 
@@ -191,10 +206,12 @@ public sealed class VersionResolver(
     public async Task<VersionDetail> DownloadVersionJsonAsync(VersionSummary summary, CancellationToken ct = default)
     {
         logger.LogInformation("下载版本 JSON: {Id}", summary.Id);
-        var detail = await http.GetFromJsonAsync<VersionDetail>(summary.Url, SolarJson.Options, ct).ConfigureAwait(false)
+        var json = await http.GetStringAsync(summary.Url, ct).ConfigureAwait(false);
+        var detail = JsonSerializer.Deserialize<VersionDetail>(json, SolarJson.Options)
                      ?? throw new InvalidOperationException($"版本 {summary.Id} 的 JSON 无效。");
 
-        await JsonFile.WriteAsync(GetVersionJsonPath(summary.Id), detail, ct).ConfigureAwait(false);
+        // 原样保存：Forge/OptiFine 安装器等外部工具按 camelCase 读这份文件
+        await JsonFile.WriteRawAsync(GetVersionJsonPath(summary.Id), json, ct).ConfigureAwait(false);
         return detail;
     }
 }

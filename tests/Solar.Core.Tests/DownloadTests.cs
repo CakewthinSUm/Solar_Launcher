@@ -218,7 +218,7 @@ public class NativeExtractTaskTests
             Write(zip, "META-INF/MANIFEST.MF", "manifest");
         }
 
-        var task = new NativeExtractTask(nativesDir, null);
+        var task = new NativeExtractTask(nativesDir, null, new System.Collections.Concurrent.ConcurrentDictionary<string, byte>(StringComparer.OrdinalIgnoreCase));
         var file = new GameFile("natives") { Path = jarPath };
 
         await task.Execute(file, CancellationToken.None);
@@ -241,14 +241,14 @@ public class NativeExtractTaskTests
         using (var zip = ZipFile.Open(jarPath, ZipArchiveMode.Create))
         {
             Write(zip, "keep.dll", "a");
-            Write(zip, "drop.txt", "b");
+            Write(zip, "drop.dll", "b");
         }
 
-        var task = new NativeExtractTask(nativesDir, ["drop.txt"]);
+        var task = new NativeExtractTask(nativesDir, ["drop.dll"], new System.Collections.Concurrent.ConcurrentDictionary<string, byte>(StringComparer.OrdinalIgnoreCase));
         await task.Execute(new GameFile("natives") { Path = jarPath }, CancellationToken.None);
 
         Assert.True(File.Exists(Path.Combine(nativesDir, "keep.dll")));
-        Assert.False(File.Exists(Path.Combine(nativesDir, "drop.txt")));
+        Assert.False(File.Exists(Path.Combine(nativesDir, "drop.dll")));
 
         Directory.Delete(root, recursive: true);
     }
@@ -274,7 +274,7 @@ public class NativeExtractTaskTests
             jars.Add(jarPath);
         }
 
-        var task = new NativeExtractTask(nativesDir, null);
+        var task = new NativeExtractTask(nativesDir, null, new System.Collections.Concurrent.ConcurrentDictionary<string, byte>(StringComparer.OrdinalIgnoreCase));
 
         await Task.WhenAll(jars.Select(jar =>
             Task.Run(() => task.Execute(new GameFile("natives") { Path = jar }, CancellationToken.None).AsTask())));
@@ -287,7 +287,7 @@ public class NativeExtractTaskTests
     [Fact]
     public async Task MissingFileIsNotAnError()
     {
-        var task = new NativeExtractTask(Path.GetTempPath(), null);
+        var task = new NativeExtractTask(Path.GetTempPath(), null, new System.Collections.Concurrent.ConcurrentDictionary<string, byte>(StringComparer.OrdinalIgnoreCase));
         await task.Execute(new GameFile("natives") { Path = @"C:\does\not\exist.jar" }, CancellationToken.None);
     }
 
@@ -298,3 +298,5 @@ public class NativeExtractTaskTests
         writer.Write(content);
     }
 }
+
+

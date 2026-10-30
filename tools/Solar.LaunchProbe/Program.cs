@@ -54,8 +54,11 @@ try
     Console.WriteLine($"  MainClass: {version.Detail.MainClass}");
     Console.WriteLine($"  合并后库数量: {version.Detail.Libraries.Count}");
 
-    var requiredJava = version.Detail.JavaVersion?.MajorVersion ?? 8;
-    var java = javaDetector.Select(runtimes, requiredJava)!;
+    var java = javaDetector.Select(
+        runtimes,
+        Solar.Core.Java.JavaRequirements.For(instance, version))
+        ?? throw new InvalidOperationException(
+            $"没有满足要求的 Java：{Solar.Core.Java.JavaRequirements.For(instance, version).Describe()}");
     Console.WriteLine($"  Java: {java}");
 
     Console.WriteLine("补齐文件…");
@@ -69,7 +72,7 @@ try
         Xuid: "",
         UserType: "msa");
 
-    var context = factory.Create(instance, version, java.Path, account);
+    var context = factory.Create(instance, version, java.Path, account, javaMajorVersion: java.MajorVersion);
 
     var builder = new ArgumentBuilder();
     var classPath = ArgumentBuilder.BuildClassPath(context);
@@ -92,7 +95,8 @@ try
 
     Console.WriteLine();
     Console.WriteLine("启动游戏…");
-    var process = launcher.Start(context);
+    var launched = launcher.Start(context);
+    var process = launched.Process;
     Console.WriteLine($"pid={process.Id}");
 
     // 加载器初始化通常 20~40 秒；能活过 90 秒基本说明进游戏了

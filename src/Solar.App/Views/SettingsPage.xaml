@@ -171,6 +171,28 @@
                     </StackPanel>
                 </Border>
 
+                <!-- 游戏语言：首次启动时写进 options.txt -->
+                <Border Style="{StaticResource SolarCardStyle}">
+                    <StackPanel Spacing="8">
+                        <StackPanel Spacing="2">
+                            <TextBlock Text="游戏语言" />
+                            <TextBlock
+                                Style="{StaticResource CaptionTextBlockStyle}"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Text="首次启动时写进 options.txt；游戏里改过语言、或游戏目录里已经有存档后不再覆盖。"
+                                TextWrapping="Wrap" />
+                        </StackPanel>
+
+                        <ComboBox
+                            MinWidth="240"
+                            SelectedIndex="{x:Bind ViewModel.GameLanguageIndex, Mode=TwoWay}">
+                            <ComboBoxItem Content="简体中文" />
+                            <ComboBoxItem Content="繁體中文" />
+                            <ComboBoxItem Content="English" />
+                        </ComboBox>
+                    </StackPanel>
+                </Border>
+
                 <!-- 游戏目录：未开启版本隔离的实例共用的 .minecraft -->
                 <Border Style="{StaticResource SolarCardStyle}">
                     <StackPanel Spacing="8">

@@ -96,10 +96,11 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
+                        <!-- 启动过程的耗时主要花在下载/解压上，阶段权重算出来的比例并不准，
+                             用不确定进度条表示"正在处理"更诚实 -->
                         <ProgressBar
                             VerticalAlignment="Center"
-                            Maximum="1"
-                            Value="{x:Bind ViewModel.LaunchProgress, Mode=OneWay}" />
+                            IsIndeterminate="True" />
                         <TextBlock
                             Grid.Column="1"
                             VerticalAlignment="Center"
