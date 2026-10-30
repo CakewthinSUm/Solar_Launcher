@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using CmlLib.Core;
 using CmlLib.Core.Files;
 using CmlLib.Core.Installers;
@@ -43,7 +44,7 @@ public sealed class GameDownloader(
         CancellationToken ct = default)
     {
         var context = new RuleContext();
-        var nativesDirectory = Path.Combine(paths.GetInstanceDirectory(instance.Id), "natives");
+        var nativesDirectory = paths.GetNativesDirectory(instance.Id);
         Directory.CreateDirectory(nativesDirectory);
 
         var builder = new GameFileBuilder(paths, fileLocator);
@@ -66,7 +67,22 @@ public sealed class GameDownloader(
         if (version.Detail.AssetIndex is { } assetIndexRef)
         {
             index = await assetIndexService.GetIndexAsync(assetIndexRef, ct).ConfigureAwait(false);
-            files.AddRange(builder.BuildAssets(index));
+
+            // 与 PCL 一致：启动时资源只查存在 + 大小。资源按内容寻址，文件名就是哈希，
+            // 大小对上基本可以认为完好；完整 SHA1 校验留给「修复」场景，不拖慢每次启动。
+            // （BuildAssets 会顺手把其它启动器已有的同一份资源硬链接过来。）
+            var assets = builder.BuildAssets(index).ToList();
+            var pending = assets.Where(file => !IsAssetReady(file)).ToList();
+
+            if (pending.Count < assets.Count)
+            {
+                logger.LogInformation(
+                    "资源已就绪 {Ready}/{Total}，跳过哈希校验",
+                    assets.Count - pending.Count,
+                    assets.Count);
+            }
+
+            files.AddRange(pending);
         }
         else
         {
@@ -117,6 +133,9 @@ public sealed class GameDownloader(
 
         await installer.Install(files, fileProgress, byteProgress, ct).ConfigureAwait(false);
 
+        // natives 目录里残留的旧 dll 会被游戏加载到，和 PCL 一样在解压后清掉
+        CleanupNatives(nativesDirectory, builder.ExtractedNatives);
+
         // 1.7 以前的版本要求资源额外复制一份到 virtual/ 或 resources/
         if (index is not null)
         {
@@ -128,6 +147,45 @@ public sealed class GameDownloader(
         }
 
         logger.LogInformation("版本 {Version} 下载完成", version.Id);
+    }
+
+    /// <summary>删掉 natives 目录里不属于当前版本的旧文件。</summary>
+    private void CleanupNatives(string directory, ConcurrentDictionary<string, byte> expected)
+    {
+        if (expected.IsEmpty || !Directory.Exists(directory))
+        {
+            return;
+        }
+
+        foreach (var file in Directory.EnumerateFiles(directory))
+        {
+            if (expected.ContainsKey(Path.GetFileName(file)))
+            {
+                continue;
+            }
+
+            try
+            {
+                File.Delete(file);
+                logger.LogInformation("删除多余的 natives 文件: {File}", file);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                logger.LogWarning(ex, "删除多余的 natives 文件失败: {File}", file);
+            }
+        }
+    }
+
+    /// <summary>资源是否已经就绪：存在且大小一致。大小未知（0）时只要求存在。</summary>
+    private static bool IsAssetReady(GameFile file)
+    {
+        if (string.IsNullOrEmpty(file.Path))
+        {
+            return false;
+        }
+
+        var info = new FileInfo(file.Path);
+        return info.Exists && (file.Size <= 0 || info.Length == file.Size);
     }
 
     /// <summary>合并两条进度流的可变快照。</summary>

@@ -68,6 +68,12 @@ public sealed class LauncherSettings : IJsonOnDeserialized
     public VersionIsolationScope NewInstanceIsolationScope { get; set; } = VersionIsolationScope.All;
 
     /// <summary>
+    /// 首次启动时写进 options.txt 的游戏语言（对齐 PCL 的「帮助中文」）。
+    /// 只在游戏目录还没有语言设置、或还没有存档时生效，不会覆盖玩家自己改过的语言。
+    /// </summary>
+    public GameLanguage GameLanguage { get; set; } = GameLanguage.ChineseSimplified;
+
+    /// <summary>
     /// [已废弃] 旧的三档设置（询问/总是/从不）。只在读取旧 settings.json 时用于一次性迁移：
     /// OnDeserialized 里换算成 <see cref="NewInstanceIsolationScope"/> 后置 null，
     /// 下次保存时因 WhenWritingNull 不再写出。
@@ -105,6 +111,19 @@ public enum AfterLaunchAction
 
     /// <summary>关闭启动器。游戏是独立进程，不受影响。</summary>
     Close = 2,
+}
+
+/// <summary>首次启动时写进 options.txt 的游戏语言。</summary>
+public enum GameLanguage
+{
+    /// <summary>简体中文（PCL 的默认行为）。</summary>
+    ChineseSimplified = 0,
+
+    /// <summary>繁體中文。</summary>
+    ChineseTraditional = 1,
+
+    /// <summary>English (US)。</summary>
+    English = 2,
 }
 
 /// <summary>新建实例时版本隔离的处理方式。</summary>

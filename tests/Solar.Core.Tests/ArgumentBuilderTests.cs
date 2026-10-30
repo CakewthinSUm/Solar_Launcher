@@ -13,7 +13,8 @@ public class ArgumentBuilderTests
 {
     private static LaunchContext CreateContext(
         VersionDetail? detail = null,
-        (int, int)? resolution = null)
+        (int, int)? resolution = null,
+        int javaMajorVersion = 8)
     {
         var paths = new AppPaths(Path.Combine(Path.GetTempPath(), "solar-test-" + Guid.NewGuid().ToString("N")));
         var version = new ResolvedVersion
@@ -29,6 +30,7 @@ public class ArgumentBuilderTests
             Paths = paths,
             Settings = new LauncherSettings { MaxMemoryMb = 4096 },
             JavaPath = "java.exe",
+            JavaMajorVersion = javaMajorVersion,
             PlayerName = "Steve",
             Uuid = "8667ba71-b85a-4004-af54-457a9734eed7",
             AccessToken = "0",
@@ -40,6 +42,86 @@ public class ArgumentBuilderTests
             Resolution = resolution,
             MaxMemoryMb = 4096,
         };
+    }
+
+    [Fact]
+    public void JvmArgumentsIncludeGcEncodingAndLog4jDefense()
+    {
+        var context = CreateContext(javaMajorVersion: 21);
+        var args = new ArgumentBuilder().BuildJvmArguments(context);
+
+        Assert.Contains("-XX:+UseZGC", args);
+        Assert.Contains("-XX:+ZGenerational", args);
+        Assert.Contains("-Dstdout.encoding=UTF-8", args);
+        Assert.Contains("-Dstderr.encoding=UTF-8", args);
+        Assert.Contains("-Dlog4j2.formatMsgNoLookups=true", args);
+        Assert.Contains("-Xmx4096M", args);
+    }
+
+    [Fact]
+    public void Java8UsesG1AndLegacyEncodingProperty()
+    {
+        var context = CreateContext(javaMajorVersion: 8);
+        var args = new ArgumentBuilder().BuildJvmArguments(context);
+
+        Assert.Contains("-XX:+UseG1GC", args);
+        Assert.DoesNotContain("-XX:+UseZGC", args);
+        Assert.Contains("-Dsun.stdout.encoding=UTF-8", args);
+    }
+
+    [Fact]
+    public void DuplicateClassPathFromVersionJsonIsCollapsed()
+    {
+        // 1.17+ 的版本 JSON 里自带 -cp ${classpath} 与 -Djava.library.path，
+        // 与启动器加的那份内容相同，必须去重，否则 classpath 会被重复设置
+        var detail = new VersionDetail
+        {
+            Id = "1.21",
+            MainClass = "net.minecraft.client.main.Main",
+            Arguments = new Arguments
+            {
+                Jvm =
+                [
+                    new ArgumentEntry { Value = "-cp" },
+                    new ArgumentEntry { Value = "${classpath}" },
+                    new ArgumentEntry { Value = "-Djava.library.path=${natives_directory}" },
+                ],
+            },
+        };
+
+        var args = new ArgumentBuilder().BuildJvmArguments(CreateContext(detail));
+
+        Assert.Equal(1, args.Count(a => a == "-cp"));
+        Assert.Equal(
+            1,
+            args.Count(a => a.StartsWith("-Djava.library.path=", StringComparison.Ordinal)));
+    }
+
+    [Fact]
+    public void GameArgumentsLetLaterValueWin()
+    {
+        // 重复的 --width 会让游戏两个都失效，后出现的值必须覆盖先出现的
+        var detail = new VersionDetail
+        {
+            Id = "1.21",
+            MainClass = "net.minecraft.client.main.Main",
+            Arguments = new Arguments
+            {
+                Game =
+                [
+                    new ArgumentEntry { Value = "--width" },
+                    new ArgumentEntry { Value = "1280" },
+                    new ArgumentEntry { Value = "--width" },
+                    new ArgumentEntry { Value = "640" },
+                ],
+            },
+        };
+
+        var args = new ArgumentBuilder().BuildGameArguments(CreateContext(detail));
+
+        var index = args.ToList().IndexOf("--width");
+        Assert.Equal("640", args[index + 1]);
+        Assert.Equal(1, args.Count(a => a == "--width"));
     }
 
     [Fact]

@@ -4,15 +4,18 @@ using Solar.Core.Paths;
 
 namespace Solar.Core.Launch;
 
+/// <summary>一次启动的结果：游戏进程与它正在写的日志文件。</summary>
+public sealed record LaunchedGame(Process Process, string LogPath);
+
 public interface IGameLauncher
 {
-    /// <summary>启动游戏进程，返回运行中的进程。调用方负责等待退出。</summary>
-    Process Start(LaunchContext context);
+    /// <summary>启动游戏进程。调用方负责等待窗口出现与退出。</summary>
+    LaunchedGame Start(LaunchContext context);
 }
 
 public sealed class GameLauncher(AppPaths paths, ILogger<GameLauncher> logger) : IGameLauncher
 {
-    public Process Start(LaunchContext context)
+    public LaunchedGame Start(LaunchContext context)
     {
         var builder = new ArgumentBuilder();
         var jvmArguments = builder.BuildJvmArguments(context);
@@ -28,6 +31,11 @@ public sealed class GameLauncher(AppPaths paths, ILogger<GameLauncher> logger) :
             WorkingDirectory = context.GameDirectory,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
+
+            // 启动参数里给游戏固定了 UTF-8 输出（stdout.encoding），
+            // 这里必须按同一种编码解码，否则中文日志会变成乱码
+            StandardOutputEncoding = System.Text.Encoding.UTF8,
+            StandardErrorEncoding = System.Text.Encoding.UTF8,
         };
 
         foreach (var argument in jvmArguments.Concat(gameArguments))
@@ -71,7 +79,7 @@ public sealed class GameLauncher(AppPaths paths, ILogger<GameLauncher> logger) :
             process.Id,
             context.JavaPath);
 
-        return process;
+        return new LaunchedGame(process, logPath);
     }
 
     private static void WriteLine(TextWriter writer, string? line)

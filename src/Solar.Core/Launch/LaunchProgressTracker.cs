@@ -243,6 +243,8 @@ public sealed class LaunchProgressTracker
         plan.Add(new LaunchStagePlan(LaunchStage.ResolvingVersion, "解析版本", 10));
         plan.Add(new LaunchStagePlan(LaunchStage.Downloading, "下载文件", 50));
         plan.Add(new LaunchStagePlan(LaunchStage.Starting, "启动游戏", 5));
+        // 进程起来之后还要等窗口；进程立刻崩溃时这一步会标红，而不是假装成功
+        plan.Add(new LaunchStagePlan(LaunchStage.WaitingForWindow, "等待游戏窗口", 5));
 
         return plan;
     }

@@ -15,8 +15,12 @@ public interface IJavaDetector
     /// <summary>探测本机可用的 Java，按大版本从高到低返回。</summary>
     Task<IReadOnlyList<JavaRuntime>> DetectAsync(CancellationToken ct = default);
 
-    /// <summary>为指定版本选择最合适的 Java：优先精确匹配主版本，其次更高的版本。</summary>
-    JavaRuntime? Select(IReadOnlyList<JavaRuntime> runtimes, int requiredMajor);
+    /// <summary>
+    /// 在要求范围内选择最合适的 Java：优先恰好是下限的版本，
+    /// 其次范围内最低的更高版本，最后才退到范围内最高的版本。
+    /// 没有满足要求的返回 null，由调用方给出可操作的提示。
+    /// </summary>
+    JavaRuntime? Select(IReadOnlyList<JavaRuntime> runtimes, JavaRequirement requirement);
 }
 
 public sealed partial class JavaDetector(ILogger<JavaDetector> logger) : IJavaDetector
@@ -71,16 +75,18 @@ public sealed partial class JavaDetector(ILogger<JavaDetector> logger) : IJavaDe
         return results.OrderByDescending(r => r.MajorVersion).ToList();
     }
 
-    public JavaRuntime? Select(IReadOnlyList<JavaRuntime> runtimes, int requiredMajor)
+    public JavaRuntime? Select(IReadOnlyList<JavaRuntime> runtimes, JavaRequirement requirement)
     {
-        if (runtimes.Count == 0)
+        var candidates = runtimes.Where(requirement.IsSatisfiedBy).ToList();
+        if (candidates.Count == 0)
         {
             return null;
         }
 
-        return runtimes.FirstOrDefault(r => r.MajorVersion == requiredMajor)
-               ?? runtimes.Where(r => r.MajorVersion >= requiredMajor).OrderBy(r => r.MajorVersion).FirstOrDefault()
-               ?? runtimes.OrderByDescending(r => r.MajorVersion).First();
+        // 恰好是下限最稳（模组生态通常只验证过这个版本）；
+        // 其次范围内最低的更高版本，避免直接跳到最新的大版本。
+        return candidates.FirstOrDefault(r => r.MajorVersion == requirement.MinMajor)
+               ?? candidates.OrderBy(r => r.MajorVersion).First();
     }
 
     private static IEnumerable<string> GetSearchRoots()

@@ -300,6 +300,11 @@ public sealed partial class HomeViewModel : ViewModelBase
                     // 补齐文件结束、转入启动游戏时闪一下任务栏，提示下载已完成
                     _taskbar.Flash();
                     break;
+
+                case LaunchStage.WaitingForWindow:
+                    // 已经在等游戏窗口，下载进度不再有意义，切回不确定状态
+                    _taskbar.Report(null);
+                    break;
             }
         });
 
@@ -503,7 +508,7 @@ public sealed partial class HomeViewModel : ViewModelBase
 
         LaunchStageMessage = tracker.Outcome switch
         {
-            LaunchOutcome.Succeeded => "已交给游戏进程",
+            LaunchOutcome.Succeeded => "游戏窗口已出现",
             LaunchOutcome.Canceled => "已取消",
             _ => tracker.ActiveMessage,
         };

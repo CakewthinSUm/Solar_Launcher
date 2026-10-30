@@ -68,6 +68,10 @@ public sealed partial class SettingsViewModel : ViewModelBase
     [ObservableProperty]
     private int _newInstanceIsolationIndex;
 
+    /// <summary>首次启动写进 options.txt 的语言：0 = 简体中文，1 = 繁體中文，2 = English。</summary>
+    [ObservableProperty]
+    private int _gameLanguageIndex;
+
     /// <summary>0 = 不执行任何操作，1 = 最小化，2 = 关闭。ComboBox 只认索引。</summary>
     [ObservableProperty]
     private int _afterLaunchActionIndex;
@@ -172,6 +176,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
                    || Math.Clamp(DownloadThreads, 1, 32) != saved.DownloadThreads
                    || NullIfBlank(DownloadMirrorUrl) != saved.DownloadMirrorUrl
                    || (VersionIsolationScope)Math.Clamp(NewInstanceIsolationIndex, 0, 4) != saved.NewInstanceIsolationScope
+                   || (GameLanguage)Math.Clamp(GameLanguageIndex, 0, 2) != saved.GameLanguage
                    || (AfterLaunchAction)Math.Clamp(AfterLaunchActionIndex, 0, 2) != saved.AfterLaunchAction
                    || (ModSourcePreference)Math.Clamp(ModSourcePreferenceIndex, 0, 2) != saved.ModSourcePreference
                    || NullIfBlank(ModMirrorUrl) != saved.ModMirrorUrl
@@ -218,6 +223,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
         DownloadThreads = s.DownloadThreads;
         DownloadMirrorUrl = s.DownloadMirrorUrl ?? "";
         NewInstanceIsolationIndex = (int)s.NewInstanceIsolationScope;
+        GameLanguageIndex = (int)s.GameLanguage;
         AfterLaunchActionIndex = (int)s.AfterLaunchAction;
         ModSourcePreferenceIndex = (int)s.ModSourcePreference;
         ModMirrorUrl = s.ModMirrorUrl ?? "";
@@ -427,6 +433,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
         s.DownloadThreads = Math.Clamp(DownloadThreads, 1, 32);
         s.DownloadMirrorUrl = NullIfBlank(DownloadMirrorUrl);
         s.NewInstanceIsolationScope = (VersionIsolationScope)Math.Clamp(NewInstanceIsolationIndex, 0, 4);
+        s.GameLanguage = (GameLanguage)Math.Clamp(GameLanguageIndex, 0, 2);
         s.AfterLaunchAction = (AfterLaunchAction)Math.Clamp(AfterLaunchActionIndex, 0, 2);
 
         // Mod 源三项：换了任何一个，缓存里的项目与版本都属于旧源，必须清掉

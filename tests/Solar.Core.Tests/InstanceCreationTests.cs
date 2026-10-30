@@ -356,7 +356,8 @@ public sealed class InstanceCreationTests : IDisposable
         public Task<IReadOnlyList<JavaRuntime>> DetectAsync(CancellationToken ct = default) =>
             Task.FromResult<IReadOnlyList<JavaRuntime>>([new JavaRuntime("java.exe", "21", 21)]);
 
-        public JavaRuntime? Select(IReadOnlyList<JavaRuntime> runtimes, int requiredMajor) => runtimes[0];
+        public JavaRuntime? Select(IReadOnlyList<JavaRuntime> runtimes, Solar.Core.Java.JavaRequirement requirement) =>
+            runtimes.FirstOrDefault(requirement.IsSatisfiedBy);
     }
 
     private sealed class FakeSettings : Solar.Core.Settings.ISettingsService

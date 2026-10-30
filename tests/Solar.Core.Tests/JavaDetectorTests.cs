@@ -22,19 +22,40 @@ public class JavaDetectorTests
         Assert.Equal(0, JavaDetector.ParseMajor("not-a-version"));
     }
 
+    private static JavaDetector CreateDetector() =>
+        new(Microsoft.Extensions.Logging.Abstractions.NullLogger<JavaDetector>.Instance);
+
+    private static JavaRuntime[] Runtimes() =>
+    [
+        new("j8.exe", "1.8.0_402", 8),
+        new("j17.exe", "17.0.9", 17),
+        new("j21.exe", "21.0.1", 21),
+    ];
+
     [Fact]
     public void Select_PrefersExactMajor()
     {
-        var detector = new JavaDetector(Microsoft.Extensions.Logging.Abstractions.NullLogger<JavaDetector>.Instance);
-        var runtimes = new[]
-        {
-            new JavaRuntime("j8.exe", "1.8.0_402", 8),
-            new JavaRuntime("j17.exe", "17.0.9", 17),
-            new JavaRuntime("j21.exe", "21.0.1", 21),
-        };
+        Assert.Equal("j17.exe", CreateDetector().Select(Runtimes(), new JavaRequirement(17))!.Path);
+    }
 
-        Assert.Equal("j17.exe", detector.Select(runtimes, 17)!.Path);
-        Assert.Equal("j21.exe", detector.Select(runtimes, 22)!.Path);
-        Assert.Equal("j8.exe", detector.Select(runtimes, 6)!.Path);
+    [Fact]
+    public void Select_FallsBackToLowestHigherVersion()
+    {
+        // 要求 18+ 时选 21 而不是跳回 17
+        Assert.Equal("j21.exe", CreateDetector().Select(Runtimes(), new JavaRequirement(18))!.Path);
+    }
+
+    [Fact]
+    public void Select_ReturnsNullWhenNothingSatisfies()
+    {
+        // 26.2 这类需要 Java 25 的版本：没有合适的 Java 时不能拿 21 硬启动
+        Assert.Null(CreateDetector().Select(Runtimes(), new JavaRequirement(25)));
+    }
+
+    [Fact]
+    public void Select_RespectsMaxMajor()
+    {
+        Assert.Equal("j8.exe", CreateDetector().Select(Runtimes(), new JavaRequirement(8, 8))!.Path);
+        Assert.Null(CreateDetector().Select([Runtimes()[2]], new JavaRequirement(8, 8)));
     }
 }

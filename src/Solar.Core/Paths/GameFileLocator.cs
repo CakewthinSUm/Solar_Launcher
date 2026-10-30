@@ -27,6 +27,9 @@ public sealed class GameFileLocator(AppPaths paths, InstanceGameDirectory gameDi
 
     public string ExternalLibraries => Path.Combine(gameDirectories.Shared, "libraries");
 
+    /// <summary>游戏目录里的资源目录，即官方启动器 / 其它启动器那份。</summary>
+    public string ExternalAssets => Path.Combine(gameDirectories.Shared, "assets");
+
     /// <summary>版本目录的搜索顺序：先自己的，再游戏目录里的。</summary>
     public IEnumerable<string> VersionRoots => Normalize([PrimaryVersions, ExternalVersions]);
 

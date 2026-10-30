@@ -319,7 +319,7 @@ public sealed class InstanceCreationService(
 
         // 安装器都是现代工具，版本未解析时用最新的那个
         return requiredMajor is { } major
-            ? (javaDetector.Select(runtimes, major) ?? runtimes[0]).Path
+            ? (javaDetector.Select(runtimes, new Java.JavaRequirement(major)) ?? runtimes[0]).Path
             : runtimes[0].Path;
     }
 
