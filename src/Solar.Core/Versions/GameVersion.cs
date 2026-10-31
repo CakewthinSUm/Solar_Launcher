@@ -1,3 +1,5 @@
+using System.ComponentModel;
+
 namespace Solar.Core.Versions;
 
 public enum ModLoader
@@ -28,10 +30,13 @@ public sealed class VersionSettings
     public string? LiteLoaderVersion { get; set; }
 
     /// <summary>
-    /// 该版本是否「可装 Mod」：创建时选了模组加载器，或带 OptiFine / LiteLoader。
+    /// 该版本是否「可装 Mod」：创建时选了模组加载器或 LiteLoader。
     /// 创建时写入一次，之后不随版本 JSON 重新识别，用于列表分组与筛选。
     /// </summary>
     public bool IsModable { get; set; }
+
+    /// <summary>是否收藏；用于版本列表的收藏夹分组。</summary>
+    public bool IsFavorite { get; set; }
 
     /// <summary>版本隔离：开启后游戏目录就是该版本的版本文件夹。</summary>
     public bool VersionIsolation { get; set; }
@@ -60,8 +65,14 @@ public sealed class VersionSettings
 /// <summary>
 /// 一个「版本」：<c>versions/&lt;id&gt;/</c> 目录，与 PCL 一致——版本文件夹本身就是版本。
 /// </summary>
-public sealed class GameVersion
+public sealed class GameVersion : INotifyPropertyChanged
 {
+    /// <summary>
+    /// 只有 <see cref="IsFavorite"/> 会通知：同一个版本可能同时出现在收藏夹和它原本的分组里，
+    /// 列表里的心形按钮要靠它同时刷新两份。
+    /// </summary>
+    public event PropertyChangedEventHandler? PropertyChanged;
+
     /// <summary>版本文件夹名，也是唯一键。</summary>
     public string Id { get; set; } = "";
 
@@ -138,6 +149,21 @@ public sealed class GameVersion
     {
         get => Settings.IsModable;
         set => Settings.IsModable = value;
+    }
+
+    public bool IsFavorite
+    {
+        get => Settings.IsFavorite;
+        set
+        {
+            if (Settings.IsFavorite == value)
+            {
+                return;
+            }
+
+            Settings.IsFavorite = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsFavorite)));
+        }
     }
 
     public List<string> CompanionMods => Settings.CompanionMods;

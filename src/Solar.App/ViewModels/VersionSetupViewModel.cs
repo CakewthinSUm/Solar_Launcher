@@ -64,6 +64,13 @@ public sealed partial class VersionSetupViewModel : ViewModelBase
     [ObservableProperty]
     private string _customWindowTitle = "";
 
+    [ObservableProperty]
+    private bool _isFavorite;
+
+    /// <summary>该版本文件夹里是否有可迁移的 PCL 设置。</summary>
+    [ObservableProperty]
+    private bool _hasPclSettings;
+
     /// <summary>当前显示的图标路径：可能是已保存的图标，也可能是还没保存的新图片。</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasIcon))]
@@ -100,6 +107,8 @@ public sealed partial class VersionSetupViewModel : ViewModelBase
 
     partial void OnCustomWindowTitleChanged(string value) => ScheduleAutoSave();
 
+    partial void OnIsFavoriteChanged(bool value) => ScheduleAutoSave(immediate: true);
+
     partial void OnVersionIdInputChanged(string value) => ScheduleAutoSave();
 
     public override async Task OnNavigatedToAsync(object? parameter)
@@ -125,6 +134,7 @@ public sealed partial class VersionSetupViewModel : ViewModelBase
             IsBusy = true;
             ErrorMessage = null;
             StatusMessage = null;
+            HasPclSettings = false;
 
             _instance = await _repository.GetAsync(versionId);
             if (_instance is null)
@@ -138,7 +148,9 @@ public sealed partial class VersionSetupViewModel : ViewModelBase
             VersionIdInput = _instance.Id;
             VersionIsolation = _instance.VersionIsolation;
             CustomWindowTitle = _instance.CustomWindowTitle ?? "";
+            IsFavorite = _instance.IsFavorite;
             IconPath = _instance.IconPath;
+            HasPclSettings = PclSettingsMigration.TryRead(_gameDirectories, _instance.Id) is not null;
 
             _pendingIconSource = null;
             _iconChanged = false;
@@ -355,6 +367,7 @@ public sealed partial class VersionSetupViewModel : ViewModelBase
             }
 
             instance.VersionIsolation = VersionIsolation;
+            instance.IsFavorite = IsFavorite;
             // 留空表示不自定义，恢复默认标题
             instance.CustomWindowTitle = string.IsNullOrWhiteSpace(CustomWindowTitle) ? null : CustomWindowTitle.Trim();
 
@@ -383,6 +396,100 @@ public sealed partial class VersionSetupViewModel : ViewModelBase
         finally
         {
             IsBusy = false;
+        }
+    }
+
+    /// <summary>
+    /// 从版本文件夹里的 <c>PCL\Setup.ini</c> 迁移收藏、版本隔离与自定义图标。
+    /// 只读 PCL 文件，不改动它；识别类缓存（加载器版本、发布时间等）不迁移，Solar 会自己算。
+    /// </summary>
+    [RelayCommand]
+    private async Task MigrateFromPclAsync()
+    {
+        // 防抖中的改动先写盘，否则迁移结果可能随后被旧值覆盖
+        await FlushPendingSaveAsync();
+
+        var instance = _instance;
+        if (instance is null)
+        {
+            return;
+        }
+
+        var migrated = PclSettingsMigration.TryRead(_gameDirectories, instance.Id);
+        if (migrated is null)
+        {
+            await _dialogs.ShowMessageAsync(
+                "没有可迁移的设置",
+                $"没有找到 {PclSettingsMigration.GetSetupPath(_gameDirectories, instance.Id)}，" +
+                "或其中没有收藏、版本隔离与自定义图标。");
+            return;
+        }
+
+        var items = new List<string>
+        {
+            migrated.IsFavorite ? "收藏：是" : "收藏：否",
+        };
+
+        if (migrated.VersionIsolation is { } migratedIsolation)
+        {
+            items.Add(migratedIsolation ? "版本隔离：开" : "版本隔离：关");
+        }
+
+        if (migrated.CustomIconPath is not null)
+        {
+            items.Add(@"版本图标：PCL\Logo.png");
+        }
+
+        if (!await _dialogs.ShowConfirmAsync(
+                "从 PCL 迁移设置",
+                "将迁移以下设置：\n\n" + string.Join('\n', items) + "\n\n现有的同名设置会被覆盖。",
+                "迁移",
+                "取消"))
+        {
+            return;
+        }
+
+        await _saveGate.WaitAsync();
+        try
+        {
+            IsBusy = true;
+            ErrorMessage = null;
+            _suppressAutoSave = true;
+            try
+            {
+                instance.IsFavorite = migrated.IsFavorite;
+                IsFavorite = migrated.IsFavorite;
+
+                if (migrated.VersionIsolation is { } isolation)
+                {
+                    instance.VersionIsolation = isolation;
+                    VersionIsolation = isolation;
+                }
+
+                if (migrated.CustomIconPath is { } iconPath)
+                {
+                    await _repository.SetIconAsync(instance, iconPath);
+                    IconPath = instance.IconPath;
+                }
+
+                await _repository.SaveSettingsAsync(instance);
+            }
+            finally
+            {
+                _suppressAutoSave = false;
+            }
+
+            StatusMessage = "已从 PCL 迁移设置";
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "从 PCL 迁移版本设置失败");
+            ErrorMessage = "迁移失败：" + ex.Message;
+        }
+        finally
+        {
+            IsBusy = false;
+            _saveGate.Release();
         }
     }
 }

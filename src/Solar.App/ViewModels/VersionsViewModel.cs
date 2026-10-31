@@ -1,5 +1,3 @@
-using System.Collections.ObjectModel;
-using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
 using Solar.App.Services;
@@ -17,8 +15,11 @@ public sealed partial class VersionsViewModel : ViewModelBase
     private readonly IDialogService _dialogs;
     private readonly ILogger<VersionsViewModel> _logger;
 
-    [ObservableProperty]
-    private GameVersion? _SelectedVersion;
+    /// <summary>扫描、收藏与删除串行执行，避免写设置和重新扫描互相穿插。</summary>
+    private readonly SemaphoreSlim _gate = new(1, 1);
+
+    /// <summary>扫描结果的扁平列表；重新分组与收藏都基于它，避免重复扫描磁盘。</summary>
+    private readonly List<GameVersion> _allVersions = new();
 
     public VersionsViewModel(
         IVersionRepository repository,
@@ -30,7 +31,16 @@ public sealed partial class VersionsViewModel : ViewModelBase
         _logger = logger;
     }
 
-    public ObservableCollection<GameVersion> Versions { get; } = new();
+    /// <summary>
+    /// 三个分组对象在页面生命周期内保持不变，只更新内容。
+    /// 这样收藏一个版本时，只有来源组和目标组会重建行，展开状态和滚动位置都不会丢。
+    /// </summary>
+    public IReadOnlyList<VersionGroupViewModel> Groups { get; } =
+    [
+        new VersionGroupViewModel(VersionGroupKind.Favorites),
+        new VersionGroupViewModel(VersionGroupKind.Modable),
+        new VersionGroupViewModel(VersionGroupKind.Regular),
+    ];
 
     public override Task OnNavigatedToAsync(object? parameter) => ScanAsync();
 
@@ -65,10 +75,8 @@ public sealed partial class VersionsViewModel : ViewModelBase
         {
             IsBusy = true;
             ErrorMessage = null;
-            StatusMessage = null;
 
             await ReloadAsync();
-            StatusMessage = $"共 {Versions.Count} 个版本";
         }
         catch (Exception ex)
         {
@@ -81,20 +89,79 @@ public sealed partial class VersionsViewModel : ViewModelBase
         }
     }
 
-    /// <summary>重新读取版本列表，保留当前选中的那个。</summary>
     private async Task ReloadAsync()
     {
-        var previousId = SelectedVersion?.Id;
-
-        var items = await _repository.GetAllAsync();
-        Versions.Clear();
-        foreach (var item in items)
+        await _gate.WaitAsync();
+        try
         {
-            Versions.Add(item);
+            await ReloadCoreAsync();
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    private async Task ReloadCoreAsync()
+    {
+        var items = await _repository.GetAllAsync();
+
+        _allVersions.Clear();
+        _allVersions.AddRange(items);
+
+        RebuildGroups();
+    }
+
+    /// <summary>把最新的扫描结果分配到三个固定分组里；空组由分组自己收起。</summary>
+    private void RebuildGroups()
+    {
+        var groups = VersionGrouping.Group(_allVersions);
+
+        foreach (var group in Groups)
+        {
+            var versions = groups.FirstOrDefault(g => g.Kind == group.Kind)?.Versions
+                           ?? Array.Empty<GameVersion>();
+            group.Apply(versions);
+        }
+    }
+
+    /// <summary>
+    /// 列表里的心形按钮：切换收藏并立即写盘。
+    /// 先移动条目再保存，保存失败就移回去并弹窗提示。
+    /// </summary>
+    [RelayCommand]
+    private async Task ToggleFavoriteAsync(GameVersion? instance)
+    {
+        if (instance is null)
+        {
+            return;
         }
 
-        SelectedVersion = Versions.FirstOrDefault(i => i.Id == previousId)
-                           ?? Versions.FirstOrDefault();
+        await _gate.WaitAsync();
+        try
+        {
+            var original = instance.IsFavorite;
+            instance.IsFavorite = !original;
+
+            RebuildGroups();
+
+            try
+            {
+                await _repository.SaveSettingsAsync(instance);
+            }
+            catch (Exception ex)
+            {
+                instance.IsFavorite = original;
+                RebuildGroups();
+
+                _logger.LogError(ex, "保存版本收藏状态失败");
+                await _dialogs.ShowMessageAsync("收藏失败", ex.Message);
+            }
+        }
+        finally
+        {
+            _gate.Release();
+        }
     }
 
     [RelayCommand]
@@ -116,16 +183,20 @@ public sealed partial class VersionsViewModel : ViewModelBase
             return;
         }
 
+        await _gate.WaitAsync();
         try
         {
             await _repository.DeleteAsync(instance.Id);
-            await ReloadAsync();
-            StatusMessage = $"已删除版本“{instance.Name}”";
+            await ReloadCoreAsync();
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "删除版本失败");
             await _dialogs.ShowMessageAsync("删除失败", ex.Message);
+        }
+        finally
+        {
+            _gate.Release();
         }
     }
 
