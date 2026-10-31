@@ -39,6 +39,9 @@ public sealed class VersionSettings
     /// <summary>自定义游戏窗口标题；为空时保持默认（版本 id）。</summary>
     public string? CustomWindowTitle { get; set; }
 
+    /// <summary>自定义图标在 <c>.solar</c> 里的文件名（如 <c>icon.png</c>）；为空时用默认图标。</summary>
+    public string? CustomIcon { get; set; }
+
     /// <summary>加载器是否已安装完成。未安装时启动会先触发安装。</summary>
     public bool LoaderInstalled { get; set; }
 
@@ -63,6 +66,14 @@ public sealed class GameVersion
     public string? LoaderVersion { get; set; }
 
     public VersionSettings Settings { get; set; } = new();
+
+    /// <summary>
+    /// 自定义图标文件的完整路径；由 <see cref="VersionRepository"/> 读取设置时填好，
+    /// 未自定义或文件已被删掉时为空。
+    /// </summary>
+    public string? IconPath { get; set; }
+
+    public bool HasIcon => !string.IsNullOrEmpty(IconPath);
 
     /// <summary>显示名：用户自定义名优先，否则是版本号/加载器名。</summary>
     public string Name

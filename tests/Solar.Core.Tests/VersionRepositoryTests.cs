@@ -167,6 +167,94 @@ public sealed class VersionRepositoryTests : IDisposable
     }
 
     [Fact]
+    public async Task CustomIconIsCopiedUnderSolarAndResolvedOnLoad()
+    {
+        WriteVersion("1.21.4");
+        var source = Path.Combine(_root, "pick.png");
+        File.WriteAllBytes(source, [1, 2, 3]);
+
+        var version = (await _repository.GetAsync("1.21.4"))!;
+        Assert.False(version.HasIcon);
+
+        await _repository.SetIconAsync(version, source);
+
+        var iconPath = Path.Combine(_paths.GetVersionSettingsDirectory("1.21.4"), "icon.png");
+        Assert.True(File.Exists(iconPath));
+        Assert.Equal(iconPath, version.IconPath);
+
+        // 重新读取时从设置里的文件名还原出完整路径
+        var loaded = await _repository.GetAsync("1.21.4");
+        Assert.Equal(iconPath, loaded!.IconPath);
+        Assert.True(loaded.HasIcon);
+    }
+
+    [Fact]
+    public async Task ClearingIconDeletesFileAndSetting()
+    {
+        WriteVersion("1.21.4");
+        var source = Path.Combine(_root, "pick.png");
+        File.WriteAllBytes(source, [1, 2, 3]);
+
+        var version = (await _repository.GetAsync("1.21.4"))!;
+        await _repository.SetIconAsync(version, source);
+        await _repository.SetIconAsync(version, null);
+
+        var iconPath = Path.Combine(_paths.GetVersionSettingsDirectory("1.21.4"), "icon.png");
+        Assert.False(File.Exists(iconPath));
+        Assert.Null(version.IconPath);
+        Assert.Null((await _repository.GetAsync("1.21.4"))!.IconPath);
+    }
+
+    [Fact]
+    public async Task ReplacingIconDoesNotLeaveOldFiles()
+    {
+        WriteVersion("1.21.4");
+        var png = Path.Combine(_root, "pick.png");
+        var jpg = Path.Combine(_root, "pick.jpg");
+        File.WriteAllBytes(png, [1]);
+        File.WriteAllBytes(jpg, [2]);
+
+        var version = (await _repository.GetAsync("1.21.4"))!;
+        await _repository.SetIconAsync(version, png);
+        await _repository.SetIconAsync(version, jpg);
+
+        var directory = _paths.GetVersionSettingsDirectory("1.21.4");
+        Assert.False(File.Exists(Path.Combine(directory, "icon.png")));
+        Assert.True(File.Exists(Path.Combine(directory, "icon.jpg")));
+    }
+
+    [Fact]
+    public async Task IconFollowsVersionRename()
+    {
+        WriteVersion("1.21.4");
+        var source = Path.Combine(_root, "pick.png");
+        File.WriteAllBytes(source, [1, 2, 3]);
+
+        var version = (await _repository.GetAsync("1.21.4"))!;
+        await _repository.SetIconAsync(version, source);
+
+        var renamed = await _repository.RenameAsync("1.21.4", "我的整合包");
+
+        // .solar 跟着版本文件夹一起搬走，设置里的文件名仍然有效
+        var iconPath = Path.Combine(_paths.GetVersionSettingsDirectory("我的整合包"), "icon.png");
+        Assert.True(File.Exists(iconPath));
+        Assert.Equal(iconPath, renamed.IconPath);
+    }
+
+    [Fact]
+    public async Task UnsupportedIconFormatIsRefused()
+    {
+        WriteVersion("1.21.4");
+        var source = Path.Combine(_root, "pick.txt");
+        File.WriteAllText(source, "not an image");
+
+        var version = (await _repository.GetAsync("1.21.4"))!;
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => _repository.SetIconAsync(version, source));
+    }
+
+    [Fact]
     public async Task GetReturnsNullForMissingVersion()
     {
         Assert.Null(await _repository.GetAsync("nope"));

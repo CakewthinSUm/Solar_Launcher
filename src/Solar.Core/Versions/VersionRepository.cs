@@ -21,6 +21,12 @@ public interface IVersionRepository
 
     /// <summary>重命名版本文件夹，同时改写版本 JSON 与 jar 的文件名。</summary>
     Task<GameVersion> RenameAsync(string oldId, string newId, CancellationToken ct = default);
+
+    /// <summary>
+    /// 把图片复制进 <c>.solar</c> 作为版本图标并写入设置；
+    /// <paramref name="sourcePath"/> 为空时移除图标、恢复默认。
+    /// </summary>
+    Task SetIconAsync(GameVersion version, string? sourcePath, CancellationToken ct = default);
 }
 
 /// <summary>
@@ -81,6 +87,82 @@ public sealed class VersionRepository(
         }
 
         return Task.CompletedTask;
+    }
+
+    /// <summary>BitmapImage 能直接解码的图标格式。</summary>
+    private static readonly HashSet<string> SupportedIconExtensions =
+        new(StringComparer.OrdinalIgnoreCase) { ".png", ".jpg", ".jpeg", ".bmp", ".gif", ".ico" };
+
+    public async Task SetIconAsync(GameVersion version, string? sourcePath, CancellationToken ct = default)
+    {
+        var directory = paths.GetVersionSettingsDirectory(version.Id);
+        Directory.CreateDirectory(directory);
+
+        if (string.IsNullOrWhiteSpace(sourcePath))
+        {
+            DeleteIconFiles(directory);
+            version.Settings.CustomIcon = null;
+            version.IconPath = null;
+            await SaveSettingsAsync(version, ct).ConfigureAwait(false);
+            return;
+        }
+
+        var extension = Path.GetExtension(sourcePath);
+        if (!SupportedIconExtensions.Contains(extension))
+        {
+            throw new InvalidOperationException(
+                $"不支持的图标格式“{extension}”，请选择 PNG、JPG、BMP、GIF 或 ICO 图片。");
+        }
+
+        // 固定叫 icon.<扩展名>：改名或换图时旧文件由 DeleteIconFiles 清掉，
+        // 版本文件夹改名时图标跟着 .solar 一起搬走，设置里的文件名仍然有效。
+        var fileName = "icon" + extension.ToLowerInvariant();
+        var target = Path.Combine(directory, fileName);
+
+        // 先读进内存：万一选的图片本来就在 .solar 里，删旧图标时不会把它一起删掉
+        var content = await File.ReadAllBytesAsync(sourcePath, ct).ConfigureAwait(false);
+
+        DeleteIconFiles(directory);
+        await File.WriteAllBytesAsync(target, content, ct).ConfigureAwait(false);
+
+        version.Settings.CustomIcon = fileName;
+        version.IconPath = target;
+
+        await SaveSettingsAsync(version, ct).ConfigureAwait(false);
+        logger.LogInformation("版本 {Id} 的图标已更新: {Path}", version.Id, target);
+    }
+
+    private static void DeleteIconFiles(string directory)
+    {
+        if (!Directory.Exists(directory))
+        {
+            return;
+        }
+
+        foreach (var file in Directory.EnumerateFiles(directory, "icon.*"))
+        {
+            try
+            {
+                File.Delete(file);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // 删不掉就留着，下次换图标时会再试一次
+            }
+        }
+    }
+
+    /// <summary>把设置里的图标文件名解析成 <c>.solar</c> 下的真实路径，文件不存在就当没有图标。</summary>
+    private string? ResolveIconPath(string versionId, string? fileName)
+    {
+        if (string.IsNullOrWhiteSpace(fileName))
+        {
+            return null;
+        }
+
+        // 只取文件名，防止手改设置后指到版本文件夹之外
+        var path = Path.Combine(paths.GetVersionSettingsDirectory(versionId), Path.GetFileName(fileName));
+        return File.Exists(path) ? path : null;
     }
 
     public async Task<GameVersion> RenameAsync(string oldId, string newId, CancellationToken ct = default)
@@ -193,6 +275,7 @@ public sealed class VersionRepository(
         }
 
         version.Settings.CompanionMods ??= [];
+        version.IconPath = ResolveIconPath(scanned.VersionId, version.Settings.CustomIcon);
         return version;
     }
 }

@@ -86,6 +86,73 @@
                 </Border>
             </StackPanel>
 
+            <!-- 自定义 -->
+            <StackPanel Spacing="8">
+                <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="自定义" />
+
+                <Border Style="{StaticResource SolarCardStyle}">
+                    <StackPanel Spacing="16">
+                        <StackPanel Spacing="4">
+                            <TextBox
+                                Header="版本 id"
+                                PlaceholderText="版本文件夹名"
+                                Text="{x:Bind ViewModel.VersionIdInput, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+                            <TextBlock
+                                Style="{StaticResource CaptionTextBlockStyle}"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Text="版本 id 就是版本文件夹名。保存后文件夹、版本 JSON 与 jar 会一起改名，游戏运行中无法修改。"
+                                TextWrapping="Wrap" />
+                        </StackPanel>
+
+                        <Grid ColumnSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <!-- 图标预览：自定义过就用图片，否则显示默认的文件夹图标 -->
+                            <Border
+                                Grid.Column="0"
+                                Width="48"
+                                Height="48"
+                                VerticalAlignment="Center"
+                                Background="{ThemeResource ControlFillColorSecondaryBrush}"
+                                CornerRadius="8">
+                                <Grid>
+                                    <FontIcon
+                                        FontSize="24"
+                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                        Glyph="&#xE8B7;"
+                                        Visibility="{x:Bind ViewModel.HasIcon, Mode=OneWay, Converter={StaticResource CollapsedWhenTrue}}" />
+                                    <Image
+                                        Source="{x:Bind ViewModel.IconPath, Mode=OneWay, Converter={StaticResource PathToImageSource}}"
+                                        Stretch="UniformToFill"
+                                        Visibility="{x:Bind ViewModel.HasIcon, Mode=OneWay, Converter={StaticResource VisibleWhenTrue}}" />
+                                </Grid>
+                            </Border>
+
+                            <StackPanel
+                                Grid.Column="1"
+                                VerticalAlignment="Center"
+                                Spacing="2">
+                                <TextBlock Style="{StaticResource BodyTextBlockStyle}" Text="版本图标" />
+                                <TextBlock
+                                    Style="{StaticResource CaptionTextBlockStyle}"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="PNG / JPG / BMP / GIF / ICO，保存后显示在版本列表里。"
+                                    TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Grid>
+
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button Command="{x:Bind ViewModel.PickIconCommand}" Content="选择图片" />
+                            <Button Command="{x:Bind ViewModel.ClearIconCommand}" Content="恢复默认" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
             <!-- 保存 -->
             <StackPanel Orientation="Horizontal" Spacing="12">
                 <Button
