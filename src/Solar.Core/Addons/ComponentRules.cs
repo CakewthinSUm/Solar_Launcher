@@ -34,17 +34,22 @@ public sealed record ComponentSelection
     /// <summary>选了任何模组加载器时，OptiFine 作为 Mod 放进 mods，而不是生成独立版本。</summary>
     public bool OptiFineAsMod => OptiFine is not null && Loader != ModLoader.Vanilla;
 
+    /// <summary>选了任何附加组件（OptiFine / LiteLoader / Fabric API / OptiFabric）。</summary>
     public bool HasAnyAddon =>
         OptiFine is not null || LiteLoader is not null || FabricApi is not null || OptiFabric is not null;
 
     /// <summary>
-    /// 装完后是否「可装 Mod」：有模组加载器，或带 OptiFine / LiteLoader。
-    /// 与 PCL 的 modable 口径一致，创建版本时会落盘到版本设置。
+    /// 装完后是否「可装 Mod」：有模组加载器（Forge / NeoForge / Fabric / Quilt）或 LiteLoader。
+    /// 与 PCL 的 modable 口径一致：OptiFine 不算模组加载器，只有 OptiFine 的版本归常规版本。
+    /// 创建版本时会落盘到版本设置，供列表分组使用。
     /// </summary>
-    public bool IsModable => Loader != ModLoader.Vanilla || HasAnyAddon;
+    public bool IsModable => Loader != ModLoader.Vanilla || LiteLoader is not null;
 
-    /// <summary>需要独立游戏目录的特征，与 <see cref="IsModable"/> 同口径。</summary>
-    public bool NeedsIsolation => IsModable;
+    /// <summary>
+    /// 需要独立游戏目录的特征：有加载器或任何附加组件（含 OptiFine）。
+    /// 比 <see cref="IsModable"/> 宽，只用于创建页的隔离默认值。
+    /// </summary>
+    public bool NeedsIsolation => Loader != ModLoader.Vanilla || HasAnyAddon;
 
     /// <summary>界面上的一句话摘要，用于默认版本名。</summary>
     public string BuildDefaultName(string minecraftVersion)

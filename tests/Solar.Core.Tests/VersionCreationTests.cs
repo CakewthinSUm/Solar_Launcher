@@ -239,14 +239,22 @@ public sealed class VersionCreationTests : IDisposable
     }
 
     [Fact]
-    public void AddonsWithoutLoaderCountAsModable()
+    public void OnlyLoadersAndLiteLoaderCountAsModable()
     {
         Assert.False(new ComponentSelection().IsModable);
 
-        // 与 PCL 一致：原版 + OptiFine / LiteLoader 也算可装 Mod
-        Assert.True(new ComponentSelection
+        // 与 PCL 一致：OptiFine 不是模组加载器，只有 OptiFine 的版本算常规版本
+        Assert.False(new ComponentSelection
         {
             OptiFine = new OptiFineBuild("1.12.2", "HD_U", "G5", "OptiFine_1.12.2_HD_U_G5.jar", null),
+        }.IsModable);
+
+        // 有加载器时 OptiFine 只是附加 Mod，不改变可装 Mod 的判定
+        Assert.True(new ComponentSelection
+        {
+            Loader = ModLoader.Forge,
+            LoaderVersion = "47.3.0",
+            OptiFine = new OptiFineBuild("1.20.1", "HD_U", "I6", "OptiFine_1.20.1_HD_U_I6.jar", null),
         }.IsModable);
 
         Assert.True(new ComponentSelection

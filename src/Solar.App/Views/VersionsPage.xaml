@@ -9,10 +9,15 @@
     xmlns:controls="using:Solar.App.Views.Controls"
     xmlns:conv="using:Solar.App.Converters"
     xmlns:models="using:Solar.Core.Versions"
+    xmlns:vm="using:Solar.App.ViewModels"
     mc:Ignorable="d">
 
     <Page.Resources>
         <conv:VisibleWhenTrueConverter x:Key="VisibleWhenTrue" />
+
+        <!-- 行悬停：透明画刷保证整行可命中，进入时换成浅色填充 -->
+        <SolidColorBrush x:Key="VersionRowTransparentBrush" Color="Transparent" />
+        <SolidColorBrush x:Key="VersionRowHoverBrush" Color="{ThemeResource SubtleFillColorSecondary}" />
     </Page.Resources>
 
     <!-- 底部不留内边距，列表铺到窗口下边缘；留白由列表自己的 Padding 给 -->
@@ -55,86 +60,163 @@
         </Grid>
 
 
-        <Grid Grid.Row="1" RowSpacing="12">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="*" />
-            </Grid.RowDefinitions>
+        <!--
+            页面级滚动：分组本身用 Expander 折叠，组内不再套 ScrollViewer，
+            否则会出现嵌套滚动。版本数量级不大，ItemsControl 不虚拟化反而更稳。
+        -->
+        <ScrollViewer
+            Grid.Row="1"
+            Padding="0,0,0,16"
+            HorizontalScrollBarVisibility="Disabled"
+            HorizontalScrollMode="Disabled"
+            VerticalScrollBarVisibility="Auto"
+            VerticalScrollMode="Auto">
+                <ItemsControl ItemsSource="{x:Bind ViewModel.Groups, Mode=OneWay}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Spacing="12" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
 
-            <InfoBar
-                Grid.Row="0"
-                IsClosable="True"
-                IsOpen="{x:Bind ViewModel.HasStatusMessage, Mode=OneWay}"
-                Message="{x:Bind ViewModel.StatusMessage, Mode=OneWay}"
-                Severity="Success" />
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:VersionGroupViewModel">
+                            <Expander
+                                HorizontalAlignment="Stretch"
+                                HorizontalContentAlignment="Stretch"
+                                IsExpanded="{x:Bind IsExpanded, Mode=TwoWay}"
+                                Visibility="{x:Bind IsVisible, Mode=OneWay, Converter={StaticResource VisibleWhenTrue}}">
+                                <Expander.Header>
+                                    <Grid Padding="0,4" ColumnSpacing="8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
 
-            <ListView
-                Grid.Row="1"
-                ItemsSource="{x:Bind ViewModel.Versions, Mode=OneWay}"
-                Padding="0,0,0,16"
-                SelectedItem="{x:Bind ViewModel.SelectedVersion, Mode=TwoWay}"
-                SelectionMode="Single">
-                <ListView.ItemContainerStyle>
-                    <Style TargetType="ListViewItem">
-                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                        <Setter Property="Padding" Value="12,0" />
-                    </Style>
-                </ListView.ItemContainerStyle>
-                <ListView.ItemTemplate>
-                    <DataTemplate x:DataType="models:GameVersion">
-                        <Grid ColumnSpacing="12" Padding="0,8">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
+                                        <TextBlock
+                                            Grid.Column="0"
+                                            VerticalAlignment="Center"
+                                            AutomationProperties.HeadingLevel="Level2"
+                                            Style="{StaticResource BodyStrongTextBlockStyle}"
+                                            Text="{x:Bind Title}" />
 
-                            <!-- 版本图标：自定义过就用图片，否则显示默认的文件夹图标 -->
-                            <Border
-                                Grid.Column="0"
-                                Width="36"
-                                Height="36"
-                                VerticalAlignment="Center"
-                                Background="{ThemeResource ControlFillColorSecondaryBrush}"
-                                CornerRadius="6">
-                                <Grid>
-                                    <FontIcon
-                                        FontSize="18"
+                                        <TextBlock
+                                            Grid.Column="1"
+                                            VerticalAlignment="Center"
+                                            Style="{StaticResource CaptionTextBlockStyle}"
+                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                            Text="{x:Bind CountText, Mode=OneWay}" />
+                                    </Grid>
+                                </Expander.Header>
+
+                                <StackPanel Spacing="0">
+                                    <!-- 只有收藏夹会在为空时仍然显示，所以这条提示也只会出现在收藏夹里 -->
+                                    <TextBlock
+                                        Margin="12,4,12,8"
+                                        Style="{StaticResource CaptionTextBlockStyle}"
                                         Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                        Glyph="&#xE8B7;"
-                                        Visibility="{x:Bind HasIcon, Converter={StaticResource CollapsedWhenTrue}}" />
-                                    <Image
-                                        Source="{x:Bind IconPath, Converter={StaticResource PathToImageSource}}"
-                                        Stretch="UniformToFill"
-                                        Visibility="{x:Bind HasIcon, Converter={StaticResource VisibleWhenTrue}}" />
-                                </Grid>
-                            </Border>
+                                        Text="还没有收藏的版本。点版本右侧的心形即可收藏。"
+                                        TextWrapping="Wrap"
+                                        Visibility="{x:Bind IsEmpty, Mode=OneWay, Converter={StaticResource VisibleWhenTrue}}" />
 
-                            <StackPanel Grid.Column="1" Spacing="2">
-                                <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{x:Bind Name}" />
-                                <TextBlock
-                                    Style="{StaticResource CaptionTextBlockStyle}"
-                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}">
-                                    <Run Text="{x:Bind MinecraftVersion}" />
-                                    <Run Text=" · " />
-                                    <Run Text="{x:Bind DisplayLoader}" />
-                                    <Run Text="{x:Bind IsolationBadge}" />
-                                </TextBlock>
-                            </StackPanel>
+                                    <ItemsControl ItemsSource="{x:Bind Versions, Mode=OneWay}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <StackPanel Spacing="0" />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
 
-                            <!-- 列表项内的操作按钮，点击由页面代码转发给 ViewModel -->
-                            <StackPanel
-                                Grid.Column="2"
-                                VerticalAlignment="Center"
-                                Orientation="Horizontal"
-                                Spacing="8">
-                                <Button Click="SetupVersion_Click" Content="设置" />
-                                <Button Click="DeleteVersion_Click" Content="删除" />
-                            </StackPanel>
-                        </Grid>
-                    </DataTemplate>
-                </ListView.ItemTemplate>
-            </ListView>
-        </Grid>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="models:GameVersion">
+                                                <Border
+                                                    Padding="12,8"
+                                                    Background="{StaticResource VersionRowTransparentBrush}"
+                                                    CornerRadius="{StaticResource ControlCornerRadius}"
+                                                    PointerEntered="VersionRow_PointerEntered"
+                                                    PointerExited="VersionRow_PointerExited"
+                                                    PointerMoved="VersionRow_PointerMoved">
+                                                    <Grid ColumnSpacing="12">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="Auto" />
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                        </Grid.ColumnDefinitions>
+
+                                                        <!-- 版本图标：自定义过就用图片，否则显示默认的文件夹图标 -->
+                                                        <Border
+                                                            Grid.Column="0"
+                                                            Width="36"
+                                                            Height="36"
+                                                            VerticalAlignment="Center"
+                                                            Background="{ThemeResource ControlFillColorSecondaryBrush}"
+                                                            CornerRadius="6">
+                                                            <Grid>
+                                                                <FontIcon
+                                                                    FontSize="18"
+                                                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                                    Glyph="&#xE8B7;"
+                                                                    Visibility="{x:Bind HasIcon, Converter={StaticResource CollapsedWhenTrue}}" />
+                                                                <Image
+                                                                    Source="{x:Bind IconPath, Converter={StaticResource PathToImageSource}}"
+                                                                    Stretch="UniformToFill"
+                                                                    Visibility="{x:Bind HasIcon, Converter={StaticResource VisibleWhenTrue}}" />
+                                                            </Grid>
+                                                        </Border>
+
+                                                        <StackPanel Grid.Column="1" Spacing="2">
+                                                            <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{x:Bind Name}" />
+                                                            <TextBlock
+                                                                Style="{StaticResource CaptionTextBlockStyle}"
+                                                                Foreground="{ThemeResource TextFillColorSecondaryBrush}">
+                                                                <Run Text="{x:Bind MinecraftVersion}" />
+                                                                <Run Text=" · " />
+                                                                <Run Text="{x:Bind DisplayLoader}" />
+                                                                <Run Text="{x:Bind IsolationBadge}" />
+                                                            </TextBlock>
+                                                        </StackPanel>
+
+                                                        <!-- 列表项内的操作按钮，点击由页面代码转发给 ViewModel -->
+                                                        <StackPanel
+                                                            Grid.Column="2"
+                                                            VerticalAlignment="Center"
+                                                            Orientation="Horizontal"
+                                                            Spacing="8">
+                                                            <!-- 心形快捷收藏：未收藏是轮廓，已收藏是实心 -->
+                                                            <Button
+                                                                Width="32"
+                                                                Height="32"
+                                                                Padding="0"
+                                                                AutomationProperties.Name="收藏"
+                                                                Background="Transparent"
+                                                                BorderThickness="0"
+                                                                Click="Favorite_Click"
+                                                                ToolTipService.ToolTip="收藏 / 取消收藏">
+                                                                <Grid>
+                                                                    <FontIcon
+                                                                        FontSize="16"
+                                                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                                        Glyph="&#xEB51;"
+                                                                        Visibility="{x:Bind IsFavorite, Mode=OneWay, Converter={StaticResource CollapsedWhenTrue}}" />
+                                                                    <FontIcon
+                                                                        FontSize="16"
+                                                                        Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+                                                                        Glyph="&#xEB52;"
+                                                                        Visibility="{x:Bind IsFavorite, Mode=OneWay, Converter={StaticResource VisibleWhenTrue}}" />
+                                                                </Grid>
+                                                            </Button>
+
+                                                            <Button Click="SetupVersion_Click" Content="设置" />
+                                                            <Button Click="DeleteVersion_Click" Content="删除" />
+                                                        </StackPanel>
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </Expander>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+        </ScrollViewer>
     </Grid>
 </views:PageBase>

@@ -50,6 +50,7 @@ public sealed class VersionRepositoryTests : IDisposable
         Assert.NotNull(version);
 
         version!.VersionIsolation = true;
+        version.IsFavorite = true;
         version.JavaPath = @"C:\Java\bin\java.exe";
         version.MaxMemoryMb = 6144;
         version.Name = "我的版本";
@@ -64,6 +65,7 @@ public sealed class VersionRepositoryTests : IDisposable
         var loaded = await _repository.GetAsync("1.21.4");
         Assert.NotNull(loaded);
         Assert.True(loaded!.VersionIsolation);
+        Assert.True(loaded.IsFavorite);
         Assert.Equal(@"C:\Java\bin\java.exe", loaded.JavaPath);
         Assert.Equal(6144, loaded.MaxMemoryMb);
         Assert.Equal("我的版本", loaded.Name);
