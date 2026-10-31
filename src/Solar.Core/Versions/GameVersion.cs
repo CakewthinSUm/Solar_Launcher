@@ -27,6 +27,12 @@ public sealed class VersionSettings
     /// <summary>LiteLoader 版本号；只支持 1.13 以前的版本。</summary>
     public string? LiteLoaderVersion { get; set; }
 
+    /// <summary>
+    /// 该版本是否「可装 Mod」：创建时选了模组加载器，或带 OptiFine / LiteLoader。
+    /// 创建时写入一次，之后不随版本 JSON 重新识别，用于列表分组与筛选。
+    /// </summary>
+    public bool IsModable { get; set; }
+
     /// <summary>版本隔离：开启后游戏目录就是该版本的版本文件夹。</summary>
     public bool VersionIsolation { get; set; }
 
@@ -126,6 +132,12 @@ public sealed class GameVersion
     {
         get => Settings.LiteLoaderVersion;
         set => Settings.LiteLoaderVersion = value;
+    }
+
+    public bool IsModable
+    {
+        get => Settings.IsModable;
+        set => Settings.IsModable = value;
     }
 
     public List<string> CompanionMods => Settings.CompanionMods;

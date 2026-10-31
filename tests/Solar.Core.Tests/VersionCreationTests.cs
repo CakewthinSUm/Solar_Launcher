@@ -65,9 +65,11 @@ public sealed class VersionCreationTests : IDisposable
         Assert.Equal(ModLoader.Vanilla, instance.Loader);
         Assert.True(instance.LoaderInstalled);
         Assert.False(instance.VersionIsolation);
+        Assert.False(instance.IsModable);
 
         var saved = await _repository.GetAsync(instance.Id);
         Assert.NotNull(saved);
+        Assert.False(saved!.IsModable);
 
         Assert.Equal(1, _downloader.Calls);
         Assert.Equal(0, _loaderInstaller.Calls);
@@ -92,6 +94,11 @@ public sealed class VersionCreationTests : IDisposable
         Assert.True(instance.LoaderInstalled);
         Assert.Equal("Fabric 版本", instance.Id);
         Assert.True(instance.VersionIsolation);
+        Assert.True(instance.IsModable);
+
+        // 落盘后重新扫描也能读回来，供列表分组使用
+        var saved = await _repository.GetAsync(instance.Id);
+        Assert.True(saved!.IsModable);
 
         // 自定义文件夹名直接作为加载器的目标版本 id
         Assert.Equal(instance.Id, _loaderInstaller.TargetVersionId);
@@ -155,6 +162,62 @@ public sealed class VersionCreationTests : IDisposable
     }
 
     [Fact]
+    public async Task ExistingVersionNameIsRejectedBeforeDownloading()
+    {
+        // 已有同名版本：加载器安装器原本会直接覆盖它的版本 JSON 与设置
+        var directory = _mcPaths.GetVersionDirectory("Fabric 版本");
+        Directory.CreateDirectory(directory);
+        File.WriteAllText(
+            Path.Combine(directory, "Fabric 版本.json"),
+            """{"id":"Fabric 版本","mainClass":"net.minecraft.client.main.Main"}""");
+
+        var settingsFile = _mcPaths.GetVersionSettingsFile("Fabric 版本");
+        Directory.CreateDirectory(Path.GetDirectoryName(settingsFile)!);
+        File.WriteAllText(settingsFile, """{"DisplayName":"原有版本"}""");
+
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => CreateService().CreateAsync(
+            new VersionCreateRequest(
+                "Fabric 版本",
+                "1.21.4",
+                new ComponentSelection { Loader = ModLoader.Fabric, LoaderVersion = "0.16.9" },
+                true)));
+
+        Assert.Contains("已存在同名版本", error.Message);
+
+        // 检查发生在下载之前，已有版本没有被改动
+        Assert.Equal(0, _downloader.Calls);
+        Assert.Equal(0, _loaderInstaller.Calls);
+        Assert.Equal("原有版本", (await _repository.GetAsync("Fabric 版本"))!.Name);
+    }
+
+    [Fact]
+    public async Task ExistingCustomNameIsRejectedBeforeDownloading()
+    {
+        Directory.CreateDirectory(_mcPaths.GetVersionDirectory("我的原版"));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => CreateService().CreateAsync(
+            new VersionCreateRequest("我的原版", "1.21.4", new ComponentSelection(), false)));
+
+        Assert.Equal(0, _downloader.Calls);
+    }
+
+    [Fact]
+    public async Task ExistingVanillaFolderIsRejectedWhenNameIsEmpty()
+    {
+        // 没有自定义名、也没有附加组件时，版本 id 就是游戏版本号
+        var directory = _mcPaths.GetVersionDirectory("1.21.4");
+        Directory.CreateDirectory(directory);
+        File.WriteAllText(
+            Path.Combine(directory, "1.21.4.json"),
+            """{"id":"1.21.4","mainClass":"net.minecraft.client.main.Main"}""");
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => CreateService().CreateAsync(
+            new VersionCreateRequest("", "1.21.4", new ComponentSelection(), false)));
+
+        Assert.Equal(0, _downloader.Calls);
+    }
+
+    [Fact]
     public async Task OptiFineWithLoaderGoesToModsInsteadOfProfile()
     {
         var instance = await CreateService().CreateAsync(
@@ -173,6 +236,25 @@ public sealed class VersionCreationTests : IDisposable
         Assert.Equal("Forge + OptiFine", instance.Id);
         Assert.Equal("1.20.1_HD_U_I6", instance.OptiFineVersion);
         Assert.Contains("OptiFine_1.20.1_HD_U_I6.jar", instance.CompanionMods);
+    }
+
+    [Fact]
+    public void AddonsWithoutLoaderCountAsModable()
+    {
+        Assert.False(new ComponentSelection().IsModable);
+
+        // 与 PCL 一致：原版 + OptiFine / LiteLoader 也算可装 Mod
+        Assert.True(new ComponentSelection
+        {
+            OptiFine = new OptiFineBuild("1.12.2", "HD_U", "G5", "OptiFine_1.12.2_HD_U_G5.jar", null),
+        }.IsModable);
+
+        Assert.True(new ComponentSelection
+        {
+            LiteLoader = new LiteLoaderBuild("1.12.2", "1.12.2-RC", "com.mumfrey.liteloader.launch.LiteLoaderTweaker", []),
+        }.IsModable);
+
+        Assert.True(new ComponentSelection { Loader = ModLoader.Fabric, LoaderVersion = "0.16.9" }.IsModable);
     }
 
     [Fact]

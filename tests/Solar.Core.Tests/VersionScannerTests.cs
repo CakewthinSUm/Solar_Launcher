@@ -149,6 +149,42 @@ public sealed class VersionScannerTests : IDisposable
         Assert.Equal("a_b_c", VersionScanner.BuildId("a:b*c"));
     }
 
+    [Fact]
+    public void BuildUniqueIdAppendsCounterWhenNameExists()
+    {
+        var taken = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        Assert.Equal("1.21.4", VersionScanner.BuildUniqueId("1.21.4", taken.Contains));
+
+        taken.Add("1.21.4");
+        Assert.Equal("1.21.4#2", VersionScanner.BuildUniqueId("1.21.4", taken.Contains));
+
+        taken.Add("1.21.4#2");
+        Assert.Equal("1.21.4#3", VersionScanner.BuildUniqueId("1.21.4", taken.Contains));
+    }
+
+    [Fact]
+    public void BuildUniqueIdSanitizesBeforeChecking()
+    {
+        var taken = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "a_b" };
+
+        Assert.Equal("a_b#2", VersionScanner.BuildUniqueId("a:b", taken.Contains));
+    }
+
+    [Fact]
+    public void BuildUniqueIdKeepsSuffixWithinLengthLimit()
+    {
+        // 原名已经到 64 字符上限时，追加后缀要先把正文截短，否则截断后又会变回原名
+        var longName = new string('a', 64);
+        var taken = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { longName };
+
+        var unique = VersionScanner.BuildUniqueId(longName, taken.Contains);
+
+        Assert.Equal(64, unique.Length);
+        Assert.EndsWith("#2", unique);
+        Assert.NotEqual(longName, unique);
+    }
+
     private void WriteVersion(string id, string json)
     {
         var directory = Path.Combine(_paths.Versions, id);

@@ -37,7 +37,14 @@ public sealed record ComponentSelection
     public bool HasAnyAddon =>
         OptiFine is not null || LiteLoader is not null || FabricApi is not null || OptiFabric is not null;
 
-    public bool NeedsIsolation => Loader != ModLoader.Vanilla || HasAnyAddon;
+    /// <summary>
+    /// 装完后是否「可装 Mod」：有模组加载器，或带 OptiFine / LiteLoader。
+    /// 与 PCL 的 modable 口径一致，创建版本时会落盘到版本设置。
+    /// </summary>
+    public bool IsModable => Loader != ModLoader.Vanilla || HasAnyAddon;
+
+    /// <summary>需要独立游戏目录的特征，与 <see cref="IsModable"/> 同口径。</summary>
+    public bool NeedsIsolation => IsModable;
 
     /// <summary>界面上的一句话摘要，用于默认版本名。</summary>
     public string BuildDefaultName(string minecraftVersion)

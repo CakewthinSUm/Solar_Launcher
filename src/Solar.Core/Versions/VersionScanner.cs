@@ -235,6 +235,35 @@ public sealed partial class VersionScanner(MinecraftPaths paths, ILogger<Version
         _ => [],
     };
 
+    /// <summary>
+    /// 自动生成的版本名重名时，依次追加 <c>#2</c>、<c>#3</c>…，返回第一个没被占用的 id。
+    /// <paramref name="exists"/> 由调用方按实际版本目录判断。
+    /// </summary>
+    public static string BuildUniqueId(string name, Func<string, bool> exists)
+    {
+        var baseId = BuildId(name);
+        if (!exists(baseId))
+        {
+            return baseId;
+        }
+
+        for (var index = 2; ; index++)
+        {
+            var suffix = "#" + index;
+
+            // 留出后缀的长度，否则 BuildId 截断后候选又会变回原名
+            var stem = baseId.Length + suffix.Length > 64
+                ? baseId[..(64 - suffix.Length)]
+                : baseId;
+
+            var candidate = BuildId(stem + suffix);
+            if (!exists(candidate))
+            {
+                return candidate;
+            }
+        }
+    }
+
     /// <summary>版本号会被用作目录名，去掉 Windows 不允许的字符并限长。</summary>
     public static string BuildId(string versionId)
     {
