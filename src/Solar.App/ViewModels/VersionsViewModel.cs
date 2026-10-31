@@ -129,36 +129,4 @@ public sealed partial class VersionsViewModel : ViewModelBase
         }
     }
 
-    /// <summary>重命名版本：文件夹名、版本 JSON 与 jar 会一起改名，和 PCL 一致。</summary>
-    [RelayCommand]
-    private async Task RenameAsync(GameVersion? version)
-    {
-        if (version is null)
-        {
-            return;
-        }
-
-        var name = await _dialogs.ShowInputAsync(
-            "重命名版本",
-            "新名字会同时作为版本文件夹名。游戏运行中无法重命名。",
-            version.Name);
-
-        if (string.IsNullOrWhiteSpace(name) || string.Equals(name.Trim(), version.Id, StringComparison.Ordinal))
-        {
-            return;
-        }
-
-        try
-        {
-            var renamed = await _repository.RenameAsync(version.Id, name.Trim());
-            await ReloadAsync();
-            SelectedVersion = Versions.FirstOrDefault(v => v.Id == renamed.Id) ?? SelectedVersion;
-            StatusMessage = $"已重命名为“{renamed.Name}”";
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "重命名版本失败");
-            await _dialogs.ShowMessageAsync("重命名失败", ex.Message);
-        }
-    }
 }

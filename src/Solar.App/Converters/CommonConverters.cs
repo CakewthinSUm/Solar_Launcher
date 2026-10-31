@@ -1,5 +1,7 @@
+using System.IO;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Data;
+using Microsoft.UI.Xaml.Media.Imaging;
 
 namespace Solar.App.Converters;
 
@@ -41,6 +43,38 @@ public sealed class InvertBoolConverter : IValueConverter
 
     public object ConvertBack(object value, Type targetType, object parameter, string language) =>
         value is not true;
+}
+
+/// <summary>
+/// 本地图片路径 → ImageSource。路径为空或文件不存在时返回 null，
+/// 由界面上的占位图标顶上。
+/// </summary>
+public sealed class PathToImageSourceConverter : IValueConverter
+{
+    public object? Convert(object value, Type targetType, object parameter, string language)
+    {
+        if (value is not string path || string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+        {
+            return null;
+        }
+
+        try
+        {
+            return new BitmapImage
+            {
+                // 换图标时文件名可能不变（都是 icon.png），不能用缓存里的旧图
+                CreateOptions = BitmapCreateOptions.IgnoreImageCache,
+                UriSource = new Uri(path),
+            };
+        }
+        catch (Exception ex) when (ex is UriFormatException or ArgumentException)
+        {
+            return null;
+        }
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, string language) =>
+        throw new NotSupportedException();
 }
 
 /// <summary>模组加载器的枚举值 → 中文显示名。</summary>

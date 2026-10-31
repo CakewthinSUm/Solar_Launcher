@@ -20,6 +20,7 @@
             <conv:VisibleWhenTextConverter x:Key="VisibleWhenText" />
             <conv:InvertBoolConverter x:Key="InvertBool" />
             <conv:ModLoaderDisplayConverter x:Key="ModLoaderDisplay" />
+            <conv:PathToImageSourceConverter x:Key="PathToImageSource" />
 
             <!--
                 TitleBar 的返回键在禁用时默认会填一块 ControlFillColorDisabledBrush 灰底，

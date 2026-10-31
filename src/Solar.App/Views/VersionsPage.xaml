@@ -84,11 +84,33 @@
                     <DataTemplate x:DataType="models:GameVersion">
                         <Grid ColumnSpacing="12" Padding="0,8">
                             <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
 
-                            <StackPanel Grid.Column="0" Spacing="2">
+                            <!-- 版本图标：自定义过就用图片，否则显示默认的文件夹图标 -->
+                            <Border
+                                Grid.Column="0"
+                                Width="36"
+                                Height="36"
+                                VerticalAlignment="Center"
+                                Background="{ThemeResource ControlFillColorSecondaryBrush}"
+                                CornerRadius="6">
+                                <Grid>
+                                    <FontIcon
+                                        FontSize="18"
+                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                        Glyph="&#xE8B7;"
+                                        Visibility="{x:Bind HasIcon, Converter={StaticResource CollapsedWhenTrue}}" />
+                                    <Image
+                                        Source="{x:Bind IconPath, Converter={StaticResource PathToImageSource}}"
+                                        Stretch="UniformToFill"
+                                        Visibility="{x:Bind HasIcon, Converter={StaticResource VisibleWhenTrue}}" />
+                                </Grid>
+                            </Border>
+
+                            <StackPanel Grid.Column="1" Spacing="2">
                                 <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{x:Bind Name}" />
                                 <TextBlock
                                     Style="{StaticResource CaptionTextBlockStyle}"
@@ -102,12 +124,11 @@
 
                             <!-- 列表项内的操作按钮，点击由页面代码转发给 ViewModel -->
                             <StackPanel
-                                Grid.Column="1"
+                                Grid.Column="2"
                                 VerticalAlignment="Center"
                                 Orientation="Horizontal"
                                 Spacing="8">
                                 <Button Click="SetupVersion_Click" Content="设置" />
-                                <Button Click="RenameVersion_Click" Content="重命名" />
                                 <Button Click="DeleteVersion_Click" Content="删除" />
                             </StackPanel>
                         </Grid>

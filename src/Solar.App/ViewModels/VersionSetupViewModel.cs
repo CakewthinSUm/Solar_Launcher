@@ -8,8 +8,8 @@ using Solar.Core.Versions;
 namespace Solar.App.ViewModels;
 
 /// <summary>
-/// 单个版本的设置页。目前只有「版本隔离」，后续的 Java 路径、内存覆盖也放这里。
-/// 导航参数是版本 Id。
+/// 单个版本的设置页：版本隔离、窗口标题，以及「自定义」里的版本 id 与图标。
+/// 后续的 Java 路径、内存覆盖也放这里。导航参数是版本 Id。
 /// </summary>
 public sealed partial class VersionSetupViewModel : ViewModelBase
 {
@@ -19,6 +19,14 @@ public sealed partial class VersionSetupViewModel : ViewModelBase
     private readonly ILogger<VersionSetupViewModel> _logger;
 
     private GameVersion? _instance;
+
+    /// <summary>用户新挑的图标源文件；保存时才复制进版本文件夹。</summary>
+    private string? _pendingIconSource;
+
+    /// <summary>图标被换过或清掉了；没动过就不去碰磁盘上的图标文件。</summary>
+    private bool _iconChanged;
+
+    private static readonly string[] IconExtensions = [".png", ".jpg", ".jpeg", ".bmp", ".gif", ".ico"];
 
     /// <summary>
     /// 页面被 <c>NavigationCacheMode.Required</c> 缓存复用，切换版本时页面参数变化不会重建页面，
@@ -32,6 +40,10 @@ public sealed partial class VersionSetupViewModel : ViewModelBase
     [ObservableProperty]
     private string _VersionSummary = "";
 
+    /// <summary>「自定义」里的版本 id：就是版本文件夹名，保存时改名。</summary>
+    [ObservableProperty]
+    private string _versionIdInput = "";
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(EffectiveGameDirectory))]
     [NotifyPropertyChangedFor(nameof(IsolationHint))]
@@ -39,6 +51,13 @@ public sealed partial class VersionSetupViewModel : ViewModelBase
 
     [ObservableProperty]
     private string _customWindowTitle = "";
+
+    /// <summary>当前显示的图标路径：可能是已保存的图标，也可能是还没保存的新图片。</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasIcon))]
+    private string? _iconPath;
+
+    public bool HasIcon => !string.IsNullOrEmpty(IconPath);
 
     public VersionSetupViewModel(
         IVersionRepository repository,
@@ -88,8 +107,13 @@ public sealed partial class VersionSetupViewModel : ViewModelBase
 
             VersionName = _instance.Name;
             VersionSummary = $"{_instance.MinecraftVersion} · {_instance.DisplayLoader}";
+            VersionIdInput = _instance.Id;
             VersionIsolation = _instance.VersionIsolation;
             CustomWindowTitle = _instance.CustomWindowTitle ?? "";
+            IconPath = _instance.IconPath;
+
+            _pendingIconSource = null;
+            _iconChanged = false;
         }
         catch (Exception ex)
         {
@@ -102,11 +126,73 @@ public sealed partial class VersionSetupViewModel : ViewModelBase
         }
     }
 
+    /// <summary>挑一张本地图片作为版本图标；保存时才复制进版本文件夹。</summary>
+    [RelayCommand]
+    private async Task PickIconAsync()
+    {
+        if (App.MainWindow is not { } window)
+        {
+            return;
+        }
+
+        try
+        {
+            var picker = new Microsoft.Windows.Storage.Pickers.FileOpenPicker(window.AppWindow.Id)
+            {
+                CommitButtonText = "选择",
+            };
+
+            foreach (var extension in IconExtensions)
+            {
+                picker.FileTypeFilter.Add(extension);
+            }
+
+            var file = await picker.PickSingleFileAsync();
+            if (string.IsNullOrEmpty(file?.Path))
+            {
+                return;
+            }
+
+            _pendingIconSource = file.Path;
+            _iconChanged = true;
+            IconPath = file.Path;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "选择版本图标失败");
+            await _dialogs.ShowMessageAsync("无法打开文件选择器", "请稍后重试。\n\n" + ex.Message);
+        }
+    }
+
+    /// <summary>恢复默认图标，保存后生效。</summary>
+    [RelayCommand]
+    private void ClearIcon()
+    {
+        _pendingIconSource = null;
+        _iconChanged = true;
+        IconPath = null;
+    }
+
     [RelayCommand]
     private async Task SaveAsync()
     {
         if (_instance is null)
         {
+            return;
+        }
+
+        var targetId = VersionIdInput.Trim();
+        if (targetId.Length == 0)
+        {
+            ErrorMessage = "版本 id 不能为空。";
+            return;
+        }
+
+        // id 就是版本文件夹名，先挡掉 Windows 不允许的字符，
+        // 免得 BuildId 悄悄替换成下划线、用户以为名字没生效
+        if (targetId.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 || targetId.EndsWith('.'))
+        {
+            ErrorMessage = "版本 id 不能包含 \\ / : * ? \" < > | 等字符，也不能以点结尾。";
             return;
         }
 
@@ -117,6 +203,19 @@ public sealed partial class VersionSetupViewModel : ViewModelBase
             IsBusy = true;
             ErrorMessage = null;
             StatusMessage = null;
+
+            // 改了 id 就先改名：版本文件夹、版本 JSON 与 jar 一起改，
+            // 之后的隔离复制与图标都落在新文件夹里
+            var renamed = !string.Equals(targetId, _instance.Id, StringComparison.Ordinal);
+            if (renamed)
+            {
+                _instance = await _repository.RenameAsync(_instance.Id, targetId);
+                VersionId = _instance.Id;
+                VersionIdInput = _instance.Id;
+                VersionName = _instance.Name;
+                VersionSummary = $"{_instance.MinecraftVersion} · {_instance.DisplayLoader}";
+                OnPropertyChanged(nameof(EffectiveGameDirectory));
+            }
 
             // 关闭隔离不搬文件：版本文件夹原样留着，下次再开启还在。
             // 开启时才问一次要不要把共享目录的现有内容带过来。
@@ -141,11 +240,22 @@ public sealed partial class VersionSetupViewModel : ViewModelBase
             _instance.VersionIsolation = VersionIsolation;
             // 留空表示不自定义，恢复默认标题
             _instance.CustomWindowTitle = string.IsNullOrWhiteSpace(CustomWindowTitle) ? null : CustomWindowTitle.Trim();
+
+            if (_iconChanged)
+            {
+                await _repository.SetIconAsync(_instance, _pendingIconSource);
+                _pendingIconSource = null;
+                _iconChanged = false;
+                IconPath = _instance.IconPath;
+            }
+
             await _repository.SaveSettingsAsync(_instance);
 
             StatusMessage = copyResult is { } summary
                 ? $"已保存，并复制了 {summary.CopiedFiles} 个文件（跳过已存在的 {summary.SkippedFiles} 个）。"
-                : "设置已保存";
+                : renamed
+                    ? $"已保存，版本 id 改为“{_instance.Id}”。"
+                    : "设置已保存";
         }
         catch (Exception ex)
         {

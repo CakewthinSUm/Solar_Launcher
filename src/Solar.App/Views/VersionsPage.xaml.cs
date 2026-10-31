@@ -53,14 +53,6 @@ public sealed partial class VersionsPage : PageBase
         }
     }
 
-    private void RenameVersion_Click(object sender, RoutedEventArgs e)
-    {
-        if (sender is FrameworkElement { DataContext: GameVersion version })
-        {
-            ViewModel.RenameCommand.Execute(version);
-        }
-    }
-
     private void DeleteVersion_Click(object sender, RoutedEventArgs e)
     {
         if (sender is FrameworkElement { DataContext: GameVersion version })
