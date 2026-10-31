@@ -101,11 +101,21 @@
                         <ProgressBar
                             VerticalAlignment="Center"
                             IsIndeterminate="True" />
-                        <TextBlock
-                            Grid.Column="1"
-                            VerticalAlignment="Center"
-                            Style="{StaticResource CaptionTextBlockStyle}"
-                            Text="{x:Bind ViewModel.LaunchPercentText, Mode=OneWay}" />
+
+                        <!-- 百分比从 0% 变成 100% 时列宽不能跟着变：进度条宽度一变就会被
+                             重新测量，不确定动画会从头播放，看起来像每个阶段都闪一下。
+                             透明占位把列宽固定在最宽的百分比上。 -->
+                        <Grid Grid.Column="1" VerticalAlignment="Center">
+                            <TextBlock
+                                AutomationProperties.AccessibilityView="Raw"
+                                IsHitTestVisible="False"
+                                Opacity="0"
+                                Style="{StaticResource CaptionTextBlockStyle}"
+                                Text="100%" />
+                            <TextBlock
+                                Style="{StaticResource CaptionTextBlockStyle}"
+                                Text="{x:Bind ViewModel.LaunchPercentText, Mode=OneWay}" />
+                        </Grid>
                     </Grid>
 
                     <!-- 当前阶段消息、下载统计与文件名 -->
