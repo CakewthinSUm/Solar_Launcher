@@ -239,6 +239,9 @@ public sealed class ModpackService(
             Loader = plan.Loader,
             LoaderVersion = plan.Loader == ModLoader.Vanilla ? null : plan.LoaderVersion,
 
+            // 整合包里的 Mod 要能被加载，前提是选了模组加载器
+            IsModable = plan.Loader != ModLoader.Vanilla,
+
             // 整合包的游戏目录就是自己的版本文件夹
             VersionIsolation = true,
             LoaderInstalled = true,

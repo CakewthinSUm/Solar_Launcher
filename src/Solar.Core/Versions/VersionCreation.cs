@@ -73,6 +73,20 @@ public sealed class VersionCreationService(
         var minecraftVersion = request.MinecraftVersion;
         var customName = string.IsNullOrWhiteSpace(request.Name) ? null : VersionScanner.BuildId(request.Name.Trim());
 
+        // 重名检查必须在任何下载之前：加载器安装器会直接写进目标文件夹，
+        // 已存在时会被静默覆盖，而不是报错。
+        if (customName is not null)
+        {
+            EnsureVersionIdAvailable(customName);
+        }
+        else if (components.Loader == ModLoader.Vanilla
+                 && components.OptiFine is null
+                 && components.LiteLoader is null)
+        {
+            // 没有自定义名、也没有附加 profile 时，id 就是游戏版本号
+            EnsureVersionIdAvailable(minecraftVersion);
+        }
+
         progress?.Report(new VersionCreateProgress(VersionCreateStage.Preparing, "正在创建版本…"));
 
         // 1. 装出规范 id 的版本文件夹（加载器 / 附加 profile）
@@ -100,6 +114,7 @@ public sealed class VersionCreationService(
             LoaderVersion = components.Loader == ModLoader.Vanilla ? null : components.LoaderVersion,
             OptiFineVersion = components.OptiFine?.Version,
             LiteLoaderVersion = components.LiteLoader?.Version,
+            IsModable = components.IsModable,
             VersionIsolation = request.VersionIsolation,
             LoaderInstalled = true,
         };
@@ -132,6 +147,18 @@ public sealed class VersionCreationService(
             version.Id, version.MinecraftVersion, version.DisplayLoader);
 
         return version;
+    }
+
+    /// <summary>
+    /// 目标 id 已被占用时直接拒绝创建。加载器 / OptiFine / LiteLoader 的规范 id
+    /// 由安装器在运行时决定，创建前无法预知，所以只在能确定 id 时检查。
+    /// </summary>
+    private void EnsureVersionIdAvailable(string versionId)
+    {
+        if (Directory.Exists(paths.GetVersionDirectory(versionId)))
+        {
+            throw new InvalidOperationException($"已存在同名版本 {versionId}。");
+        }
     }
 
     /// <summary>

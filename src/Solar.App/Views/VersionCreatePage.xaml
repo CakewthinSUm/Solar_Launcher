@@ -32,6 +32,12 @@
                 <!-- 版本与名称 -->
                 <Border Style="{StaticResource SolarCardStyle}">
                     <StackPanel Spacing="12">
+                        <InfoBar
+                            IsClosable="False"
+                            IsOpen="{x:Bind ViewModel.HasNameConflict, Mode=OneWay}"
+                            Message="名称已存在"
+                            Severity="Error" />
+
                         <Grid ColumnSpacing="12">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="1*" />
@@ -45,11 +51,27 @@
                                 ItemsSource="{x:Bind ViewModel.Versions, Mode=OneWay}"
                                 SelectedItem="{x:Bind ViewModel.SelectedVersion, Mode=TwoWay}" />
 
-                            <TextBox
-                                Grid.Column="1"
-                                Header="版本名称"
-                                PlaceholderText="留空则按所选组件自动命名"
-                                Text="{x:Bind ViewModel.VersionName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                            <!--
+                                标题单独画：TextBox 自己的边框会被焦点状态覆盖，
+                                重名时叠一层红框，输入过程中也能看到。
+                            -->
+                            <StackPanel Grid.Column="1" Spacing="8">
+                                <TextBlock
+                                    Style="{StaticResource BodyTextBlockStyle}"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="版本名称" />
+                                <Grid>
+                                    <TextBox
+                                        PlaceholderText="留空则按所选组件自动命名"
+                                        Text="{x:Bind ViewModel.VersionName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                    <Border
+                                        BorderBrush="{ThemeResource SystemFillColorCriticalBrush}"
+                                        BorderThickness="2"
+                                        CornerRadius="4"
+                                        IsHitTestVisible="False"
+                                        Visibility="{x:Bind ViewModel.HasNameConflict, Mode=OneWay, Converter={StaticResource VisibleWhenTrue}}" />
+                                </Grid>
+                            </StackPanel>
                         </Grid>
 
                         <TextBlock
@@ -227,7 +249,7 @@
                 <Button
                     MinWidth="180"
                     Command="{x:Bind ViewModel.CreateCommand}"
-                    IsEnabled="{x:Bind ViewModel.IsCreating, Mode=OneWay, Converter={StaticResource InvertBool}}"
+                    IsEnabled="{x:Bind ViewModel.CanCreate, Mode=OneWay}"
                     Style="{StaticResource AccentButtonStyle}">
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <FontIcon FontSize="16" Glyph="&#xE896;" />

@@ -66,6 +66,7 @@ public sealed partial class VersionCreateViewModel : ViewModelBase
     private string _isolationHint = "";
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanCreate))]
     private bool _isCreating;
 
     [ObservableProperty]
@@ -140,6 +141,15 @@ public sealed partial class VersionCreateViewModel : ViewModelBase
     public bool HasWarningTip => !string.IsNullOrWhiteSpace(WarningTip);
 
     public bool HasInfoTip => !string.IsNullOrWhiteSpace(InfoTip);
+
+    /// <summary>
+    /// 版本名称对应的文件夹已经存在。名称随输入实时变化，每次改动都会重算，
+    /// 页面上据此禁用「开始下载」并给出提示。
+    /// </summary>
+    public bool HasNameConflict => FindExistingVersionId() is not null;
+
+    /// <summary>正在创建或有重名时不能开始下载。</summary>
+    public bool CanCreate => !IsCreating && !HasNameConflict;
 
     /// <summary>当前选中的组件汇总，安装流程直接用这个。</summary>
     public ComponentSelection Selection { get; private set; } = new();
@@ -687,7 +697,10 @@ public sealed partial class VersionCreateViewModel : ViewModelBase
 
             if (string.IsNullOrWhiteSpace(VersionName) || _autoName)
             {
-                VersionName = Selection.BuildDefaultName(MinecraftVersion);
+                // 自动名撞上已有版本时依次试 #2、#3，不让用户手动去改
+                VersionName = VersionScanner.BuildUniqueId(
+                    Selection.BuildDefaultName(MinecraftVersion),
+                    id => Directory.Exists(_gameDirectories.GetVersionDirectory(id)));
                 _autoName = true;
             }
 
@@ -696,6 +709,9 @@ public sealed partial class VersionCreateViewModel : ViewModelBase
                 // 所有档位都实时跟随默认值：切了加载器或版本后，建议值可能已经变了
                 ApplyIsolationDefault();
             }
+
+            // 组件的选择会影响留空名称时最终用的 id
+            NotifyNameConflictChanged();
         }
         finally
         {
@@ -773,7 +789,11 @@ public sealed partial class VersionCreateViewModel : ViewModelBase
         {
             _autoName = false;
         }
+
+        NotifyNameConflictChanged();
     }
+
+    partial void OnMinecraftVersionChanged(string value) => NotifyNameConflictChanged();
 
     /// <summary>
     /// 由页面在隔离开关变化时调用，避免默认值把它覆盖回去。
@@ -787,11 +807,54 @@ public sealed partial class VersionCreateViewModel : ViewModelBase
         }
     }
 
+    /// <summary>
+    /// 按当前输入推算创建后会用的版本 id，返回已经被占用的那个。
+    /// 与服务层一致：名称留空且带加载器 / 附加 profile 时，id 由安装器决定，这里无法预知。
+    /// </summary>
+    private string? FindExistingVersionId()
+    {
+        var id = ResolveTargetVersionId();
+        if (string.IsNullOrWhiteSpace(id))
+        {
+            return null;
+        }
+
+        return Directory.Exists(_gameDirectories.GetVersionDirectory(id)) ? id : null;
+    }
+
+    private string? ResolveTargetVersionId()
+    {
+        if (!string.IsNullOrWhiteSpace(VersionName))
+        {
+            return VersionScanner.BuildId(VersionName.Trim());
+        }
+
+        // 名称留空：只有纯原版能确定 id 就是游戏版本号
+        return Selection.Loader == ModLoader.Vanilla
+               && Selection.OptiFine is null
+               && Selection.LiteLoader is null
+            ? MinecraftVersion
+            : null;
+    }
+
+    private void NotifyNameConflictChanged()
+    {
+        OnPropertyChanged(nameof(HasNameConflict));
+        OnPropertyChanged(nameof(CanCreate));
+    }
+
     [RelayCommand]
     private async Task CreateAsync()
     {
         if (IsCreating || string.IsNullOrEmpty(MinecraftVersion))
         {
+            return;
+        }
+
+        // 按钮已经会禁用，这里再挡一次：名称可能在按钮状态刷新前就被改掉
+        if (HasNameConflict)
+        {
+            ErrorMessage = "版本名称已存在，请换一个名称。";
             return;
         }
 
@@ -861,6 +924,9 @@ public sealed partial class VersionCreateViewModel : ViewModelBase
             _taskbar.Reset();
             _createCts?.Dispose();
             _createCts = null;
+
+            // 中途失败时版本文件夹可能已经建出来了，重算一次避免再次点击时撞名
+            NotifyNameConflictChanged();
         }
     }
 
