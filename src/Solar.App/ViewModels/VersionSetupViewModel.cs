@@ -9,18 +9,30 @@ namespace Solar.App.ViewModels;
 
 /// <summary>
 /// 单个版本的设置页：版本隔离、窗口标题，以及「自定义」里的版本 id 与图标。
-/// 后续的 Java 路径、内存覆盖也放这里。导航参数是版本 Id。
+/// 页面上的改动会自动保存，不需要再点保存按钮。导航参数是版本 Id。
 /// </summary>
 public sealed partial class VersionSetupViewModel : ViewModelBase
 {
+    /// <summary>输入停顿这么久之后才写盘，免得逐字符输入时每敲一下都去改一次文件夹名。</summary>
+    private static readonly TimeSpan AutoSaveDelay = TimeSpan.FromMilliseconds(600);
+
     private readonly IVersionRepository _repository;
     private readonly MinecraftPaths _gameDirectories;
     private readonly IDialogService _dialogs;
     private readonly ILogger<VersionSetupViewModel> _logger;
 
+    /// <summary>保存与载入串行执行，避免改名和写设置互相穿插。</summary>
+    private readonly SemaphoreSlim _saveGate = new(1, 1);
+
+    /// <summary>载入或改名后同步界面时不要再触发一次自动保存。</summary>
+    private bool _suppressAutoSave;
+
+    /// <summary>防抖中的自动保存；新的改动会取消上一次。</summary>
+    private CancellationTokenSource? _autoSaveCts;
+
     private GameVersion? _instance;
 
-    /// <summary>用户新挑的图标源文件；保存时才复制进版本文件夹。</summary>
+    /// <summary>用户新挑的图标源文件；自动保存时才复制进版本文件夹。</summary>
     private string? _pendingIconSource;
 
     /// <summary>图标被换过或清掉了；没动过就不去碰磁盘上的图标文件。</summary>
@@ -40,7 +52,7 @@ public sealed partial class VersionSetupViewModel : ViewModelBase
     [ObservableProperty]
     private string _VersionSummary = "";
 
-    /// <summary>「自定义」里的版本 id：就是版本文件夹名，保存时改名。</summary>
+    /// <summary>「自定义」里的版本 id：就是版本文件夹名，自动保存时改名。</summary>
     [ObservableProperty]
     private string _versionIdInput = "";
 
@@ -83,17 +95,33 @@ public sealed partial class VersionSetupViewModel : ViewModelBase
         ? "游戏目录就是该版本的文件夹，存档与模组都在里面。"
         : "与其它未开启隔离的版本共用同一份存档、模组与配置，多个带 Mod 的版本可能互相冲突。";
 
+    /// <summary>开关这类一次性改动立刻写盘，不必等防抖。</summary>
+    partial void OnVersionIsolationChanged(bool value) => ScheduleAutoSave(immediate: true);
+
+    partial void OnCustomWindowTitleChanged(string value) => ScheduleAutoSave();
+
+    partial void OnVersionIdInputChanged(string value) => ScheduleAutoSave();
+
     public override async Task OnNavigatedToAsync(object? parameter)
     {
+        // 上一个版本的改动可能还在防抖等待里，先写盘再换掉 _instance
+        await FlushPendingSaveAsync();
+
         var versionId = parameter as string ?? VersionId;
         if (string.IsNullOrEmpty(versionId))
         {
+            // 没有目标版本时别让后续输入还写回上一个版本
+            _instance = null;
             ErrorMessage = "没有指定要设置的版本。";
             return;
         }
 
+        await _saveGate.WaitAsync();
         try
         {
+            _suppressAutoSave = true;
+            _instance = null;
+
             IsBusy = true;
             ErrorMessage = null;
             StatusMessage = null;
@@ -122,11 +150,26 @@ public sealed partial class VersionSetupViewModel : ViewModelBase
         }
         finally
         {
+            _suppressAutoSave = false;
             IsBusy = false;
+            _saveGate.Release();
         }
     }
 
-    /// <summary>挑一张本地图片作为版本图标；保存时才复制进版本文件夹。</summary>
+    /// <summary>离开页面时把还在防抖等待里的改动立刻写掉。</summary>
+    public async Task FlushPendingSaveAsync()
+    {
+        if (_autoSaveCts is null)
+        {
+            return;
+        }
+
+        _autoSaveCts.Cancel();
+        _autoSaveCts = null;
+        await SaveAsync();
+    }
+
+    /// <summary>挑一张本地图片作为版本图标；挑完立刻保存。</summary>
     [RelayCommand]
     private async Task PickIconAsync()
     {
@@ -156,6 +199,7 @@ public sealed partial class VersionSetupViewModel : ViewModelBase
             _pendingIconSource = file.Path;
             _iconChanged = true;
             IconPath = file.Path;
+            ScheduleAutoSave(immediate: true);
         }
         catch (Exception ex)
         {
@@ -164,19 +208,81 @@ public sealed partial class VersionSetupViewModel : ViewModelBase
         }
     }
 
-    /// <summary>恢复默认图标，保存后生效。</summary>
+    /// <summary>恢复默认图标，立刻保存。</summary>
     [RelayCommand]
     private void ClearIcon()
     {
         _pendingIconSource = null;
         _iconChanged = true;
         IconPath = null;
+        ScheduleAutoSave(immediate: true);
     }
 
-    [RelayCommand]
+    /// <summary>
+    /// 安排一次自动保存：开关、图标这类一次性改动立刻写盘，
+    /// 输入框里的文字则等用户停手后再写，避免每敲一个字符就改一次文件夹名。
+    /// </summary>
+    private void ScheduleAutoSave(bool immediate = false)
+    {
+        if (_suppressAutoSave || _instance is null)
+        {
+            return;
+        }
+
+        _autoSaveCts?.Cancel();
+        _autoSaveCts = null;
+
+        if (immediate)
+        {
+            _ = SaveAsync();
+            return;
+        }
+
+        var cts = new CancellationTokenSource();
+        _autoSaveCts = cts;
+        _ = SaveAfterDelayAsync(cts);
+    }
+
+    private async Task SaveAfterDelayAsync(CancellationTokenSource cts)
+    {
+        try
+        {
+            await Task.Delay(AutoSaveDelay, cts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        finally
+        {
+            if (ReferenceEquals(_autoSaveCts, cts))
+            {
+                _autoSaveCts = null;
+            }
+
+            cts.Dispose();
+        }
+
+        await SaveAsync();
+    }
+
     private async Task SaveAsync()
     {
-        if (_instance is null)
+        await _saveGate.WaitAsync();
+        try
+        {
+            await SaveCoreAsync();
+        }
+        finally
+        {
+            _saveGate.Release();
+        }
+    }
+
+    private async Task SaveCoreAsync()
+    {
+        var instance = _instance;
+        if (instance is null)
         {
             return;
         }
@@ -196,24 +302,35 @@ public sealed partial class VersionSetupViewModel : ViewModelBase
             return;
         }
 
-        var wasIsolated = _instance.VersionIsolation;
+        var wasIsolated = instance.VersionIsolation;
 
         try
         {
             IsBusy = true;
             ErrorMessage = null;
-            StatusMessage = null;
 
             // 改了 id 就先改名：版本文件夹、版本 JSON 与 jar 一起改，
             // 之后的隔离复制与图标都落在新文件夹里
-            var renamed = !string.Equals(targetId, _instance.Id, StringComparison.Ordinal);
+            var renamed = !string.Equals(targetId, instance.Id, StringComparison.Ordinal);
             if (renamed)
             {
-                _instance = await _repository.RenameAsync(_instance.Id, targetId);
-                VersionId = _instance.Id;
-                VersionIdInput = _instance.Id;
-                VersionName = _instance.Name;
-                VersionSummary = $"{_instance.MinecraftVersion} · {_instance.DisplayLoader}";
+                instance = await _repository.RenameAsync(instance.Id, targetId);
+                _instance = instance;
+                VersionId = instance.Id;
+
+                // 回写规范化后的 id 不该再触发一次保存
+                _suppressAutoSave = true;
+                try
+                {
+                    VersionIdInput = instance.Id;
+                    VersionName = instance.Name;
+                    VersionSummary = $"{instance.MinecraftVersion} · {instance.DisplayLoader}";
+                }
+                finally
+                {
+                    _suppressAutoSave = false;
+                }
+
                 OnPropertyChanged(nameof(EffectiveGameDirectory));
             }
 
@@ -233,34 +350,35 @@ public sealed partial class VersionSetupViewModel : ViewModelBase
                     // 可能有上千个文件，放到后台线程避免卡住界面
                     copyResult = await Task.Run(() => VersionContent.CopySharedContent(
                         _gameDirectories.MinecraftRoot,
-                        _gameDirectories.GetVersionDirectory(_instance.Id)));
+                        _gameDirectories.GetVersionDirectory(instance.Id)));
                 }
             }
 
-            _instance.VersionIsolation = VersionIsolation;
+            instance.VersionIsolation = VersionIsolation;
             // 留空表示不自定义，恢复默认标题
-            _instance.CustomWindowTitle = string.IsNullOrWhiteSpace(CustomWindowTitle) ? null : CustomWindowTitle.Trim();
+            instance.CustomWindowTitle = string.IsNullOrWhiteSpace(CustomWindowTitle) ? null : CustomWindowTitle.Trim();
 
             if (_iconChanged)
             {
-                await _repository.SetIconAsync(_instance, _pendingIconSource);
+                await _repository.SetIconAsync(instance, _pendingIconSource);
                 _pendingIconSource = null;
                 _iconChanged = false;
-                IconPath = _instance.IconPath;
+                IconPath = instance.IconPath;
             }
 
-            await _repository.SaveSettingsAsync(_instance);
+            await _repository.SaveSettingsAsync(instance);
 
             StatusMessage = copyResult is { } summary
-                ? $"已保存，并复制了 {summary.CopiedFiles} 个文件（跳过已存在的 {summary.SkippedFiles} 个）。"
+                ? $"已自动保存，并复制了 {summary.CopiedFiles} 个文件（跳过已存在的 {summary.SkippedFiles} 个）。"
                 : renamed
-                    ? $"已保存，版本 id 改为“{_instance.Id}”。"
-                    : "设置已保存";
+                    ? $"已自动保存，版本 id 改为“{instance.Id}”。"
+                    : "已自动保存";
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "保存版本设置失败");
-            await _dialogs.ShowMessageAsync("保存失败", ex.Message);
+            _logger.LogError(ex, "自动保存版本设置失败");
+            // 自动保存在后台进行，用页面上的错误条提示，不弹对话框打断输入
+            ErrorMessage = "自动保存失败：" + ex.Message;
         }
         finally
         {
