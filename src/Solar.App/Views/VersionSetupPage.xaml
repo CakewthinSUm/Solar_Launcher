@@ -80,7 +80,7 @@
                         <TextBlock
                             Style="{StaticResource CaptionTextBlockStyle}"
                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                            Text="修改游戏窗口左上角显示的标题，保存后下次启动生效。"
+                            Text="修改游戏窗口左上角显示的标题，修改后自动保存，下次启动生效。"
                             TextWrapping="Wrap" />
                     </StackPanel>
                 </Border>
@@ -101,7 +101,7 @@
                             <TextBlock
                                 Style="{StaticResource CaptionTextBlockStyle}"
                                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                Text="版本 id 就是版本文件夹名。保存后文件夹、版本 JSON 与 jar 会一起改名，游戏运行中无法修改。"
+                                Text="版本 id 就是版本文件夹名。修改后自动保存，文件夹、版本 JSON 与 jar 会一起改名，游戏运行中无法修改。"
                                 TextWrapping="Wrap" />
                         </StackPanel>
 
@@ -140,7 +140,7 @@
                                 <TextBlock
                                     Style="{StaticResource CaptionTextBlockStyle}"
                                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                    Text="PNG / JPG / BMP / GIF / ICO，保存后显示在版本列表里。"
+                                    Text="PNG / JPG / BMP / GIF / ICO，选择后自动保存，显示在版本列表里。"
                                     TextWrapping="Wrap" />
                             </StackPanel>
                         </Grid>
@@ -153,12 +153,8 @@
                 </Border>
             </StackPanel>
 
-            <!-- 保存 -->
+            <!-- 自动保存状态：页面上的改动会自己写盘，这里只显示进度与结果 -->
             <StackPanel Orientation="Horizontal" Spacing="12">
-                <Button
-                    Command="{x:Bind ViewModel.SaveCommand}"
-                    Content="保存"
-                    Style="{StaticResource AccentButtonStyle}" />
                 <ProgressRing
                     Width="20"
                     Height="20"

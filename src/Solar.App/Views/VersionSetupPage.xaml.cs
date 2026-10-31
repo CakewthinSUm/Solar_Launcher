@@ -24,4 +24,11 @@ public sealed partial class VersionSetupPage : PageBase
         ViewModel.VersionId = e.Parameter as string;
         base.OnNavigatedTo(e);
     }
+
+    /// <summary>离开页面时，把还在防抖等待里的自动保存立刻写掉。</summary>
+    protected override void OnNavigatedFrom(NavigationEventArgs e)
+    {
+        _ = ViewModel.FlushPendingSaveAsync();
+        base.OnNavigatedFrom(e);
+    }
 }
