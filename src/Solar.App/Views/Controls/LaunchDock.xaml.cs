@@ -122,19 +122,26 @@ public sealed partial class LaunchDock : UserControl
         var buttonHeight = LaunchButton.ActualHeight > 0 ? LaunchButton.ActualHeight : 40;
         var targetWidth = DockRoot.ActualWidth;
 
+        // 内容按展开后的最终宽度固定：ApplyOpenState 里 Surface 的内宽要扣掉边框，
+        // 用同样的宽度量，卡片落位时内容不会被重新测量——进度条的不确定动画
+        // 一旦被重新测量就会从头播放，展开完成时看起来像刷新了一次。
+        var contentWidth = Math.Max(
+            targetWidth - Surface.BorderThickness.Left - Surface.BorderThickness.Right,
+            0);
+
         // 固定内容尺寸后再展开，避免每帧重排文字
         Surface.Opacity = 1;
         CardContent.Visibility = Visibility.Visible;
         CardContent.Opacity = 0;
         CardContent.IsHitTestVisible = false;
-        CardContent.Width = targetWidth;
+        CardContent.Width = contentWidth;
         CardContent.Height = double.NaN;
         CardContent.HorizontalAlignment = HorizontalAlignment.Right;
         CardContent.VerticalAlignment = VerticalAlignment.Bottom;
-        CardContent.Measure(new Windows.Foundation.Size(targetWidth, double.PositiveInfinity));
+        CardContent.Measure(new Windows.Foundation.Size(contentWidth, double.PositiveInfinity));
         var targetHeight = Math.Max(CardContent.DesiredSize.Height, buttonHeight);
 
-        CardContent.Width = targetWidth;
+        CardContent.Width = contentWidth;
         CardContent.Height = targetHeight;
         Surface.Width = buttonWidth;
         Surface.Height = buttonHeight;
